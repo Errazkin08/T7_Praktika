@@ -4,5 +4,5 @@ Taldekideak:
 - Aimar Errazkin Peña
 ---
 Erabiliko ditugun teknologiak:
-Front-End: **Svelte**
-Back-End: **Flask**
+- Front-End: **Svelte**
+- Back-End: **Flask**

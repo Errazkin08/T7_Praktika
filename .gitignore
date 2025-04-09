@@ -1,0 +1,105 @@
+### Python (Flask Backend) ###
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.venv
+venv/
+ENV/
+instance/
+.webassets-cache
+.flask_session/
+
+### Svelte/Node.js (Frontend) ###
+node_modules/
+.svelte-kit/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.DS_Store
+.env
+.env.*
+!.env.example
+/build
+/public/build
+.output
+.vercel
+.netlify
+
+### Docker ###
+.docker/
+docker-compose.override.yml
+
+### IDE/Editor specific ###
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+*.iws
+out/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+### OS specific ###
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+### Logs and databases ###
+*.log
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+### API Keys and secrets ###
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+secrets.json

@@ -1,22 +1,10 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
-  plugins: [
-    react()
-  ],
-  resolve: {
-    alias: {
-      '/src': path.resolve(__dirname, 'src')
-    }
-  },
-  build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html')
-      }
-    }
+  plugins: [svelte()],
+  server: {
+    host: '0.0.0.0',
+    port: 80
   }
-})
+});

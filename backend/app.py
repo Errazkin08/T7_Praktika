@@ -19,6 +19,14 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
+@app.route('/api/hello', methods=['GET'])
+def hello():
+    return jsonify({"message": "Hello from Flask!"})
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok"})
+
 # Helper function to convert ObjectId to string
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):

@@ -18,6 +18,7 @@
     <div class="nav-links">
       <a href="/" on:click|preventDefault={() => navigate('/')}>Home</a>
       <a href="/proba" on:click|preventDefault={() => navigate('/proba')}>Proba</a>
+      <a href="/map" on:click|preventDefault={() => navigate('/map')}>Map</a>
       
       {#if $user}
         <!-- Show these links when user is logged in -->

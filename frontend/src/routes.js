@@ -3,6 +3,7 @@ import Proba from './pages/Proba.svelte';
 import NotFound from './pages/NotFound.svelte';
 import Login from './pages/Login.svelte';
 import Register from './pages/Register.svelte';
+import Map from './pages/Map.svelte';
 
 // Define routes
 const routes = {
@@ -10,6 +11,7 @@ const routes = {
   '/proba': Proba,
   '/login': Login,
   '/register': Register,
+  '/map': Map,
   '*': NotFound
 };
 

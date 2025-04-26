@@ -130,8 +130,8 @@ edo
 
 - **Metodoa:** GET
 - **Bidea:** `/api/users/`
-- **Deskribapena:** Erabiltzaile baten informazioa itzultzen du
-- **Inplementazioa:** Ez
+- **Deskribapena:** Erabiltzaile guztien informazioa itzultzen du
+- **Inplementazioa:** Bai
 - **Erantzuna (arrakastarekin):**
 ```json
 [
@@ -147,6 +147,19 @@ edo
 }
 ]
 ```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "message": "No users found"
+}
+```
+edo
+```json
+{
+    "error": "Internal server error"
+}
+```
+
 #### Erabiltzaile baten puntuazioa eguneratu
 
 - **Metodoa:** PUT
@@ -175,6 +188,43 @@ edo
 ```json
 {
     "error": "Score is required"
+}
+```
+
+#### Saioa amaitu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/logout`
+- **Deskribapena:** Erabiltzailearen saioa ixten du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Logged out successfully"
+}
+```
+
+#### Saioaren egoera egiaztatu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/session`
+- **Deskribapena:** Egiaztatu erabiltzailea saioan dagoen ala ez
+- **Inplementazioa:** Bai
+- **Erantzuna (saio aktiboarekin):**
+```json
+{
+    "authenticated": true,
+    "user": {
+        "username": "erabiltzailea",
+        "score": 0,
+        "level": 1
+    }
+}
+```
+- **Erantzuna (saiorik gabe):**
+```json
+{
+    "authenticated": false
 }
 ```
 

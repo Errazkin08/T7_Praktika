@@ -5,8 +5,8 @@ WORKDIR /app
 # Copy all application files
 COPY app.py database.py routes.py IAProba.py ./
 
-# Install all necessary dependencies (added flask_cors)
-RUN pip install flask pymongo groq requests flask-cors
+# Install all necessary dependencies (added flask-session)
+RUN pip install flask pymongo groq requests flask-cors flask-session
 
 # Environment variables
 ENV MONGO_URI=mongodb://mongodb:27017/

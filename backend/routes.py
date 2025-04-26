@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from database import add_user, find_user, update_user_score
+from flask import Blueprint, request, jsonify, session
+from database import add_user, find_user, update_user_score, get_all_users
 import hashlib
 
 routes_blueprint = Blueprint('routes', __name__)
@@ -48,6 +48,10 @@ def login():
     if password_hash != user['password']:
         return jsonify({"error": "Invalid username or password"}), 401
     
+    # Store user in session
+    session['username'] = user['username']
+    session['user_id'] = str(user.get('_id', ''))
+    
     return jsonify({
         "message": "Login successful",
         "user": {
@@ -56,6 +60,27 @@ def login():
             "level": user['level']
         }
     }), 200
+
+@routes_blueprint.route('/api/logout', methods=['POST'])
+def logout():
+    # Clear the session
+    session.clear()
+    return jsonify({"message": "Logged out successfully"}), 200
+
+@routes_blueprint.route('/api/session', methods=['GET'])
+def check_session():
+    if 'username' in session:
+        user = find_user(session['username'])
+        if user:
+            return jsonify({
+                "authenticated": True,
+                "user": {
+                    "username": user['username'],
+                    "score": user['score'],
+                    "level": user['level']
+                }
+            }), 200
+    return jsonify({"authenticated": False}), 401
 
 @routes_blueprint.route('/api/users/<username>/score', methods=['PUT'])
 def update_score(username):
@@ -92,8 +117,8 @@ def get_all_users():
     try:
         # Query all users from the database
         users = get_all_users()
-        if not users:
+        if not users or len(users) == 0:
             return jsonify({"message": "No users found"}), 404
         return jsonify(users), 200
     except Exception as e:
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500

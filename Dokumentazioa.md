@@ -126,6 +126,27 @@ edo
 }
 ```
 
+#### Erabiltzaile guztiak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/users/`
+- **Deskribapena:** Erabiltzaile baten informazioa itzultzen du
+- **Inplementazioa:** Ez
+- **Erantzuna (arrakastarekin):**
+```json
+[
+{
+    "username": "erabiltzailea",
+    "score": 0,
+    "level": 1
+},
+{
+    "username": "erabiltzailea2",
+    "score": 0,
+    "level": 1
+}
+]
+```
 #### Erabiltzaile baten puntuazioa eguneratu
 
 - **Metodoa:** PUT

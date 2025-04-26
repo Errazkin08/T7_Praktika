@@ -86,3 +86,14 @@ def get_user(username):
         "score": user['score'],
         "level": user['level']
     }), 200
+
+@routes_blueprint.route('/api/users/', methods=['GET'])
+def get_all_users():
+    try:
+        # Query all users from the database
+        users = get_all_users()
+        if not users:
+            return jsonify({"message": "No users found"}), 404
+        return jsonify(users), 200
+    except Exception as e:
+        return jsonify({"error": "Internal server error"}), 500

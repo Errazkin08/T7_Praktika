@@ -64,3 +64,10 @@ def update_user_score(username, score):
         {"username": username},
         {"$set": {"score": score}}
     )
+
+def get_all_users():
+    """
+    Get all users from the database
+    """
+    db = get_db()
+    return list(db.users.find({}, {'_id': 0, 'password': 0}))

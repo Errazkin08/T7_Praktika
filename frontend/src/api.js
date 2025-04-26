@@ -61,6 +61,32 @@ async function apiTextRequest(endpoint, options = {}) {
     }
 }
 
+// Authentication functions
+export async function registerUser(username, email, password) {
+    return apiRequest('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+            username,
+            email,
+            password
+        })
+    });
+}
+
+export async function loginUser(username, password) {
+    return apiRequest('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({
+            username,
+            password
+        })
+    });
+}
+
+export async function getUserProfile(username) {
+    return apiRequest(`/api/users/${username}`);
+}
+
 // API endpoints as functions
 export async function getHello() {
     // Using apiTextRequest for text response from /proba
@@ -75,4 +101,7 @@ export async function getHealth() {
 export default {
     getHello,
     getHealth,
+    registerUser,
+    loginUser,
+    getUserProfile
 };

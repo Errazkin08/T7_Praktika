@@ -1,9 +1,15 @@
 <script>
-  import { currentRoute, navigate } from './router.js'; // Updated import path
+  import { currentRoute, navigate } from './router.js';
   import routes from './routes';
+  import { user, clearUser } from './stores/auth.js';
   
   // Get the component for the current route
   $: component = routes[$currentRoute] || routes['*'];
+  
+  function handleLogout() {
+    clearUser();
+    navigate('/');
+  }
 </script>
 
 <header>
@@ -12,8 +18,17 @@
     <div class="nav-links">
       <a href="/" on:click|preventDefault={() => navigate('/')}>Home</a>
       <a href="/proba" on:click|preventDefault={() => navigate('/proba')}>Proba</a>
-      <a href="/login" on:click|preventDefault={() => navigate('/login')}>Login</a>
-      <a href="/register" on:click|preventDefault={() => navigate('/register')}>Register</a>
+      
+      {#if $user}
+        <!-- Show these links when user is logged in -->
+        <span class="user-welcome">Welcome, {$user.username}</span>
+        <a href="/profile" on:click|preventDefault={() => navigate('/profile')}>Profile</a>
+        <a href="/" on:click|preventDefault={handleLogout}>Logout</a>
+      {:else}
+        <!-- Show these links when user is logged out -->
+        <a href="/login" on:click|preventDefault={() => navigate('/login')}>Login</a>
+        <a href="/register" on:click|preventDefault={() => navigate('/register')}>Register</a>
+      {/if}
     </div>
   </nav>
 </header>
@@ -48,6 +63,11 @@
     color: white;
     margin-left: 1rem;
     text-decoration: none;
+  }
+  
+  .user-welcome {
+    color: #ffcc00;
+    margin-left: 1rem;
   }
   
   main {

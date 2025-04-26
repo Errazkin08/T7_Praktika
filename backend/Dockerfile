@@ -2,11 +2,19 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy all application files
+COPY app.py database.py routes.py IAProba.py ./
 
-COPY . .
+# Install all necessary dependencies (added flask_cors)
+RUN pip install flask pymongo groq requests flask-cors
 
+# Environment variables
+ENV MONGO_URI=mongodb://mongodb:27017/
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=development
+
+# Expose port
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+# Run the Flask application
+CMD ["python", "app.py"]

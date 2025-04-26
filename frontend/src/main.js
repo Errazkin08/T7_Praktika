@@ -1,6 +1,6 @@
 import App from './App.svelte';
 import './app.css';
-import { initRouter } from './lib/router.js';
+import { initRouter } from './router.js'; // Updated import path
 
 // Initialize the router
 initRouter();

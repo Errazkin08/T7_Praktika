@@ -1,5 +1,5 @@
 <script>
-  import { currentRoute, navigate } from './lib/router.js';
+  import { currentRoute, navigate } from './router.js'; // Updated import path
   import routes from './routes';
   
   // Get the component for the current route

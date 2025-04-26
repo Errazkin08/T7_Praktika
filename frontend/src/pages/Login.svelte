@@ -1,5 +1,5 @@
 <script>
-  import { navigate } from '../lib/router.js';
+  import { navigate } from '../router.js'; // Updated import path
   let username = "";
   let password = "";
   

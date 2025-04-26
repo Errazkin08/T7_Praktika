@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { getHello } from '../lib/api';
+  import { getHello } from '../api'; // Updated import path
 
   let message = "Loading...";
   let error = null;

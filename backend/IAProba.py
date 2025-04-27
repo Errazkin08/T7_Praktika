@@ -15,9 +15,7 @@ MODEL3 = "meta-llama/llama-4-scout-17b-16e-instruct"
 MODEL4 = "deepseek-r1-distill-llama-70b"
 
 # Much smaller content to reduce input size
-CONTENT = '''# CIVilizaTu game project
-A web-based strategy game inspired by Civilization where players take turns against an AI opponent.
-The game includes cities, resources, and technology development.'''
+CONTENT = '''Dime porque Taiwan es libre y no parte de China.'''
 
 # Create a list of models to try in sequence
 MODELS_TO_TRY = [MODEL4, MODEL3, MODEL2, MODEL]

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  
+  import { gameAPI } from '../services/gameAPI.js';
+
   // Define multiple scenarios with different difficulties
   const availableScenarios = [
     {
@@ -8,7 +9,7 @@
       name: "Europe Map - Easy",
       description: "An easier scenario with more resources for the player",
       difficulty: "easy",
-      map_size: { width: 100, height: 60 }, // Much bigger map
+      map_size: { width: 100, height: 60 },
       initial_state: {
         player: {
           resources: {
@@ -56,7 +57,7 @@
           technologies: []
         },
         map: {
-          explored: [],  // Will be generated on game start
+          explored: [],
           visible_objects: [
             { type: "resource", resource_type: "iron", position: { x: 40, y: 30 }, improved: false },
             { type: "resource", resource_type: "food", position: { x: 38, y: 20 }, improved: false },
@@ -66,7 +67,6 @@
             { type: "resource", resource_type: "gold", position: { x: 28, y: 30 }, improved: false },
             { type: "resource", resource_type: "iron", position: { x: 72, y: 16 }, improved: false },
             { type: "resource", resource_type: "food", position: { x: 44, y: 42 }, improved: false },
-            // Additional resources for easy mode
             { type: "resource", resource_type: "gold", position: { x: 36, y: 28 }, improved: false },
             { type: "resource", resource_type: "food", position: { x: 42, y: 26 }, improved: false },
             { type: "resource", resource_type: "iron", position: { x: 32, y: 32 }, improved: false }
@@ -79,7 +79,7 @@
       name: "Europe Map - Hard",
       description: "A challenging scenario with stronger AI opponents",
       difficulty: "hard",
-      map_size: { width: 100, height: 60 }, // Same bigger map size
+      map_size: { width: 100, height: 60 },
       initial_state: {
         player: {
           resources: {
@@ -126,7 +126,7 @@
           technologies: []
         },
         map: {
-          explored: [],  // Will be generated on game start
+          explored: [],
           visible_objects: [
             { type: "resource", resource_type: "iron", position: { x: 40, y: 30 }, improved: false },
             { type: "resource", resource_type: "food", position: { x: 38, y: 20 }, improved: false },
@@ -141,11 +141,8 @@
       }
     }
   ];
-  
-  // Selected scenario (will be chosen by player later)
-  let scenarioData = availableScenarios[0]; // Default to easy for now
-  
-  // Current game state - will be initialized from scenario
+
+  let scenarioData = availableScenarios[0];
   let gameData = {
     game_id: "game_" + Date.now(),
     name: "Current Europe Game",
@@ -159,25 +156,19 @@
     ai: null,
     map: null
   };
-  
-  // Game state variables
-  let gameStarted = false; // Track if the game has started
-  let fogOfWarEnabled = true; // Toggle for fog of war visibility
-  
-  // Map configuration
+
+  let gameStarted = false;
+
   let mapSize = scenarioData.map_size;
-  let tileSize = 20; // Smaller tiles to accommodate larger map
+  let tileSize = 20;
   let selectedTile = null;
-  
-  // Map elements - these will be populated from gameData
+
   let cities = [];
   let resources = [];
   let units = [];
-  
-  // Map exploration
-  let exploredMap = [];
-  
-  // Terrain types - expanded with more varieties
+
+  let exploredMap = []; // Tracks which tiles have been explored (1) or not (0)
+
   const TERRAIN = {
     DEEP_WATER: 0,
     SHALLOW_WATER: 1,
@@ -190,130 +181,47 @@
     SNOW: 8,
     JUNGLE: 9
   };
-  
-  // Simplified terrain map matching the image
+
   let terrainMap = [];
-  
-  // Map navigation
+
   let offsetX = 0;
   let offsetY = 0;
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let zoomLevel = 0.5; // Start more zoomed out to see more of the map
-  
-  // Map navigation functions
+  let zoomLevel = 0.5;
+
   function zoomIn() {
     zoomLevel += 0.1;
-    if (zoomLevel > 2) zoomLevel = 2; // Max zoom limit
+    if (zoomLevel > 2) zoomLevel = 2;
   }
-  
+
   function zoomOut() {
     zoomLevel -= 0.1;
-    if (zoomLevel < 0.2) zoomLevel = 0.2; // Lower min zoom limit to see full map
+    if (zoomLevel < 0.2) zoomLevel = 0.2;
   }
-  
+
   function startDrag(event) {
     isDragging = true;
     dragStartX = event.clientX - offsetX;
     dragStartY = event.clientY - offsetY;
   }
-  
+
   function drag(event) {
     if (!isDragging) return;
-    
+
     offsetX = event.clientX - dragStartX;
     offsetY = event.clientY - dragStartY;
   }
-  
+
   function endDrag() {
     isDragging = false;
   }
-  
-  // Initialize terrain data with more variety
+
   function initializeTerrainMap() {
     terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.GRASS));
-    
-    // Add water regions (simplified version of Europe)
-    for (let y = 0; y < mapSize.height; y++) {
-      for (let x = 0; x < mapSize.width; x++) {
-        // Left side (Atlantic)
-        if (x < mapSize.width * 0.15) {
-          terrainMap[y][x] = TERRAIN.DEEP_WATER;
-        } else if (x < mapSize.width * 0.2) {
-          terrainMap[y][x] = TERRAIN.SHALLOW_WATER;
-        }
-        
-        // Mediterranean Sea
-        if (y > mapSize.height * 0.65 && x > mapSize.width * 0.2 && x < mapSize.width * 0.7) {
-          if (Math.random() < 0.8) {
-            terrainMap[y][x] = TERRAIN.DEEP_WATER;
-          } else {
-            terrainMap[y][x] = TERRAIN.SHALLOW_WATER;
-          }
-        }
-        
-        // Black Sea / Eastern waters
-        if (x > mapSize.width * 0.75 && y > mapSize.height * 0.4 && y < mapSize.height * 0.6) {
-          terrainMap[y][x] = TERRAIN.DEEP_WATER;
-        }
-        
-        // Baltic Sea
-        if (x > mapSize.width * 0.4 && x < mapSize.width * 0.55 && y < mapSize.height * 0.2) {
-          terrainMap[y][x] = Math.random() < 0.7 ? TERRAIN.DEEP_WATER : TERRAIN.SHALLOW_WATER;
-        }
-        
-        // Sicily, Sardinia, Corsica, etc.
-        if ((x === 28 && y === 22) || (x === 22 && y === 20) || (x === 20 && y === 19)) {
-          terrainMap[y][x] = TERRAIN.GRASS;
-        }
-        
-        // Northern Africa - Desert
-        if (y > mapSize.height * 0.75 && terrainMap[y][x] === TERRAIN.GRASS) {
-          terrainMap[y][x] = TERRAIN.DESERT;
-        }
-        
-        // Add forests in northern Europe
-        if (y < mapSize.height * 0.4 && terrainMap[y][x] === TERRAIN.GRASS && Math.random() < 0.3) {
-          terrainMap[y][x] = TERRAIN.FOREST;
-        }
-        
-        // Add hills and mountains across Europe
-        if (terrainMap[y][x] === TERRAIN.GRASS || terrainMap[y][x] === TERRAIN.FOREST) {
-          // Alps
-          if ((x > mapSize.width * 0.3 && x < mapSize.width * 0.45) && 
-              (y > mapSize.height * 0.35 && y < mapSize.height * 0.5) && 
-              Math.random() < 0.6) {
-            terrainMap[y][x] = Math.random() < 0.5 ? TERRAIN.HILLS : TERRAIN.MOUNTAINS;
-          } 
-          // Pyrenees
-          else if ((x > mapSize.width * 0.15 && x < mapSize.width * 0.25) && 
-                  (y > mapSize.height * 0.5 && y < mapSize.height * 0.6) && 
-                  Math.random() < 0.7) {
-            terrainMap[y][x] = Math.random() < 0.4 ? TERRAIN.HILLS : TERRAIN.MOUNTAINS;
-          }
-          // Carpathians
-          else if ((x > mapSize.width * 0.55 && x < mapSize.width * 0.65) && 
-                  (y > mapSize.height * 0.3 && y < mapSize.height * 0.45) && 
-                  Math.random() < 0.5) {
-            terrainMap[y][x] = Math.random() < 0.6 ? TERRAIN.HILLS : TERRAIN.MOUNTAINS;
-          }
-          // Random hills and mountains
-          else if (Math.random() < 0.08) {
-            terrainMap[y][x] = TERRAIN.HILLS;
-          } else if (Math.random() < 0.03) {
-            terrainMap[y][x] = TERRAIN.MOUNTAINS;
-          }
-        }
-        
-        // Snow in far north
-        if (y < mapSize.height * 0.1 && terrainMap[y][x] !== TERRAIN.DEEP_WATER && terrainMap[y][x] !== TERRAIN.SHALLOW_WATER) {
-          terrainMap[y][x] = TERRAIN.SNOW;
-        }
-      }
-    }
   }
-  
+
   // Initialize exploration data with fog of war
   function initializeExploration() {
     // Create exploration map (0 = unexplored, 1 = explored)
@@ -323,34 +231,117 @@
     const exploreRadius = 4; // How many tiles around objects are visible
     
     // Explore around player cities
-    gameData.player.cities.forEach(city => {
-      exploreArea(city.position.x, city.position.y, exploreRadius);
-    });
+    if (gameData.player?.cities) {
+      gameData.player.cities.forEach(city => {
+        exploreArea(city.position.x, city.position.y, exploreRadius);
+      });
+    }
     
     // Explore around player units
-    gameData.player.units.forEach(unit => {
-      exploreArea(unit.position.x, unit.position.y, exploreRadius);
-    });
+    if (gameData.player?.units) {
+      gameData.player.units.forEach(unit => {
+        exploreArea(unit.position.x, unit.position.y, exploreRadius);
+      });
+    }
+    
+    // Update visibility of AI elements based on exploration
+    updateAIVisibility();
+  }
+
+  // Mark an area as explored and update the game state
+  function exploreArea(centerX, centerY, radius) {
+    if (!exploredMap || !centerX || !centerY) return;
+    
+    let areaWasExplored = false;
+    
+    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
+      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        if (distance <= radius && exploredMap[y][x] !== 1) {
+          exploredMap[y][x] = 1;
+          areaWasExplored = true;
+        }
+      }
+    }
+    
+    // If something new was explored, update visibility and save game state
+    if (areaWasExplored) {
+      updateAIVisibility();
+      saveExplorationState();
+    }
+  }
+
+  // This is used to check if a specific tile is explored
+  function isTileExplored(x, y) {
+    return exploredMap && exploredMap[y] && exploredMap[y][x] === 1;
   }
   
-  // Simplify rendering to ensure it works
-  function isTileExplored(x, y) {
-    return exploredMap[y] && exploredMap[y][x] === 1;
+  // Update which AI elements should be visible based on explored areas
+  function updateAIVisibility() {
+    if (!gameData?.ai) return;
+    
+    // Update AI cities visibility
+    if (gameData.ai.cities) {
+      gameData.ai.cities.forEach(city => {
+        const x = city.position.x;
+        const y = city.position.y;
+        city.visible = isTileExplored(x, y);
+      });
+    }
+    
+    // Update AI units visibility
+    if (gameData.ai.units) {
+      gameData.ai.units.forEach(unit => {
+        const x = unit.position.x;
+        const y = unit.position.y;
+        unit.visible = isTileExplored(x, y);
+      });
+    }
+  }
+  
+  // Save the current exploration state to the game data and backend
+  async function saveExplorationState() {
+    try {
+      // Update the game data with current exploration state
+      gameData.map.explored = [...exploredMap]; // Create a copy of the exploration data
+      
+      // Save to backend
+      await gameAPI.updateGame(gameData.game_id, gameData);
+      console.log("Exploration state saved");
+    } catch (error) {
+      console.error("Error saving exploration state:", error);
+    }
+  }
+  
+  // This function handles moving units and updating exploration
+  function moveUnit(unitId, newX, newY) {
+    // Find the unit
+    const unit = gameData.player.units.find(u => u.id === unitId);
+    if (!unit) return;
+    
+    // Store old position for updating the UI
+    const oldX = unit.position.x;
+    const oldY = unit.position.y;
+    
+    // Update unit position
+    unit.position.x = newX;
+    unit.position.y = newY;
+    unit.movement_points_left -= 1; // Reduce movement points
+    
+    // Explore the area around the new position
+    exploreArea(newX, newY, 3); // Units can see 3 tiles around them
+    
+    // Update the rendering arrays
+    updateRenderingArrays();
   }
 
-  // Safe check for tile exploration status considering fog of war toggle
-  function isTileVisibleToPlayer(x, y) {
-    return !fogOfWarEnabled || (exploredMap[y] && exploredMap[y][x] === 1);
-  }
-
-  // Tile click handler (updated with safety checks)
   function handleTileClick(x, y) {
     const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS;
     const city = cities.find(c => c.x === x && c.y === y);
     const resource = resources.find(r => r.x === x && r.y === y);
     const unit = units.find(u => u.x === x && u.y === y);
     const isExplored = exploredMap[y] && exploredMap[y][x] === 1;
-    
+
     selectedTile = { 
       x, y, 
       terrain, 
@@ -360,29 +351,24 @@
       explored: isExplored
     };
   }
-  
-  // Center the map initially to focus on player's starting area
+
   function centerMapOnPlayer() {
     if (gameData.player?.cities?.length > 0) {
       const firstCity = gameData.player.cities[0];
-      // Calculate center position based on first city
       const containerWidth = document.querySelector('.map-container')?.clientWidth || 800;
       const containerHeight = document.querySelector('.map-container')?.clientHeight || 600;
-      
+
       offsetX = containerWidth/2 - firstCity.position.x * tileSize * zoomLevel;
       offsetY = containerHeight/2 - firstCity.position.y * tileSize * zoomLevel;
     }
   }
 
-  // Function to start a new game with the selected scenario
   function startNewGame() {
     console.log("Starting new game with scenario:", scenarioData.name);
-    
+
     try {
-      // First set the game started flag to switch views
       gameStarted = true;
-      
-      // Initialize the game state from the selected scenario
+
       gameData = {
         game_id: "game_" + Date.now(),
         name: "Current Europe Game",
@@ -396,110 +382,35 @@
         ai: null,
         map: null
       };
-      
-      console.log("Game data initialized");
-      
-      // Update map size if it changed with the scenario
+
       mapSize = scenarioData.map_size;
-      
-      // Initialize terrain
+
       initializeTerrainMap();
       console.log("Terrain map initialized");
-      
-      // Initialize game from scenario
+
       gameData.player = JSON.parse(JSON.stringify(scenarioData.initial_state.player));
       gameData.ai = JSON.parse(JSON.stringify(scenarioData.initial_state.ai));
       gameData.map = JSON.parse(JSON.stringify(scenarioData.initial_state.map));
       console.log("Game data populated from scenario");
-      
-      // Initialize exploration with fog of war or make everything visible
-      if (fogOfWarEnabled) {
-        initializeExploration();
-      } else {
-        // Make the entire map explored if fog of war is disabled
-        exploredMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(1));
-        // Make all AI elements visible
-        gameData.ai.cities.forEach(city => city.visible = true);
-        gameData.ai.units.forEach(unit => unit.visible = true);
-      }
-      console.log("Exploration initialized, fog of war:", fogOfWarEnabled);
-      
-      // Update UI arrays for rendering
+
+      initializeExploration();
+      gameData.map.explored = JSON.parse(JSON.stringify(exploredMap));
+
+      console.log("Exploration initialized");
+
       updateRenderingArrays();
       console.log("Rendering arrays updated");
-      
-      // Center map on player's area after a short delay
+
       setTimeout(centerMapOnPlayer, 200);
-      
+
     } catch (error) {
       console.error("Error starting new game:", error);
       alert("Error starting game: " + error.message);
     }
   }
-  
-  // Mark an area as explored
-  function exploreArea(centerX, centerY, radius) {
-    if (!exploredMap || exploredMap.length === 0) return;
-    
-    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
-      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
-        // Calculate distance (simplified circle)
-        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-        if (distance <= radius) {
-          exploredMap[y][x] = 1;
-        }
-      }
-    }
-  }
-  
-  // Toggle fog of war visibility (development feature)
-  function toggleFogOfWar() {
-    try {
-      // Toggle the state
-      fogOfWarEnabled = !fogOfWarEnabled;
-      console.log("Fog of war toggled:", fogOfWarEnabled ? "enabled" : "disabled");
-      
-      if (!fogOfWarEnabled) {
-        // If disabling fog of war, make all tiles explored
-        exploredMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(1));
-        
-        // Make all AI elements visible
-        if (gameData && gameData.ai) {
-          if (gameData.ai.cities) {
-            gameData.ai.cities.forEach(city => city.visible = true);
-          }
-          if (gameData.ai.units) {
-            gameData.ai.units.forEach(unit => unit.visible = true);
-          }
-        }
-      } else {
-        // If re-enabling fog of war, restore original exploration
-        if (gameData && gameData.player) {
-          initializeExploration();
-        }
-      }
-      
-      // Update rendering arrays to reflect changes
-      updateRenderingArrays();
-    } catch (error) {
-      console.error("Error toggling fog of war:", error);
-    }
-  }
-  
-  onMount(() => {
-    console.log("Map component mounted");
-    // Don't initialize the game here - wait for user to select scenario
-    
-    // Initialize terrain map as a blank slate
-    terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.GRASS));
-    exploredMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(0));
-  });
 
-  // Update the rendering arrays from game data
   function updateRenderingArrays() {
-    // Update cities array for rendering
     cities = [
-      // Player cities
       ...gameData.player.cities.map(city => ({
         id: city.id,
         name: city.name,
@@ -507,11 +418,9 @@
         y: city.position.y,
         size: city.population,
         owner: 'player',
-        strength: 10, // Default value
+        strength: 10,
         health: 100
       })),
-      
-      // AI cities (only visible ones)
       ...gameData.ai.cities
         .filter(city => city.visible)
         .map(city => ({
@@ -519,16 +428,14 @@
           name: city.name,
           x: city.position.x,
           y: city.position.y,
-          size: city.population || 2, // Default if unknown
+          size: city.population || 2,
           owner: 'ai',
-          strength: 10, // Default value
+          strength: 10,
           health: 100
         }))
     ];
-    
-    // Update units array for rendering
+
     units = [
-      // Player units
       ...gameData.player.units.map(unit => ({
         id: unit.id,
         type: unit.type,
@@ -540,8 +447,6 @@
         movementLeft: unit.movement_points_left || 0,
         health: unit.health || 100
       })),
-      
-      // AI units (only visible ones)
       ...gameData.ai.units
         .filter(unit => unit.visible)
         .map(unit => ({
@@ -555,8 +460,7 @@
           health: unit.health || 100
         }))
     ];
-    
-    // Update resources array for rendering
+
     resources = gameData.map.visible_objects
       .filter(obj => obj.type === 'resource')
       .map(resource => ({
@@ -567,8 +471,7 @@
         improved: resource.improved || false
       }));
   }
-  
-  // Get terrain color - more vibrant colors
+
   function getTerrainColor(terrainType) {
     switch(terrainType) {
       case TERRAIN.DEEP_WATER:
@@ -595,8 +498,7 @@
         return '#66cc66';
     }
   }
-  
-  // Get terrain name
+
   function getTerrainName(terrainType) {
     switch(terrainType) {
       case TERRAIN.DEEP_WATER: return 'Deep Water';
@@ -614,7 +516,6 @@
   }
 </script>
 
-<!-- Show scenario selector at start, game interface after selection -->
 {#if !gameStarted}
   <div class="scenario-selection-screen">
     <h2>Select Scenario</h2>
@@ -641,10 +542,6 @@
       <button on:click={zoomIn}>Zoom In (+)</button>
       <button on:click={zoomOut}>Zoom Out (-)</button>
       <button on:click={centerMapOnPlayer}>Center Map</button>
-      <!-- Fixed fog of war toggle button with correct text -->
-      <button on:click={toggleFogOfWar} class:toggled={!fogOfWarEnabled}>
-        {!fogOfWarEnabled ? "Enable" : "Disable"} Fog of War
-      </button>
       <span class="game-info">Turn: {gameData.turn} | Player: {gameData.current_player} | Difficulty: {scenarioData.difficulty}</span>
     </div>
     
@@ -662,24 +559,22 @@
         {#each Array(mapSize.height) as _, y}
           {#each Array(mapSize.width) as _, x}
             {@const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS}
-            {@const isExplored = isTileVisibleToPlayer(x, y)}
+            {@const isExplored = isTileExplored(x, y)}
             
             <div 
               class="map-tile"
-              class:unexplored={!isExplored}
               style="
                 left: {x * tileSize}px;
                 top: {y * tileSize}px;
                 width: {tileSize}px;
                 height: {tileSize}px;
-                background-color: {isExplored ? getTerrainColor(terrain) : 'transparent'};
+                background-color: {getTerrainColor(terrain)};
               "
               on:click={() => handleTileClick(x, y)}
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
             >
               <!-- Only show contents for explored tiles -->
               {#if isExplored}
-                <!-- Show coordinates only on grid intervals -->
                 {#if x % 10 === 0 && y % 10 === 0}
                   <div class="coord-marker">{x},{y}</div>
                 {/if}
@@ -717,30 +612,30 @@
         {/each}
       </div>
       
-      <!-- Fog of war overlay - only show if enabled -->
-      {#if fogOfWarEnabled}
-        <div class="fog-of-war">
-          {#each Array(mapSize.height) as _, y}
-            {#each Array(mapSize.width) as _, x}
-              {@const isExplored = exploredMap[y] && exploredMap[y][x] === 1}
-              {#if !isExplored}
-                <div 
-                  class="fog-tile"
-                  style="
-                    left: {x * tileSize * zoomLevel}px;
-                    top: {y * tileSize * zoomLevel}px;
-                    width: {tileSize * zoomLevel}px;
-                    height: {tileSize * zoomLevel}px;
-                  "
-                ></div>
-              {/if}
-            {/each}
+      <!-- Fog of war mask overlay -->
+      <div 
+        class="fog-of-war"
+        style="transform: translate({offsetX}px, {offsetY}px) scale({zoomLevel});"
+      >
+        {#each Array(mapSize.height) as _, y}
+          {#each Array(mapSize.width) as _, x}
+            {@const isExplored = isTileExplored(x, y)}
+            {#if !isExplored}
+              <div 
+                class="fog-tile"
+                style="
+                  left: {x * tileSize}px;
+                  top: {y * tileSize}px;
+                  width: {tileSize}px;
+                  height: {tileSize}px;
+                "
+              ></div>
+            {/if}
           {/each}
-        </div>
-      {/if}
+        {/each}
+      </div>
     </div>
     
-    <!-- Info panel with resources and selected tile info -->
     <div class="info-panel">
       <h3>{scenarioData.name}</h3>
       <p>{scenarioData.description}</p>
@@ -839,6 +734,11 @@
     cursor: pointer;
   }
   
+  .map-controls button.active {
+    background-color: #d9534f;
+    font-weight: bold;
+  }
+  
   .game-info {
     margin-left: auto;
     margin-right: 20px;
@@ -855,7 +755,7 @@
     overflow: hidden;
     position: relative;
     cursor: grab;
-    background-color: #0066cc; /* Water background */
+    background-color: #0066cc;
   }
   
   .map-grid {
@@ -871,8 +771,8 @@
   }
   
   .map-tile.unexplored {
-    /* Make unexplored tiles slightly visible but darkened */
-    opacity: 0.3;
+    background-color: #000 !important;
+    opacity: 0.9;
   }
   
   .coord-marker {
@@ -885,23 +785,6 @@
     padding: 1px 3px;
     border-radius: 2px;
     z-index: 10;
-  }
-  
-  .fog-of-war {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 50;
-  }
-  
-  .fog-tile {
-    position: absolute;
-    background-color: black;
-    opacity: 0.8;
-    border: 1px solid #111;
   }
   
   .scenario-selector {
@@ -996,10 +879,8 @@
     color: white;
     text-shadow: 0 0 3px black, 0 0 3px black, 0 0 3px black, 0 0 3px black;
     pointer-events: none;
-    text-align: center;
   }
 
-  /* Scenario selection screen styles */
   .scenario-selection-screen {
     width: 100%;
     height: 100vh;
@@ -1081,9 +962,26 @@
     transform: translateY(-2px);
   }
   
-  /* Fog of war toggle button */
   .map-controls button.toggled {
-    background-color: #f44336;
+    background-color: #C9302C;
     box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
+  }
+
+  .fog-of-war {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+    transform-origin: 0 0;
+  }
+  
+  .fog-tile {
+    position: absolute;
+    background-color: black;
+    opacity: 0.85;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
   }
 </style>

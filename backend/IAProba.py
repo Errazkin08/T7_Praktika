@@ -1,155 +1,158 @@
-import os
-import groq
-from groq import Groq
-import json
-from requests.exceptions import HTTPError
+#!/usr/bin/env python3
+import requests
 import time
-import socket
-import sys
+import json
+from typing import Dict,Optional, Any
 
-# Replace 'your_groq_api_key' with your actual Groq API key
-GROQ_API_KEY = "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"
-MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
-MODEL2 = "llama-3.3-70b-versatile"
-MODEL3 = "meta-llama/llama-4-scout-17b-16e-instruct"
-MODEL4 = "deepseek-r1-distill-llama-70b"
-
-# Much smaller content to reduce input size
-CONTENT = '''# CIVilizaTu game project
-A web-based strategy game inspired by Civilization where players take turns against an AI opponent.
-The game includes cities, resources, and technology development.'''
-
-# Create a list of models to try in sequence
-MODELS_TO_TRY = [MODEL4, MODEL3, MODEL2, MODEL]
-
-# Rate limit testing settings
-RATE_LIMIT_TEST = True
-REQUEST_DELAY = 0.5  # Half second between requests to trigger limits faster
-MAX_RETRIES = 3      # Maximum number of connection retries
-RETRY_DELAY = 2      # Initial delay between retries (will increase with backoff)
-
-# Start with the first model and only change on errors
-current_model_index = 0
-current_model = MODELS_TO_TRY[current_model_index]
-
-try:
-    for i in range(0, 10000):
-        client = Groq(api_key=GROQ_API_KEY)
+class GroqAPIClient:
+    """Cliente para realizar llamadas a la API de Groq con manejo de errores y cambio de modelos."""
+    
+    BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+    
+    # Lista de modelos disponibles en Groq (agrega o quita según necesidad)
+    MODELS = [
+        "llama3-8b-8192",
+        "llama3-70b-8192",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "deepseek-r1-distill-llama-70b",
         
-        print(f"\n--- Request #{i} using model: {current_model} ---")
+    ]
+    
+    def __init__(self, api_key: Optional[str] = None):
+        """
+        Inicializa el cliente de Groq API.
         
-        # Add retry logic for connection issues
-        retry_count = 0
-        success = False
+        Args:
+            api_key: Clave de API de Groq. Si no se proporciona, se intentará
+                     obtener de la variable de entorno GROQ_API_KEY.
+        """
+        self.api_key = "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"
+                
+        self.current_model_index = 0
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        print(f"Cliente inicializado. Modelo inicial: {self.current_model}")
+    
+    @property
+    def current_model(self) -> str:
+        """Obtiene el modelo actual que se está utilizando."""
+        return self.MODELS[self.current_model_index]
+    
+    def rotate_model(self) -> str:
+        """Cambia al siguiente modelo disponible y devuelve su nombre."""
+        self.current_model_index = (self.current_model_index + 1) % len(self.MODELS)
+        print(f"Cambiando al modelo: {self.current_model}")
+        return self.current_model
+    
+    def call_api(self, prompt: str, temperature: float = 0.7) -> Dict[str, Any]:
+        """
+        Realiza una llamada a la API de Groq con manejo de errores.
         
-        while retry_count <= MAX_RETRIES and not success:
+        Args:
+            prompt: El texto del prompt a enviar.
+            max_tokens: Número máximo de tokens en la respuesta.
+            temperature: Temperatura para la generación (0.0 - 1.0).
+            retry_delay: Tiempo en segundos entre reintentos.
+            max_retries: Número máximo de reintentos antes de cambiar de modelo.
+            
+        Returns:
+            Respuesta de la API en formato diccionario.
+        """
+        payload = {
+            "model": self.current_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature
+        }
+        
+        retries = 0
+        while retries < len(self.MODELS):  # Intentar con todos los modelos si es necesario
             try:
-                # Use a system message to request a brief response
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": "Provide very brief responses of just 1-2 sentences."},
-                        {"role": "user", "content": "Summarize this briefly: " + CONTENT},
-                    ],
-                    model=current_model,
-                    max_tokens=100,  # Limit output size
-                    temperature=0.7,
-                    timeout=30.0,    # Set an explicit timeout
+                print(f"Enviando solicitud a {self.current_model}")
+                response = requests.post(
+                    self.BASE_URL,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30
                 )
                 
-                print("Response:")
-                print(chat_completion.choices[0].message.content)
-                success = True
+                # Si la respuesta es exitosa, devolver los datos
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"Respuesta exitosa recibida (tokens: {data.get('usage', {}).get('total_tokens', 'N/A')})")
+                    retries=0
+                    return data
                 
-            except (socket.error, ConnectionError, TimeoutError) as e:
-                retry_count += 1
-                wait_time = RETRY_DELAY * (2 ** (retry_count - 1))  # Exponential backoff
+                # Manejar errores comunes
+                error_info = response.json() if response.content else {"error": {"message": "Error desconocido"}}
+                error_message = error_info.get("error", {}).get("message", "Error desconocido")
                 
-                print(f"\n⚠️  Connection error: {e}")
-                print(f"Retry {retry_count}/{MAX_RETRIES} in {wait_time} seconds...")
-                
-                with open("connection_errors.log", "a") as log:
-                    log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Connection error with {current_model}: {e}\n")
-                
-                time.sleep(wait_time)
-                
-                if retry_count > MAX_RETRIES:
-                    print("Max retries exceeded, switching models...")
-                    # Only switch models after exhausting retries
-                    current_model_index = (current_model_index + 1) % len(MODELS_TO_TRY)
-                    current_model = MODELS_TO_TRY[current_model_index]
-                    break
-                
-            except groq.RateLimitError as e:
-                print("\n")
-                print("*" * 80)
-                print("*" + " "*78 + "*")
-                print("*" + "🚫 RATE LIMIT ERROR DETECTED (429) 🚫".center(78) + "*")
-                print("*" + "-"*78 + "*")
-                print("*" + f"Model: {current_model}".center(78) + "*")
-                print("*" + f"Request: #{i}".center(78) + "*")
-                print("*" + "-"*78 + "*")
-                print("*" + "Error details:".center(78) + "*")
-                print("*" + str(e).center(78) + "*")
-                print("*" + " "*78 + "*")
-                print("*" * 80)
-                print("\n")
-                
-                # Log the error with timestamp
-                with open("rate_limit_errors.log", "a") as log:
-                    log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Rate limit hit with {current_model}\n")
-                
-                # Switch models on rate limit error
-                current_model_index = (current_model_index + 1) % len(MODELS_TO_TRY)
-                current_model = MODELS_TO_TRY[current_model_index]
-                
-                print(f"Switching to model: {current_model}")
-                print("Waiting 5 seconds before next request...")
-                time.sleep(5)
-                break
-                
-            except Exception as e:
-                print(f"\n⚠️  Error encountered: {e}")
-                
-                # Check if it's a 429 error but caught as a different exception type
-                error_str = str(e).lower()
-                if "429" in error_str or "too many requests" in error_str or "rate limit" in error_str:
-                    print("\n")
-                    print("#" * 80)
-                    print("#" + "429 RATE LIMITING ERROR DETECTED AS GENERAL EXCEPTION!".center(78) + "#")
-                    print("#" * 80)
-                    print("\n")
+                if response.status_code == 429:  # Rate limit o límite de tokens
+                    print(f"Error 429: {error_message}")
                     
-                    # Log the error with timestamp
-                    with open("rate_limit_errors.log", "a") as log:
-                        log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 429 error via general exception with {current_model}\n")
+                    # Si se alcanzó el límite, cambiar de modelo
+                    if "rate limit" in error_message.lower() or "token limit" in error_message.lower():
+                        self.rotate_model()
+                        payload["model"] = self.current_model
+                        retries += 1
+                        continue
                     
-                    # Switch models on rate limit error
-                    current_model_index = (current_model_index + 1) % len(MODELS_TO_TRY)
-                    current_model = MODELS_TO_TRY[current_model_index]
-                    print(f"Switching to model: {current_model}")
-                
+                    retries += 1
+                    
+                elif response.status_code in (400, 401, 403):
+                    print(f"Error {response.status_code}: {error_message}")
+                    raise Exception(f"Error en la API: {error_message}")
+                    
                 else:
-                    # For other errors, log but don't switch models unless max retries reached
-                    retry_count += 1
-                    wait_time = RETRY_DELAY * (2 ** (retry_count - 1))
+                    print(f"Error {response.status_code}: {error_message}. Cambiando de modelo.")
+                    self.rotate_model()
+                    payload["model"] = self.current_model
+                    retries += 1
                     
-                    with open("general_errors.log", "a") as log:
-                        log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error with {current_model}: {e}\n")
-                    
-                    print(f"Retry {retry_count}/{MAX_RETRIES} in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    
-                    if retry_count > MAX_RETRIES:
-                        print("Max retries exceeded, switching models...")
-                        current_model_index = (current_model_index + 1) % len(MODELS_TO_TRY)
-                        current_model = MODELS_TO_TRY[current_model_index]
-                
-                break
+            except (requests.RequestException, json.JSONDecodeError) as e:
+                print(f"Error de conexión: {str(e)}")
+                time.sleep(1)
+                retries += 1
+                self.rotate_model()
+                payload["model"] = self.current_model
         
-        # Add short delay between requests if testing rate limits
-        if RATE_LIMIT_TEST and success:
-            time.sleep(REQUEST_DELAY)
+        # Si se agotaron todos los reintentos
+        raise Exception("Se agotaron todos los reintentos con todos los modelos disponibles.")
+    
+    def run_call(self, prompt: str) -> str:
+        """        
+        Args:
+            prompt: El texto del prompt fijo a enviar.
+        """
+        try:
+            response = self.call_api(prompt)
             
-except KeyboardInterrupt:
-    print("\nExiting script due to keyboard interrupt...")
-    sys.exit(0)
+            # Extraer y mostrar la respuesta
+            if response and "choices" in response and len(response["choices"]) > 0:
+                message = response["choices"][0]["message"]
+                content = message.get("content", "").strip()
+                
+                print(content)
+                
+        except Exception as e:
+            print(f"Error en la llamada #{str(e)}") 
+
+def main():
+    # El prompt fijo que se usará en todas las llamadas
+    PROMPT = """Explicame como funciona El civilization."""
+    try:
+        # Inicializar el cliente
+        client = GroqAPIClient()
+        
+        # Ejecutar las llamadas a la API
+        for i in range(1000):
+            client.run_call(
+                prompt=PROMPT
+            )
+        
+    except Exception as e:
+        print(f"Error en la ejecución: {str(e)}")
+        
+if __name__ == "__main__":
+    main()

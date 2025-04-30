@@ -1,13 +1,15 @@
 from flask import Blueprint, request, jsonify, session
-from database import add_user, find_user, update_user_score, get_all_users
+from database import add_user, find_user, update_user_score, get_all_users, update_user_login, add_map
 import hashlib
 
 routes_blueprint = Blueprint('routes', __name__)
 
+#just a proba endpoint
 @routes_blueprint.route('/proba', methods=['GET'])
 def proba():
     return "Kaixoooo"
 
+#Register a new user
 @routes_blueprint.route('/api/users', methods=['POST'])
 def register_user():
     data = request.get_json()
@@ -29,6 +31,8 @@ def register_user():
     add_user(username, password_hash)
     return jsonify({"message": "User created successfully"}), 201
 
+
+#Login a user
 @routes_blueprint.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -51,6 +55,7 @@ def login():
     # Store user in session
     session['username'] = user['username']
     session['user_id'] = str(user.get('_id', ''))
+    update_user_login(user['username'])
     
     return jsonify({
         "message": "Login successful",
@@ -61,12 +66,14 @@ def login():
         }
     }), 200
 
+# Logout a user
 @routes_blueprint.route('/api/logout', methods=['POST'])
 def logout():
     # Clear the session
     session.clear()
     return jsonify({"message": "Logged out successfully"}), 200
 
+# Check if user is logged in
 @routes_blueprint.route('/api/session', methods=['GET'])
 def check_session():
     if 'username' in session:
@@ -82,23 +89,7 @@ def check_session():
             }), 200
     return jsonify({"authenticated": False}), 401
 
-@routes_blueprint.route('/api/users/<username>/score', methods=['PUT'])
-def update_score(username):
-    data = request.get_json()
-    score = data.get('score')
-    
-    if score is None:
-        return jsonify({"error": "Score is required"}), 400
-    
-    # Check if user exists
-    user = find_user(username)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    # Update user's score
-    update_user_score(username, score)
-    return jsonify({"message": "Score updated successfully"}), 200
-
+# Get user information from its username
 @routes_blueprint.route('/api/users/<username>', methods=['GET'])
 def get_user(username):
     # Fetch user from database
@@ -112,6 +103,7 @@ def get_user(username):
         "level": user['level']
     }), 200
 
+#Get all users from the database
 @routes_blueprint.route('/api/users/', methods=['GET'])
 def get_all_users():
     try:
@@ -122,3 +114,34 @@ def get_all_users():
         return jsonify(users), 200
     except Exception as e:
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+# Create a new map
+@routes_blueprint.route('/api/maps', methods=['POST'])
+def create_map():
+    data = request.get_json()
+    width = data.get('width')
+    height = data.get('height')
+    startPoint = data.get('startPoint')
+    difficulty = data.get('difficulty')
+    
+    # Validate required fields
+    if not width or not height or not startPoint or not difficulty:
+        return jsonify({"error": "Width, height, startPoint, and difficulty are required"}), 400
+    
+    # Validate data types
+    if not isinstance(width, int) or not isinstance(height, int):
+        return jsonify({"error": "Width and height must be integers"}), 400
+    
+    if not isinstance(startPoint, list) or len(startPoint) != 2:
+        return jsonify({"error": "StartPoint must be a list of two integers"}), 400
+    
+    if difficulty not in ["easy", "medium", "hard"]:
+        return jsonify({"error": "Difficulty must be 'easy', 'medium', or 'hard'"}), 400
+    
+    # Create map in database
+    result = add_map(width, height, startPoint, difficulty)
+    
+    return jsonify({
+        "message": "Map created successfully",
+        "map_id": str(result.inserted_id)
+    }), 201

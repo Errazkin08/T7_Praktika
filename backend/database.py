@@ -41,7 +41,27 @@ def init_db():
         db.create_collection('games')
         print("Games collection created")
     
+    # Check if any map exists, if not create a test map
+    create_test_map_if_not_exists()
+
+def create_test_map_if_not_exists():
+    """
+    Create a test map if there are no maps in the database
+    """
+    db = get_db()
     
+    # Check if any maps exist
+    maps_count = db.maps.count_documents({})
+    
+    if maps_count == 0:
+        # Create a test map
+        width = 30
+        height = 15
+        startPoint = [15, 7]  # Center of the map
+        
+        # Use the add_map function to create the test map
+        result = add_map(width, height, startPoint, "easy")
+        print("Test map created")
 
 def add_user(username, password_hash):
     """
@@ -90,13 +110,13 @@ def get_all_users():
     db = get_db()
     return list(db.users.find({}, {'_id': 0, 'password': 0}))
 
-def add_map(width, height, startPoint, difficulty):
+def add_map(width, height, startPoint, difficulty="easy"):
     """
     Add a new map to the database
     """
     db = get_db()
     
-    # Create a grid (vector of vectors) initialized with zeros
+        # Create a grid (vector of vectors) initialized with zeros
     grid = [[0 for _ in range(width)] for _ in range(height)]
     
     # Set the start point to 1
@@ -134,4 +154,11 @@ def add_game(username, map):
         "map":map
     }
     return db.games.insert_one(game)
+
+def get_first_map():
+    """
+    Get the first map from the database
+    """
+    db = get_db()
+    return db.maps.find_one({}, {'_id': 0})
 

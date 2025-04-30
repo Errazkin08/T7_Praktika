@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from database import add_user, find_user, update_user_score, get_all_users, update_user_login, add_map
+from database import add_user, find_user, update_user_score, get_all_users, update_user_login, add_map, get_first_map
 import hashlib
 
 routes_blueprint = Blueprint('routes', __name__)
@@ -145,3 +145,15 @@ def create_map():
         "message": "Map created successfully",
         "map_id": str(result.inserted_id)
     }), 201
+
+# Get the first map from the database
+@routes_blueprint.route('/api/maps/first', methods=['GET'])
+def get_first_map_endpoint():
+    try:
+        # Get the first map
+        map_data = get_first_map()
+        if not map_data:
+            return jsonify({"error": "No maps found"}), 404
+        return jsonify(map_data), 200
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500

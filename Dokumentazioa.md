@@ -277,6 +277,34 @@ edo
 }
 ```
 
+#### Lehenengo mapa lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/maps/first`
+- **Deskribapena:** Datu-baseko lehenengo mapa itzultzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "width": 30,
+    "height": 15,
+    "grid": [[0,0,0,...],[0,1,0,...],...],
+    "startPoint": [15, 7]
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "No maps found"
+}
+```
+edo
+```json
+{
+    "error": "Internal server error: [error message]"
+}
+```
+
 ## Erroreen Kudeaketa
 
 Erroreen kasuan, API-ak ondorengo egiturako erantzunak bueltatzen ditu:

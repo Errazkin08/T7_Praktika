@@ -203,7 +203,7 @@ export const gameAPI = {
 
   /**
    * Get first map from database
-   * Returns map data in format: { width, height, grid, startPoint }
+   * Returns map data in format: { width, height, grid, startPoint, fogOfWar, difficulty }
    */
   async getFirstMap() {
     try {

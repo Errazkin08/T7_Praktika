@@ -21,12 +21,10 @@
 {#if showHeader}
 <header class:minimal={isAuthPage}>
   <nav>
-    <div class="logo">Civilization Game</div>
+    <div class="logo">CIVilizaTu Game</div>
     <div class="nav-links">
       {#if $user}
         <a href="/home" on:click|preventDefault={() => navigate('/home')}>Dashboard</a>
-        <a href="/new-game" on:click|preventDefault={() => navigate('/new-game')}>New Game</a>
-        <a href="/load-game" on:click|preventDefault={() => navigate('/load-game')}>Load Game</a>
         <span class="user-welcome">Welcome, {$user.username}</span>
         <a href="/" on:click|preventDefault={handleLogout}>Logout</a>
       {:else if !isAuthPage}

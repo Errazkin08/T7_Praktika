@@ -9,24 +9,26 @@
   let gameStarted = false;
   let isLoading = true;
   let loadingError = null;
-  
-  // Game data structures
+
   let gameData = null;
-  let mapSize = { width: 30, height: 30 }; // Changed to 30x30
-  let tileSize = 24; // Larger tiles for better visibility with smaller map
+  let mapSize = { width: 30, height: 15 };
+  let tileSize = 24;
   let selectedTile = null;
   let cities = [];
   let resources = [];
   let units = [];
-  let exploredMap = []; 
+  let exploredMap = [];
   let terrainMap = [];
   let offsetX = 0;
   let offsetY = 0;
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let zoomLevel = 0.8; // Adjusted zoom level for better visibility
-  
+  let zoomLevel = 0.8;
+
+  let activeUnit = null;
+  let movementTiles = [];
+
   const TERRAIN = {
     DEEP_WATER: 0,
     SHALLOW_WATER: 1,
@@ -40,23 +42,17 @@
     JUNGLE: 9
   };
 
-  // Make sure we have a valid game in progress
   onMount(() => {
     try {
-      // If no user is logged in, redirect to login
       if (!$user) {
         navigate('/');
         return;
       }
-      
-      // Set up keyboard shortcuts
+
       window.addEventListener('keydown', handleKeyPress);
-      
-      // Initialize the game
       initializeGame();
-      
+
       return () => {
-        // Clean up event listeners
         window.removeEventListener('keydown', handleKeyPress);
       };
     } catch (err) {
@@ -66,418 +62,176 @@
   });
 
   function handleKeyPress(event) {
-    // ESC key toggles pause menu
     if (event.key === 'Escape') {
       togglePauseMenu();
     }
   }
-  
+
   function togglePauseMenu() {
     showPauseMenu = !showPauseMenu;
     pauseGame(showPauseMenu);
   }
-  
-  // Function to properly initialize the game with improved error handling
+
   async function initializeGame() {
     try {
       isLoading = true;
       loadingError = null;
-      
-      // Create basic game data
+
       createBasicGameData();
 
-      // Fetch map data from API
       try {
-        console.log("Fetching map data from API...");
         const mapData = await gameAPI.getFirstMap();
-        
+
         if (mapData) {
-          console.log("Map data loaded successfully from API");
-          
-          // Update map size
           mapSize = {
             width: mapData.width || 30,
-            height: mapData.height || 30
+            height: mapData.height || 15
           };
-          
-          // Create terrain map from grid
+
           if (mapData.grid && Array.isArray(mapData.grid)) {
-            console.log(`Map grid received: ${mapData.grid.length}x${mapData.grid[0]?.length}`);
-            
-            // Convert grid data to terrain map
             terrainMap = convertGridToTerrain(mapData.grid);
-            
-            // Set player starting position based on startPoint if available
+
+            if (mapData.fogOfWar && Array.isArray(mapData.fogOfWar)) {
+              exploredMap = mapData.fogOfWar;
+            } else {
+              initializeFogOfWar(mapData.difficulty || gameData.difficulty);
+            }
+
             if (mapData.startPoint && Array.isArray(mapData.startPoint) && mapData.startPoint.length === 2) {
               const [startX, startY] = mapData.startPoint;
-              
-              // Update city and unit positions
+
               if (gameData.player?.cities?.length > 0) {
                 gameData.player.cities[0].position.x = startX;
                 gameData.player.cities[0].position.y = startY;
-                
-                // Position second city near first if it exists
+
                 if (gameData.player.cities.length > 1) {
                   gameData.player.cities[1].position.x = Math.min(startX + 3, mapSize.width - 1);
                   gameData.player.cities[1].position.y = Math.min(startY + 3, mapSize.height - 1);
                 }
               }
-              
-              // Update unit positions
+
               if (gameData.player?.units?.length > 0) {
                 gameData.player.units[0].position.x = startX + 1;
                 gameData.player.units[0].position.y = startY;
-                
+
                 if (gameData.player.units.length > 1) {
                   gameData.player.units[1].position.x = startX;
                   gameData.player.units[1].position.y = startY + 1;
                 }
               }
+
+              const radius = 3;
+              for (let y = Math.max(0, startY - radius); y <= Math.min(mapSize.height - 1, startY + radius); y++) {
+                for (let x = Math.max(0, startX - radius); x <= Math.min(mapSize.width - 1, startX + radius); x++) {
+                  const distance = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                  if (distance <= radius) {
+                    exploredMap[y][x] = 1;
+                  }
+                }
+              }
             }
           } else {
-            console.warn("Map grid data missing or invalid, using generated terrain");
             initializeTerrainMap();
+            initializeFogOfWar(gameData.difficulty);
           }
         } else {
-          console.warn("No map data returned from API, using local generation");
           initializeTerrainMap();
+          initializeFogOfWar(gameData.difficulty);
         }
       } catch (apiError) {
-        console.error("Error fetching map data:", apiError);
-        console.log("Falling back to local map generation");
         initializeTerrainMap();
+        initializeFogOfWar(gameData.difficulty);
       }
-      
-      // Initialize exploration data after terrain is set up
-      initializeExploration();
-      
-      // Update game map with exploration data
+
       gameData.map.explored = JSON.parse(JSON.stringify(exploredMap));
-      
-      // Update rendering arrays
       updateRenderingArrays();
-      console.log("Rendering arrays updated");
-      
-      // Mark game as started
+
       gameStarted = true;
       isLoading = false;
-      
-      // Center the map on player after a short delay
+
       setTimeout(centerMapOnPlayer, 200);
-      
     } catch (error) {
-      console.error("Error starting new game:", error);
       loadingError = error.message || "Unknown error occurred while starting the game.";
       isLoading = false;
     }
   }
 
-  // Helper function to create basic game data
-  function createBasicGameData() {
-    // Get difficulty from gameState if available
-    const difficulty = $gameState.currentScenario?.difficulty || "easy";
-    
-    gameData = {
-      game_id: "game_" + Date.now(),
-      name: $gameState.gameName || "My Game",
-      scenario_id: $gameState.currentScenario?._id || "default_scenario",
-      created_at: new Date().toISOString(),
-      last_saved: new Date().toISOString(),
-      turn: 1,
-      current_player: "player",
-      difficulty: difficulty, // Store difficulty in game data
-      cheats_used: [],
-      player: {
-        resources: {
-          food: 50,
-          production: 40,
-          science: 20,
-          gold: 300
-        },
-        cities: [
-          { id: "city1", name: 'London', position: { x: 12, y: 8 }, population: 4, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
-          { id: "city2", name: 'Paris', position: { x: 15, y: 12 }, population: 3, buildings: [], production: { current_item: "settler", turns_remaining: 3 } }
-        ],
-        units: [
-          { id: "unit1", type: 'warrior', position: { x: 13, y: 9 }, movement_points: 2, movement_points_left: 2, strength: 6, health: 100 },
-          { id: "unit2", type: 'archer', position: { x: 16, y: 13 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 }
-        ],
-        technologies: [
-          { id: "agriculture", completed: true },
-          { id: "pottery", completed: true },
-          { id: "animal_husbandry", in_progress: true, turns_remaining: 2 }
-        ]
-      },
-      ai: {
-        resources: {
-          food: 30,
-          production: 15,
-          science: 5,
-          gold: 150
-        },
-        cities: [
-          { id: "ai_city1", name: 'Berlin', position: { x: 20, y: 8 }, visible: false },
-          { id: "ai_city2", name: 'Rome', position: { x: 20, y: 18 }, visible: false }
-        ],
-        units: [
-          { id: "ai_unit1", type: 'warrior', position: { x: 19, y: 9 }, visible: false }
-        ],
-        technologies: []
-      },
-      map: {
-        explored: [],
-        visible_objects: [
-          { type: "resource", resource_type: "iron", position: { x: 17, y: 15 }, improved: false },
-          { type: "resource", resource_type: "food", position: { x: 14, y: 10 }, improved: false },
-          { type: "resource", resource_type: "gold", position: { x: 11, y: 16 }, improved: false }
-        ]
-      }
-    };
-  }
-  
-  // Convert API grid to terrain map
-  function convertGridToTerrain(grid) {
-    // Create terrain map from grid data
-    const height = grid.length;
-    const width = grid[0]?.length || 30;
-    let newTerrainMap = Array(height).fill().map(() => Array(width).fill(TERRAIN.GRASS));
-    
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        // Convert grid value to terrain type
-        // Assuming grid has values that can be mapped to terrain types:
-        // 0 = water, 1 = plains, 2 = forest, 3 = mountains, etc.
-        switch (grid[y][x]) {
-          case 0:
-            newTerrainMap[y][x] = TERRAIN.DEEP_WATER;
-            break;
-          case 1:
-            newTerrainMap[y][x] = TERRAIN.PLAINS;
-            break;
-          case 2:
-            newTerrainMap[y][x] = TERRAIN.FOREST;
-            break;
-          case 3:
-            newTerrainMap[y][x] = TERRAIN.MOUNTAINS;
-            break;
-          case 4:
-            newTerrainMap[y][x] = TERRAIN.HILLS;
-            break;
-          case 5:
-            newTerrainMap[y][x] = TERRAIN.DESERT;
-            break;
-          case 6:
-            newTerrainMap[y][x] = TERRAIN.SHALLOW_WATER;
-            break;
-          case 7:
-            newTerrainMap[y][x] = TERRAIN.GRASS;
-            break;
-          case 8:
-            newTerrainMap[y][x] = TERRAIN.SNOW;
-            break;
-          case 9:
-            newTerrainMap[y][x] = TERRAIN.JUNGLE;
-            break;
-          default:
-            newTerrainMap[y][x] = TERRAIN.GRASS;
-        }
-      }
-    }
-    
-    return newTerrainMap;
-  }
-
-  function initializeTerrainMap() {
-    // First fill everything with deep water
-    terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.DEEP_WATER));
-    
-    // Create a realistic continent shape using noise/probability
-    const centerX = Math.floor(mapSize.width / 2);
-    const centerY = Math.floor(mapSize.height / 2);
-    const maxRadius = Math.min(mapSize.width, mapSize.height) * 0.4; // Size of the continent
-    
-    // Create landmass using distance from center + noise
-    for (let y = 0; y < mapSize.height; y++) {
-      for (let x = 0; x < mapSize.width; x++) {
-        // Calculate distance from center
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Add some noise to the distance
-        const noise = (Math.random() - 0.5) * maxRadius * 0.5;
-        const adjustedDistance = distance + noise;
-        
-        // Determine terrain based on distance from center
-        if (adjustedDistance < maxRadius * 0.6) {
-          // Main continent
-          terrainMap[y][x] = TERRAIN.PLAINS;
-          
-          // Add terrain variety
-          const terrainVariety = Math.random();
-          if (terrainVariety < 0.3) terrainMap[y][x] = TERRAIN.GRASS;
-          else if (terrainVariety < 0.4) terrainMap[y][x] = TERRAIN.HILLS;
-          else if (terrainVariety < 0.45) terrainMap[y][x] = TERRAIN.FOREST;
-          else if (terrainVariety < 0.48) terrainMap[y][x] = TERRAIN.MOUNTAINS;
-        } else if (adjustedDistance < maxRadius * 0.8) {
-          // Coast and islands
-          const coastal = Math.random();
-          if (coastal < 0.7) {
-            terrainMap[y][x] = TERRAIN.SHALLOW_WATER;
-          } else {
-            // Small islands
-            terrainMap[y][x] = Math.random() < 0.6 ? TERRAIN.GRASS : TERRAIN.PLAINS;
-          }
-        }
-      }
-    }
-    
-    // Create a river
-    let riverX = centerX + Math.floor(Math.random() * 5) - 2;
-    let riverY = 0;
-    
-    while (riverY < mapSize.height) {
-      // Make the river meander
-      riverX += Math.floor(Math.random() * 3) - 1;
-      
-      // Keep river in bounds
-      if (riverX < 0) riverX = 0;
-      if (riverX >= mapSize.width) riverX = mapSize.width - 1;
-      
-      // Add river tile
-      terrainMap[riverY][riverX] = TERRAIN.SHALLOW_WATER;
-      
-      // Sometimes make the river wider
-      if (Math.random() < 0.3 && riverX > 0) {
-        terrainMap[riverY][riverX - 1] = TERRAIN.SHALLOW_WATER;
-      }
-      if (Math.random() < 0.3 && riverX < mapSize.width - 1) {
-        terrainMap[riverY][riverX + 1] = TERRAIN.SHALLOW_WATER;
-      }
-      
-      riverY++;
-    }
-    
-    // Add desert area in one corner
-    const desertX = Math.random() < 0.5 ? 0 : mapSize.width - 6;
-    const desertY = Math.random() < 0.5 ? 0 : mapSize.height - 6;
-    
-    for (let y = desertY; y < desertY + 6 && y < mapSize.height; y++) {
-      for (let x = desertX; x < desertX + 6 && x < mapSize.width; x++) {
-        if (terrainMap[y][x] !== TERRAIN.DEEP_WATER && terrainMap[y][x] !== TERRAIN.SHALLOW_WATER) {
-          if (Math.random() < 0.8) {
-            terrainMap[y][x] = TERRAIN.DESERT;
-          }
-        }
-      }
-    }
-    
-    // Make sure cities and units are on valid terrain
-    if (gameData && gameData.player) {
-      gameData.player.cities.forEach(city => {
-        const x = city.position.x;
-        const y = city.position.y;
-        
-        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
-          const terrainType = terrainMap[y][x];
-          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
-            terrainMap[y][x] = TERRAIN.PLAINS;
-          }
-        }
-      });
-      
-      gameData.player.units.forEach(unit => {
-        const x = unit.position.x;
-        const y = unit.position.y;
-        
-        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
-          const terrainType = terrainMap[y][x];
-          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
-            terrainMap[y][x] = TERRAIN.PLAINS;
-          }
-        }
-      });
-    }
-    
-    if (gameData && gameData.ai) {
-      gameData.ai.cities.forEach(city => {
-        const x = city.position.x;
-        const y = city.position.y;
-        
-        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
-          const terrainType = terrainMap[y][x];
-          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
-            terrainMap[y][x] = TERRAIN.PLAINS;
-          }
-        }
-      });
-    }
-  }
-  
-  // Initialize exploration data with fog of war
-  function initializeExploration() {
-    // Create exploration map (0 = unexplored, 1 = explored)
+  function initializeFogOfWar(difficulty) {
     exploredMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(0));
-    
-    // Mark areas around player cities and units as explored
-    const exploreRadius = 4;
-    
-    // Explore around player cities
+
+    let exploreRadius;
+
+    switch (difficulty) {
+      case "easy":
+        exploreRadius = 5;
+        break;
+      case "medium":
+        exploreRadius = 3;
+        break;
+      case "hard":
+        exploreRadius = 2;
+        break;
+      default:
+        exploreRadius = 3;
+    }
+
     if (gameData.player?.cities) {
       gameData.player.cities.forEach(city => {
-        exploreArea(city.position.x, city.position.y, exploreRadius);
+        const centerX = city.position.x;
+        const centerY = city.position.y;
+        const radius = exploreRadius;
+
+        for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
+          for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            if (distance <= radius) {
+              exploredMap[y][x] = 1;
+            }
+          }
+        }
       });
     }
-    
-    // Explore around player units
+
     if (gameData.player?.units) {
       gameData.player.units.forEach(unit => {
-        exploreArea(unit.position.x, unit.position.y, exploreRadius);
+        const centerX = unit.position.x;
+        const centerY = unit.position.y;
+        const radius = exploreRadius - 1;
+
+        for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
+          for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            if (distance <= radius) {
+              exploredMap[y][x] = 1;
+            }
+          }
+        }
       });
     }
-    
-    // Update visibility of AI elements based on exploration
+
     updateAIVisibility();
   }
 
-  // Mark an area as explored
-  function exploreArea(centerX, centerY, radius) {
-    if (!exploredMap || !centerX || !centerY) return;
-    
-    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
-      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
-        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-        if (distance <= radius) {
-          exploredMap[y][x] = 1;
-        }
-      }
-    }
-    
-    updateAIVisibility();
-  }
-
-  // Check if a tile is explored
-  function isTileExplored(x, y) {
-    return exploredMap && exploredMap[y] && exploredMap[y][x] === 1;
-  }
-  
-  // Update which AI elements should be visible based on exploration
   function updateAIVisibility() {
     if (!gameData?.ai) return;
-    
+
     if (gameData.ai.cities) {
       gameData.ai.cities.forEach(city => {
         city.visible = isTileExplored(city.position.x, city.position.y);
       });
     }
-    
+
     if (gameData.ai.units) {
       gameData.ai.units.forEach(unit => {
         unit.visible = isTileExplored(unit.position.x, unit.position.y);
       });
     }
   }
-  
+
+  function isTileExplored(x, y) {
+    return exploredMap && exploredMap[y] && exploredMap[y][x] === 1;
+  }
+
   function updateRenderingArrays() {
     cities = [
       ...gameData.player.cities.map(city => ({
@@ -541,32 +295,363 @@
       }));
   }
 
-  function handleTileClick(x, y) {
-    const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS;
-    const city = cities.find(c => c.x === x && c.y === y);
-    const resource = resources.find(r => r.x === x && r.y === y);
-    const unit = units.find(u => u.x === x && u.y === y);
-    const isExplored = exploredMap[y] && exploredMap[y][x] === 1;
-
-    selectedTile = { 
-      x, y, 
-      terrain, 
-      city, 
-      resource, 
-      unit,
-      explored: isExplored
-    };
-  }
-
   function centerMapOnPlayer() {
     if (gameData.player?.cities?.length > 0) {
       const firstCity = gameData.player.cities[0];
       const containerWidth = document.querySelector('.map-container')?.clientWidth || 800;
       const containerHeight = document.querySelector('.map-container')?.clientHeight || 600;
 
-      offsetX = containerWidth/2 - firstCity.position.x * tileSize * zoomLevel;
-      offsetY = containerHeight/2 - firstCity.position.y * tileSize * zoomLevel;
+      offsetX = containerWidth / 2 - firstCity.position.x * tileSize * zoomLevel;
+      offsetY = containerHeight / 2 - firstCity.position.y * tileSize * zoomLevel;
     }
+  }
+
+  function createBasicGameData() {
+    const difficulty = $gameState.currentScenario?.difficulty || "easy";
+
+    gameData = {
+      game_id: "game_" + Date.now(),
+      name: $gameState.gameName || "My Game",
+      scenario_id: $gameState.currentScenario?._id || "default_scenario",
+      created_at: new Date().toISOString(),
+      last_saved: new Date().toISOString(),
+      turn: 1,
+      current_player: "player",
+      difficulty: difficulty,
+      cheats_used: [],
+      player: {
+        resources: {
+          food: 50,
+          production: 40,
+          science: 20,
+          gold: 300
+        },
+        cities: [
+          { id: "city1", name: 'London', position: { x: 12, y: 8 }, population: 4, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
+          { id: "city2", name: 'Paris', position: { x: 15, y: 12 }, population: 3, buildings: [], production: { current_item: "settler", turns_remaining: 3 } }
+        ],
+        units: [
+          { id: "unit1", type: 'warrior', position: { x: 13, y: 9 }, movement_points: 2, movement_points_left: 2, strength: 6, health: 100 },
+          { id: "unit2", type: 'archer', position: { x: 16, y: 13 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 }
+        ],
+        technologies: [
+          { id: "agriculture", completed: true },
+          { id: "pottery", completed: true },
+          { id: "animal_husbandry", in_progress: true, turns_remaining: 2 }
+        ]
+      },
+      ai: {
+        resources: {
+          food: 30,
+          production: 15,
+          science: 5,
+          gold: 150
+        },
+        cities: [
+          { id: "ai_city1", name: 'Berlin', position: { x: 20, y: 8 }, visible: false },
+          { id: "ai_city2", name: 'Rome', position: { x: 20, y: 18 }, visible: false }
+        ],
+        units: [
+          { id: "ai_unit1", type: 'warrior', position: { x: 19, y: 9 }, visible: false }
+        ],
+        technologies: []
+      },
+      map: {
+        explored: [],
+        visible_objects: [
+          { type: "resource", resource_type: "iron", position: { x: 17, y: 15 }, improved: false },
+          { type: "resource", resource_type: "food", position: { x: 14, y: 10 }, improved: false },
+          { type: "resource", resource_type: "gold", position: { x: 11, y: 16 }, improved: false }
+        ]
+      }
+    };
+  }
+
+  function convertGridToTerrain(grid) {
+    const height = grid.length;
+    const width = grid[0]?.length || 30;
+    let newTerrainMap = Array(height).fill().map(() => Array(width).fill(TERRAIN.GRASS));
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let tileValue = grid[y][x];
+
+        if (typeof tileValue !== 'number' || tileValue < 0 || tileValue > 9) {
+          const rnd = Math.random();
+          if (rnd < 0.2) tileValue = TERRAIN.DEEP_WATER;
+          else if (rnd < 0.3) tileValue = TERRAIN.SHALLOW_WATER;
+          else if (rnd < 0.45) tileValue = TERRAIN.PLAINS;
+          else if (rnd < 0.6) tileValue = TERRAIN.GRASS;
+          else if (rnd < 0.75) tileValue = TERRAIN.FOREST;
+          else if (rnd < 0.85) tileValue = TERRAIN.HILLS;
+          else if (rnd < 0.9) tileValue = TERRAIN.MOUNTAINS;
+          else if (rnd < 0.95) tileValue = TERRAIN.DESERT;
+          else tileValue = TERRAIN.JUNGLE;
+        }
+
+        switch (tileValue) {
+          case 0:
+            newTerrainMap[y][x] = TERRAIN.DEEP_WATER;
+            break;
+          case 1:
+            newTerrainMap[y][x] = TERRAIN.PLAINS;
+            break;
+          case 2:
+            newTerrainMap[y][x] = TERRAIN.FOREST;
+            break;
+          case 3:
+            newTerrainMap[y][x] = TERRAIN.MOUNTAINS;
+            break;
+          case 4:
+            newTerrainMap[y][x] = TERRAIN.HILLS;
+            break;
+          case 5:
+            newTerrainMap[y][x] = TERRAIN.DESERT;
+            break;
+          case 6:
+            newTerrainMap[y][x] = TERRAIN.SHALLOW_WATER;
+            break;
+          case 7:
+            newTerrainMap[y][x] = TERRAIN.GRASS;
+            break;
+          case 8:
+            newTerrainMap[y][x] = TERRAIN.SNOW;
+            break;
+          case 9:
+            newTerrainMap[y][x] = TERRAIN.JUNGLE;
+            break;
+          default:
+            newTerrainMap[y][x] = TERRAIN.GRASS;
+        }
+      }
+    }
+
+    return newTerrainMap;
+  }
+
+  function initializeTerrainMap() {
+    terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.GRASS));
+  }
+
+  function exploreArea(centerX, centerY, radius) {
+    if (!exploredMap || !centerX || !centerY) return;
+
+    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
+      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        if (distance <= radius) {
+          exploredMap[y][x] = 1;
+        }
+      }
+    }
+
+    updateAIVisibility();
+  }
+
+  function getTerrainColor(terrainType) {
+    switch (terrainType) {
+      case TERRAIN.DEEP_WATER: return '#0066cc';
+      case TERRAIN.SHALLOW_WATER: return '#3399ff';
+      case TERRAIN.DESERT: return '#e6cc99';
+      case TERRAIN.GRASS: return '#66cc66';
+      case TERRAIN.FOREST: return '#006633';
+      case TERRAIN.PLAINS: return '#cccc99';
+      case TERRAIN.HILLS: return '#996633';
+      case TERRAIN.MOUNTAINS: return '#666666';
+      case TERRAIN.SNOW: return '#ffffff';
+      case TERRAIN.JUNGLE: return '#339933';
+      default: return '#66cc66';
+    }
+  }
+
+  function getTerrainName(terrainType) {
+    switch (terrainType) {
+      case TERRAIN.DEEP_WATER: return 'Deep Water';
+      case TERRAIN.SHALLOW_WATER: return 'Shallow Water';
+      case TERRAIN.DESERT: return 'Desert';
+      case TERRAIN.GRASS: return 'Grassland';
+      case TERRAIN.FOREST: return 'Forest';
+      case TERRAIN.PLAINS: return 'Plains';
+      case TERRAIN.HILLS: return 'Hills';
+      case TERRAIN.MOUNTAINS: return 'Mountains';
+      case TERRAIN.SNOW: return 'Snow';
+      case TERRAIN.JUNGLE: return 'Jungle';
+      default: return 'Unknown';
+    }
+  }
+
+  function moveUnit(unit, newX, newY) {
+    const tile = movementTiles.find(t => t.x === newX && t.y === newY);
+    if (!tile) return;
+
+    const gameUnit = gameData.player.units.find(u => u.id === unit.id);
+    if (!gameUnit) return;
+
+    const movementCost = tile.movementCost || 1;
+    gameUnit.movement_points_left = Math.max(0, gameUnit.movement_points_left - movementCost);
+
+    gameUnit.position.x = newX;
+    gameUnit.position.y = newY;
+
+    exploreArea(newX, newY, 2);
+
+    gameData.map.explored = JSON.parse(JSON.stringify(exploredMap));
+
+    const renderUnit = units.find(u => u.id === unit.id);
+    if (renderUnit) {
+      renderUnit.x = newX;
+      renderUnit.y = newY;
+      renderUnit.movementLeft = gameUnit.movement_points_left;
+    }
+
+    selectedTile = {
+      x: newX,
+      y: newY,
+      terrain: terrainMap[newY][newX],
+      city: cities.find(c => c.x === newX && c.y === newY),
+      resource: resources.find(r => r.x === newX && r.y === newY),
+      unit: renderUnit,
+      explored: true
+    };
+
+    if (gameUnit.movement_points_left > 0) {
+      activeUnit = renderUnit;
+      movementTiles = calculateMovementOptions(renderUnit);
+    } else {
+      activeUnit = null;
+      movementTiles = [];
+    }
+  }
+
+  function skipUnitTurn(unit) {
+    const gameUnit = gameData.player.units.find(u => u.id === unit.id);
+    if (!gameUnit) return;
+
+    gameUnit.movement_points_left = 0;
+
+    const renderUnit = units.find(u => u.id === unit.id);
+    if (renderUnit) {
+      renderUnit.movementLeft = 0;
+    }
+
+    activeUnit = null;
+    movementTiles = [];
+  }
+
+  function handleTileClick(x, y) {
+    if (activeUnit && movementTiles.some(tile => tile.x === x && tile.y === y)) {
+      moveUnit(activeUnit, x, y);
+      return;
+    }
+
+    const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS;
+    const city = cities.find(c => c.x === x && c.y === y);
+    const resource = resources.find(r => r.x === x && r.y === y);
+    const unit = units.find(u => u.x === x && u.y === y);
+    const isExplored = exploredMap[y] && exploredMap[y][x] === 1;
+
+    selectedTile = {
+      x, y,
+      terrain,
+      city,
+      resource,
+      unit,
+      explored: isExplored
+    };
+
+    if (unit?.id !== activeUnit?.id) {
+      activeUnit = null;
+      movementTiles = [];
+    }
+
+    if (unit && unit.owner === 'player' && unit.movementLeft > 0) {
+      activeUnit = unit;
+      movementTiles = calculateMovementOptions(unit);
+    }
+  }
+
+  function calculateMovementOptions(unit) {
+    if (!unit || unit.movementLeft <= 0) return [];
+
+    const options = [];
+    const maxDistance = unit.movementLeft;
+    const directions = [
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: -1, dy: 0 },
+      { dx: 1, dy: -1 },
+      { dx: 1, dy: 1 },
+      { dx: -1, dy: 1 },
+      { dx: -1, dy: -1 }
+    ];
+
+    directions.forEach(dir => {
+      const newX = unit.x + dir.dx;
+      const newY = unit.y + dir.dy;
+
+      if (newX >= 0 && newX < mapSize.width &&
+        newY >= 0 && newY < mapSize.height &&
+        isTileExplored(newX, newY)) {
+
+        const terrain = terrainMap[newY][newX];
+        if (isTerrainPassable(terrain, unit.type)) {
+          const hasUnit = units.some(u => u.x === newX && u.y === newY);
+          const hasEnemyCity = cities.some(c => c.x === newX && c.y === newY && c.owner !== 'player');
+
+          if (!hasUnit && !hasEnemyCity) {
+            options.push({ x: newX, y: newY, movementCost: getTerrainMovementCost(terrain) });
+          }
+        }
+      }
+    });
+
+    return options;
+  }
+
+  function isTerrainPassable(terrain, unitType) {
+    if (unitType === 'ship') {
+      return terrain === TERRAIN.DEEP_WATER || terrain === TERRAIN.SHALLOW_WATER;
+    }
+
+    return terrain !== TERRAIN.DEEP_WATER;
+  }
+
+  function getTerrainMovementCost(terrain) {
+    switch (terrain) {
+      case TERRAIN.DEEP_WATER: return 1;
+      case TERRAIN.SHALLOW_WATER: return 1;
+      case TERRAIN.PLAINS: return 1;
+      case TERRAIN.GRASS: return 1;
+      case TERRAIN.DESERT: return 2;
+      case TERRAIN.FOREST: return 2;
+      case TERRAIN.HILLS: return 2;
+      case TERRAIN.MOUNTAINS: return 3;
+      case TERRAIN.JUNGLE: return 2;
+      case TERRAIN.SNOW: return 2;
+      default: return 1;
+    }
+  }
+
+  function endTurn() {
+    gameData.turn++;
+
+    gameData.player.units.forEach(unit => {
+      unit.movement_points_left = unit.movement_points || 2;
+    });
+
+    updateRenderingArrays();
+
+    activeUnit = null;
+    movementTiles = [];
+
+    simulateAITurn();
+
+    selectedTile = null;
+  }
+
+  function simulateAITurn() {
+    console.log("AI turn completed");
   }
 
   function zoomIn() {
@@ -597,7 +682,6 @@
 
   async function saveAndExit() {
     try {
-      // Save the current game state
       const saveData = {
         game_id: gameData.game_id,
         name: $gameState.gameName || "My Game",
@@ -607,67 +691,31 @@
         map: gameData.map,
         turn: gameData.turn,
         current_player: gameData.current_player,
-        terrain: terrainMap,  // Save terrain data
-        exploration: exploredMap  // Save exploration data
+        terrain: terrainMap,
+        exploration: exploredMap
       };
-      
+
       await gameAPI.saveGame(saveData);
-      console.log("Game saved successfully");
-      
-      // End the game and navigate back to home
+
       endGame();
       navigate('/home');
     } catch (error) {
-      console.error("Error saving game:", error);
       if (confirm("Failed to save game. Do you want to exit anyway?")) {
         endGame();
         navigate('/home');
       }
     }
   }
-  
+
   function exitWithoutSaving() {
     if (confirm("Are you sure you want to exit without saving? All progress will be lost.")) {
       endGame();
       navigate('/home');
     }
   }
-
-  function getTerrainColor(terrainType) {
-    switch(terrainType) {
-      case TERRAIN.DEEP_WATER: return '#0066cc';
-      case TERRAIN.SHALLOW_WATER: return '#3399ff';
-      case TERRAIN.DESERT: return '#e6cc99';
-      case TERRAIN.GRASS: return '#66cc66';
-      case TERRAIN.FOREST: return '#006633';
-      case TERRAIN.PLAINS: return '#cccc99';
-      case TERRAIN.HILLS: return '#996633';
-      case TERRAIN.MOUNTAINS: return '#666666';
-      case TERRAIN.SNOW: return '#ffffff';
-      case TERRAIN.JUNGLE: return '#339933';
-      default: return '#66cc66';
-    }
-  }
-
-  function getTerrainName(terrainType) {
-    switch(terrainType) {
-      case TERRAIN.DEEP_WATER: return 'Deep Water';
-      case TERRAIN.SHALLOW_WATER: return 'Shallow Water';
-      case TERRAIN.DESERT: return 'Desert';
-      case TERRAIN.GRASS: return 'Grassland';
-      case TERRAIN.FOREST: return 'Forest';
-      case TERRAIN.PLAINS: return 'Plains';
-      case TERRAIN.HILLS: return 'Hills';
-      case TERRAIN.MOUNTAINS: return 'Mountains';
-      case TERRAIN.SNOW: return 'Snow';
-      case TERRAIN.JUNGLE: return 'Jungle';
-      default: return 'Unknown';
-    }
-  }
 </script>
 
 <svelte:head>
-  <!-- Ensure full screen capabilities -->
   <style>
     body, html {
       margin: 0;
@@ -696,11 +744,13 @@
       <button on:click={() => navigate('/new-game')}>Back to New Game</button>
     </div>
   {:else if gameStarted}
-    <!-- Game controls row -->
     <div class="map-controls">
       <div class="left-controls">
         <button class="menu-button" on:click={togglePauseMenu}>☰ Menu</button>
         <span class="game-info">Turn: {gameData.turn} | Difficulty: {gameData.difficulty?.charAt(0).toUpperCase() + gameData.difficulty?.slice(1) || 'Easy'}</span>
+      </div>
+      <div class="center-controls">
+        <button class="end-turn-button" on:click={endTurn}>End Turn</button>
       </div>
       <div class="right-controls">
         <button on:click={zoomIn} title="Zoom In">+</button>
@@ -708,7 +758,7 @@
         <button on:click={centerMapOnPlayer} title="Center Map">⌖</button>
       </div>
     </div>
-    
+
     <div 
       class="map-container"
       class:blurred={showPauseMenu}
@@ -725,6 +775,7 @@
           {#each Array(mapSize.width) as _, x}
             {@const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS}
             {@const isExplored = isTileExplored(x, y)}
+            {@const isMoveTile = movementTiles.some(tile => tile.x === x && tile.y === y)}
             
             <div 
               class="map-tile"
@@ -737,8 +788,8 @@
               "
               on:click={() => handleTileClick(x, y)}
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
+              class:movement-option={isMoveTile}
             >
-              <!-- Only show contents for explored tiles -->
               {#if isExplored}
                 {#if x % 10 === 0 && y % 10 === 0}
                   <div class="coord-marker">{x},{y}</div>
@@ -764,20 +815,34 @@
                 {/each}
                 
                 {#each units.filter(unit => unit.x === x && unit.y === y) as unit}
-                  <div class="unit-marker" class:enemy={unit.owner === 'ai'} class:player={unit.owner === 'player'}>
+                  <div 
+                    class="unit-marker" 
+                    class:enemy={unit.owner === 'ai'} 
+                    class:player={unit.owner === 'player'}
+                    class:active={activeUnit && activeUnit.id === unit.id}
+                    class:no-moves={unit.owner === 'player' && unit.movementLeft <= 0}
+                  >
                     {unit.type === 'warrior' ? '⚔️' : 
                       unit.type === 'archer' ? '🏹' : 
-                      unit.type === 'knight' ? '🐎' : 
+                      unit.type === 'knight' ? '🐎' :
+                      unit.type === 'settler' ? '👨‍🌾' :
                       unit.type === 'unknown' ? '❓' : '👨‍🌾'}
+                      
+                    {#if unit.owner === 'player'}
+                      <div class="unit-moves">{unit.movementLeft}/{unit.movement}</div>
+                    {/if}
                   </div>
                 {/each}
+              {/if}
+              
+              {#if isMoveTile}
+                <div class="movement-indicator"></div>
               {/if}
             </div>
           {/each}
         {/each}
       </div>
       
-      <!-- Fog of war mask overlay -->
       <div 
         class="fog-of-war"
         style="transform: translate({offsetX}px, {offsetY}px) scale({zoomLevel});"
@@ -801,7 +866,6 @@
       </div>
     </div>
     
-    <!-- Tile info overlay -->
     {#if selectedTile && !showPauseMenu}
       <div class="tile-info-overlay">
         <div class="tile-info-card">
@@ -814,6 +878,7 @@
             <div class="terrain-info">
               <h5>Terrain: {getTerrainName(selectedTile.terrain)}</h5>
               <div class="terrain-sample" style="background-color: {getTerrainColor(selectedTile.terrain)};"></div>
+              <p>Movement Cost: {getTerrainMovementCost(selectedTile.terrain)}</p>
             </div>
             
             {#if selectedTile.city}
@@ -821,6 +886,8 @@
                 <h5>City: {selectedTile.city.name}</h5>
                 <p>Size: {selectedTile.city.size}</p>
                 <p>Owner: {selectedTile.city.owner === 'player' ? 'You' : 'AI'}</p>
+                <p>Strength: {selectedTile.city.strength}</p>
+                <p>Health: {selectedTile.city.health}/100</p>
               </div>
             {/if}
             
@@ -835,6 +902,28 @@
               <div class="unit-info">
                 <h5>Unit: {selectedTile.unit.type}</h5>
                 <p>Owner: {selectedTile.unit.owner === 'player' ? 'You' : 'AI'}</p>
+                <p>Strength: {selectedTile.unit.strength}</p>
+                <p>Health: {selectedTile.unit.health}/100</p>
+                
+                {#if selectedTile.unit.owner === 'player'}
+                  <p>Movement: {selectedTile.unit.movementLeft}/{selectedTile.unit.movement}</p>
+                  
+                  {#if selectedTile.unit.movementLeft > 0}
+                    <button 
+                      class="unit-action-button"
+                      on:click={() => {
+                        activeUnit = selectedTile.unit;
+                        movementTiles = calculateMovementOptions(selectedTile.unit);
+                      }}
+                    >
+                      Move
+                    </button>
+                  {/if}
+                  
+                  <button class="unit-action-button" on:click={() => skipUnitTurn(selectedTile.unit)}>
+                    Skip Turn
+                  </button>
+                {/if}
               </div>
             {/if}
             
@@ -848,7 +937,6 @@
       </div>
     {/if}
     
-    <!-- Pause menu overlay -->
     {#if showPauseMenu}
       <div class="pause-menu-overlay">
         <div class="pause-menu">
@@ -880,7 +968,6 @@
       </div>
     {/if}
     
-    <!-- Resources info at the bottom -->
     <div class="resources-overlay">
       <div class="resources-display">
         <div class="resource-item">
@@ -982,6 +1069,7 @@
     background-color: rgba(0, 0, 0, 0.7);
     color: white;
     z-index: 10;
+    align-items: center;
   }
   
   .left-controls, .right-controls {
@@ -990,21 +1078,24 @@
     gap: 0.5rem;
   }
   
-  .map-controls button {
-    padding: 0.3rem 0.6rem;
-    background-color: #333;
+  .center-controls {
+    display: flex;
+    align-items: center;
+  }
+  
+  .end-turn-button {
+    padding: 0.5rem 1rem;
+    background-color: #4CAF50;
     color: white;
-    border: 1px solid #555;
+    font-weight: bold;
+    border: 2px solid #2E7D32;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 1rem;
   }
   
-  .menu-button {
-    font-size: 1.1rem;
-  }
-  
-  .game-info {
-    font-size: 0.9rem;
+  .end-turn-button:hover {
+    background-color: #66BB6A;
   }
   
   .map-container {
@@ -1045,12 +1136,26 @@
     z-index: 10;
   }
   
-  /* Tile info overlay - Updated to ensure it stays on top */
+  .movement-option {
+    position: relative;
+    border: 2px dashed rgba(255, 255, 255, 0.7) !important;
+  }
+  
+  .movement-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+  }
+  
   .tile-info-overlay {
-    position: fixed; /* Changed from absolute to fixed */
+    position: fixed;
     top: 60px;
     right: 10px;
-    z-index: 200; /* Increased z-index */
+    z-index: 200;
     max-width: 300px;
     width: 100%;
     pointer-events: none;
@@ -1063,10 +1168,9 @@
     padding: 1rem;
     pointer-events: auto;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2); /* Added border for better visibility */
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
   
-  /* Updated tile-info-header styles for proper close button positioning */
   .tile-info-header {
     display: flex;
     justify-content: space-between;
@@ -1094,7 +1198,6 @@
     color: #ff9999;
   }
   
-  /* City, resource and unit markers */
   .city-marker {
     position: absolute;
     z-index: 5;
@@ -1155,6 +1258,9 @@
     bottom: 2px;
     right: 2px;
     font-size: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   
   .unit-marker.enemy {
@@ -1165,7 +1271,39 @@
     text-shadow: 0 0 3px green;
   }
   
-  /* Fog of war */
+  .unit-marker.active {
+    filter: drop-shadow(0 0 4px yellow);
+    transform: scale(1.2);
+  }
+  
+  .unit-marker.no-moves {
+    opacity: 0.6;
+  }
+  
+  .unit-moves {
+    font-size: 0.6rem;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+    padding: 0 2px;
+    margin-top: 2px;
+  }
+  
+  .unit-action-button {
+    background-color: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    padding: 3px 8px;
+    margin: 2px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .unit-action-button:hover {
+    background-color: #555;
+  }
+  
   .fog-of-war {
     position: absolute;
     top: 0;
@@ -1184,7 +1322,6 @@
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
   }
   
-  /* Pause menu */
   .pause-menu-overlay {
     position: fixed;
     top: 0;
@@ -1260,7 +1397,6 @@
     margin: 0.3rem 0;
   }
 
-  /* Reset resources overlay to original styling */
   .resources-overlay {
     position: fixed;
     bottom: 0;
@@ -1268,7 +1404,7 @@
     width: 100%;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 0.5rem;
-    z-index: 20; /* Original z-index */
+    z-index: 20;
   }
   
   .resources-display {

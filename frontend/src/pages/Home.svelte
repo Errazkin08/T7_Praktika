@@ -21,7 +21,7 @@
     <div class="option-card" on:click={() => navigate('/new-game')}>
       <div class="option-icon">🎮</div>
       <h2>New Game</h2>
-      <p>Start a new civilization and conquer the world</p>
+      <p>Start a new CIVilizaTu and conquer the world</p>
     </div>
     
     <div class="option-card" on:click={() => navigate('/load-game')}>

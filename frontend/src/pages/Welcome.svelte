@@ -13,8 +13,8 @@
 
 <div class="welcome-page">
   <div class="welcome-container">
-    <h1>Civilization Game</h1>
-    <p>Welcome to the Civilization Strategy Game</p>
+    <h1>CIVilizaTu Game</h1>
+    <p>Welcome to the CIVilizaTu Strategy Game</p>
     
     <div class="action-buttons">
       <button class="btn-primary" on:click={() => navigate('/login')}>

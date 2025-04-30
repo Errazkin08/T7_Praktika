@@ -228,6 +228,55 @@ edo
 }
 ```
 
+### Mapen Kudeaketarako
+
+#### Mapa berri bat sortu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/maps`
+- **Deskribapena:** Mapa berri bat sortzen du jokoan erabiltzeko
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "width": 10,
+    "height": 10,
+    "startPoint": [5, 5],
+    "difficulty": "easy"
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Map created successfully",
+    "map_id": "60a1b2c3d4e5f6g7h8i9j0"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Width, height, startPoint, and difficulty are required"
+}
+```
+edo
+```json
+{
+    "error": "Width and height must be integers"
+}
+```
+edo
+```json
+{
+    "error": "StartPoint must be a list of two integers"
+}
+```
+edo
+```json
+{
+    "error": "Difficulty must be 'easy', 'medium', or 'hard'"
+}
+```
+
 ## Erroreen Kudeaketa
 
 Erroreen kasuan, API-ak ondorengo egiturako erantzunak bueltatzen ditu:

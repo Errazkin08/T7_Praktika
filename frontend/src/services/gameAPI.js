@@ -159,5 +159,62 @@ export const gameAPI = {
       console.error(`Error deleting game ${gameId}:`, error);
       throw error;
     }
+  },
+
+  /**
+   * Get map data from the server
+   */
+  async getMapData() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/map`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch map data: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching map data:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Save map data to server
+   */
+  async saveMapData(mapData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/map`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(mapData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save map data: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error saving map data:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get first map from database
+   * Returns map data in format: { width, height, grid, startPoint }
+   */
+  async getFirstMap() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/maps/first`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch map: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching first map:", error);
+      throw error;
+    }
   }
 };

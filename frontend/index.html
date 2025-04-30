@@ -3,10 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hello World Svelte App</title>
+    <title>Civilization Game</title>
+    <style>
+      /* Basic default styling */
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+      }
+      .error-container {
+        padding: 20px;
+        margin: 50px auto;
+        max-width: 600px;
+        background-color: #ffebee;
+        color: #c62828;
+        border-radius: 4px;
+        text-align: center;
+      }
+    </style>
+    <!-- Add error handling for script loading -->
+    <script>
+      window.addEventListener('error', function(e) {
+        console.error('Global error caught:', e.error);
+      });
+    </script>
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <noscript>
+      <div class="error-container">
+        <h2>JavaScript Required</h2>
+        <p>This application requires JavaScript to run. Please enable JavaScript in your browser settings.</p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.js" onerror="document.body.innerHTML = '<div class=\'error-container\'><h2>Application Error</h2><p>Failed to load the application. Please check your network connection and try again.</p><button onclick=\'window.location.reload()\'>Reload</button></div>'"></script>
   </body>
 </html>

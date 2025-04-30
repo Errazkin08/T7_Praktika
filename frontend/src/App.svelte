@@ -10,43 +10,54 @@
     clearUser();
     navigate('/');
   }
+  
+  // Check if we're on a page that should have minimal UI
+  $: isMapPage = $currentRoute === '/map';
+  $: isAuthPage = $currentRoute === '/login' || $currentRoute === '/register' || $currentRoute === '/';
+  $: showHeader = !isMapPage;
+  $: showFooter = !isMapPage && !isAuthPage;
 </script>
 
-<header>
+{#if showHeader}
+<header class:minimal={isAuthPage}>
   <nav>
     <div class="logo">Civilization Game</div>
     <div class="nav-links">
-      <a href="/" on:click|preventDefault={() => navigate('/')}>Home</a>
-      <a href="/proba" on:click|preventDefault={() => navigate('/proba')}>Proba</a>
-      <a href="/map" on:click|preventDefault={() => navigate('/map')}>Map</a>
-      
       {#if $user}
-        <!-- Show these links when user is logged in -->
+        <a href="/home" on:click|preventDefault={() => navigate('/home')}>Dashboard</a>
+        <a href="/new-game" on:click|preventDefault={() => navigate('/new-game')}>New Game</a>
+        <a href="/load-game" on:click|preventDefault={() => navigate('/load-game')}>Load Game</a>
         <span class="user-welcome">Welcome, {$user.username}</span>
-        <a href="/profile" on:click|preventDefault={() => navigate('/profile')}>Profile</a>
         <a href="/" on:click|preventDefault={handleLogout}>Logout</a>
-      {:else}
-        <!-- Show these links when user is logged out -->
+      {:else if !isAuthPage}
         <a href="/login" on:click|preventDefault={() => navigate('/login')}>Login</a>
         <a href="/register" on:click|preventDefault={() => navigate('/register')}>Register</a>
       {/if}
     </div>
   </nav>
 </header>
+{/if}
 
-<main>
+<main class:full-height={isAuthPage || isMapPage} class:map-view={isMapPage}>
   <svelte:component this={component} />
 </main>
 
+{#if showFooter}
 <footer>
   <p>© 2025 Civilization Game Project</p>
 </footer>
+{/if}
 
 <style>
   header {
     background-color: #333;
     color: white;
     padding: 1rem;
+  }
+  
+  header.minimal {
+    padding: 0.5rem 1rem;
+    background-color: rgba(51, 51, 51, 0.8);
   }
   
   nav {
@@ -58,6 +69,11 @@
   .logo {
     font-size: 1.5rem;
     font-weight: bold;
+  }
+  
+  .nav-links {
+    display: flex;
+    align-items: center;
   }
   
   .nav-links a {
@@ -77,13 +93,25 @@
     padding: 2rem;
   }
   
+  main.full-height {
+    max-width: 100%;
+    padding: 0;
+    min-height: calc(100vh - 60px);
+  }
+  
+  main.map-view {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  
   footer {
     background-color: #333;
     color: white;
     text-align: center;
     padding: 1rem;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
   }
 </style>

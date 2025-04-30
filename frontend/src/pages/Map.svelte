@@ -1,16 +1,98 @@
 <script>
   import { onMount } from 'svelte';
+  import { navigate } from '../router.js';
   import { gameAPI } from '../services/gameAPI.js';
+  import { gameState, pauseGame, endGame } from '../stores/gameState.js';
+  import { user } from '../stores/auth.js';
 
-  // Define multiple scenarios with different difficulties
-  const availableScenarios = [
-    {
-      _id: "europe_map_01",
-      name: "Europe Map - Easy",
-      description: "An easier scenario with more resources for the player",
-      difficulty: "easy",
-      map_size: { width: 100, height: 60 },
-      initial_state: {
+  let showPauseMenu = false;
+  let gameStarted = false;
+  let isLoading = true;
+  let loadingError = null;
+  
+  // Game data structures
+  let gameData = null;
+  let mapSize = { width: 30, height: 30 }; // Changed to 30x30
+  let tileSize = 24; // Larger tiles for better visibility with smaller map
+  let selectedTile = null;
+  let cities = [];
+  let resources = [];
+  let units = [];
+  let exploredMap = []; 
+  let terrainMap = [];
+  let offsetX = 0;
+  let offsetY = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let zoomLevel = 0.8; // Adjusted zoom level for better visibility
+  
+  const TERRAIN = {
+    DEEP_WATER: 0,
+    SHALLOW_WATER: 1,
+    DESERT: 2,
+    GRASS: 3,
+    FOREST: 4,
+    PLAINS: 5,
+    HILLS: 6,
+    MOUNTAINS: 7,
+    SNOW: 8,
+    JUNGLE: 9
+  };
+
+  // Make sure we have a valid game in progress
+  onMount(() => {
+    try {
+      // If no user is logged in, redirect to login
+      if (!$user) {
+        navigate('/');
+        return;
+      }
+      
+      // Set up keyboard shortcuts
+      window.addEventListener('keydown', handleKeyPress);
+      
+      // Initialize the game
+      initializeGame();
+      
+      return () => {
+        // Clean up event listeners
+        window.removeEventListener('keydown', handleKeyPress);
+      };
+    } catch (err) {
+      console.error("Error mounting Map component:", err);
+      loadingError = err.message;
+    }
+  });
+
+  function handleKeyPress(event) {
+    // ESC key toggles pause menu
+    if (event.key === 'Escape') {
+      togglePauseMenu();
+    }
+  }
+  
+  function togglePauseMenu() {
+    showPauseMenu = !showPauseMenu;
+    pauseGame(showPauseMenu);
+  }
+  
+  // Function to properly initialize the game with improved error handling
+  async function initializeGame() {
+    try {
+      isLoading = true;
+      loadingError = null;
+      
+      // Create basic game data
+      gameData = {
+        game_id: "game_" + Date.now(),
+        name: $gameState.gameName || "My Game",
+        scenario_id: "default_scenario",
+        created_at: new Date().toISOString(),
+        last_saved: new Date().toISOString(),
+        turn: 1,
+        current_player: "player",
+        cheats_used: [],
         player: {
           resources: {
             food: 50,
@@ -19,17 +101,12 @@
             gold: 300
           },
           cities: [
-            { id: "city1", name: 'London', position: { x: 30, y: 20 }, population: 4, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
-            { id: "city2", name: 'Paris', position: { x: 34, y: 24 }, population: 3, buildings: [], production: { current_item: "settler", turns_remaining: 3 } },
-            { id: "city5", name: 'Madrid', position: { x: 24, y: 36 }, population: 3, buildings: [], production: { current_item: "archer", turns_remaining: 2 } },
-            { id: "city9", name: 'Stockholm', position: { x: 52, y: 10 }, population: 2, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
-            { id: "city11", name: 'Barcelona', position: { x: 32, y: 34 }, population: 2, buildings: [], production: { current_item: null, turns_remaining: 0 } }
+            { id: "city1", name: 'London', position: { x: 12, y: 8 }, population: 4, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
+            { id: "city2", name: 'Paris', position: { x: 15, y: 12 }, population: 3, buildings: [], production: { current_item: "settler", turns_remaining: 3 } }
           ],
           units: [
-            { id: "unit1", type: 'warrior', position: { x: 32, y: 22 }, movement_points: 2, movement_points_left: 2, strength: 6, health: 100 },
-            { id: "unit2", type: 'archer', position: { x: 36, y: 26 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 },
-            { id: "unit3", type: 'knight', position: { x: 26, y: 34 }, movement_points: 3, movement_points_left: 3, strength: 8, health: 100 },
-            { id: "unit4", type: 'settler', position: { x: 40, y: 24 }, movement_points: 2, movement_points_left: 2, strength: 0, health: 100 }
+            { id: "unit1", type: 'warrior', position: { x: 13, y: 9 }, movement_points: 2, movement_points_left: 2, strength: 6, health: 100 },
+            { id: "unit2", type: 'archer', position: { x: 16, y: 13 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 }
           ],
           technologies: [
             { id: "agriculture", completed: true },
@@ -45,190 +122,183 @@
             gold: 150
           },
           cities: [
-            { id: "ai_city1", name: 'Berlin', position: { x: 50, y: 18 }, visible: false },
-            { id: "ai_city2", name: 'Rome', position: { x: 50, y: 38 }, visible: false },
-            { id: "ai_city3", name: 'Warsaw', position: { x: 60, y: 20 }, visible: false },
-            { id: "ai_city4", name: 'Athens', position: { x: 60, y: 42 }, visible: false }
+            { id: "ai_city1", name: 'Berlin', position: { x: 20, y: 8 }, visible: false },
+            { id: "ai_city2", name: 'Rome', position: { x: 20, y: 18 }, visible: false }
           ],
           units: [
-            { id: "ai_unit1", type: 'warrior', position: { x: 48, y: 20 }, visible: false },
-            { id: "ai_unit2", type: 'archer', position: { x: 58, y: 22 }, visible: false }
+            { id: "ai_unit1", type: 'warrior', position: { x: 19, y: 9 }, visible: false }
           ],
           technologies: []
         },
         map: {
           explored: [],
           visible_objects: [
-            { type: "resource", resource_type: "iron", position: { x: 40, y: 30 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 38, y: 20 }, improved: false },
-            { type: "resource", resource_type: "gold", position: { x: 56, y: 24 }, improved: false },
-            { type: "resource", resource_type: "iron", position: { x: 54, y: 36 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 64, y: 22 }, improved: false },
-            { type: "resource", resource_type: "gold", position: { x: 28, y: 30 }, improved: false },
-            { type: "resource", resource_type: "iron", position: { x: 72, y: 16 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 44, y: 42 }, improved: false },
-            { type: "resource", resource_type: "gold", position: { x: 36, y: 28 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 42, y: 26 }, improved: false },
-            { type: "resource", resource_type: "iron", position: { x: 32, y: 32 }, improved: false }
+            { type: "resource", resource_type: "iron", position: { x: 17, y: 15 }, improved: false },
+            { type: "resource", resource_type: "food", position: { x: 14, y: 10 }, improved: false },
+            { type: "resource", resource_type: "gold", position: { x: 11, y: 16 }, improved: false }
           ]
         }
-      }
-    },
-    {
-      _id: "europe_map_02",
-      name: "Europe Map - Hard",
-      description: "A challenging scenario with stronger AI opponents",
-      difficulty: "hard",
-      map_size: { width: 100, height: 60 },
-      initial_state: {
-        player: {
-          resources: {
-            food: 20,
-            production: 15,
-            science: 5,
-            gold: 100
-          },
-          cities: [
-            { id: "city1", name: 'London', position: { x: 30, y: 20 }, population: 2, buildings: [], production: { current_item: "warrior", turns_remaining: 3 } },
-            { id: "city2", name: 'Paris', position: { x: 34, y: 24 }, population: 2, buildings: [], production: { current_item: "settler", turns_remaining: 5 } }
-          ],
-          units: [
-            { id: "unit1", type: 'warrior', position: { x: 32, y: 22 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 },
-            { id: "unit2", type: 'settler', position: { x: 36, y: 26 }, movement_points: 2, movement_points_left: 2, strength: 0, health: 100 }
-          ],
-          technologies: [
-            { id: "agriculture", completed: true },
-            { id: "animal_husbandry", in_progress: true, turns_remaining: 4 }
-          ]
-        },
-        ai: {
-          resources: {
-            food: 50,
-            production: 35,
-            science: 15,
-            gold: 250
-          },
-          cities: [
-            { id: "ai_city1", name: 'Berlin', position: { x: 50, y: 18 }, visible: false },
-            { id: "ai_city2", name: 'Rome', position: { x: 50, y: 38 }, visible: false },
-            { id: "ai_city3", name: 'Warsaw', position: { x: 60, y: 20 }, visible: false },
-            { id: "ai_city4", name: 'Athens', position: { x: 60, y: 42 }, visible: false },
-            { id: "ai_city5", name: 'Moscow', position: { x: 80, y: 14 }, visible: false },
-            { id: "ai_city6", name: 'Istanbul', position: { x: 70, y: 36 }, visible: false },
-            { id: "ai_city7", name: 'Vienna', position: { x: 56, y: 26 }, visible: false }
-          ],
-          units: [
-            { id: "ai_unit1", type: 'warrior', position: { x: 48, y: 20 }, visible: false },
-            { id: "ai_unit2", type: 'archer', position: { x: 58, y: 22 }, visible: false },
-            { id: "ai_unit3", type: 'knight', position: { x: 52, y: 36 }, visible: false },
-            { id: "ai_unit4", type: 'warrior', position: { x: 62, y: 40 }, visible: false }
-          ],
-          technologies: []
-        },
-        map: {
-          explored: [],
-          visible_objects: [
-            { type: "resource", resource_type: "iron", position: { x: 40, y: 30 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 38, y: 20 }, improved: false },
-            { type: "resource", resource_type: "gold", position: { x: 56, y: 24 }, improved: false },
-            { type: "resource", resource_type: "iron", position: { x: 54, y: 36 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 64, y: 22 }, improved: false },
-            { type: "resource", resource_type: "gold", position: { x: 28, y: 30 }, improved: false },
-            { type: "resource", resource_type: "iron", position: { x: 72, y: 16 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 44, y: 42 }, improved: false }
-          ]
-        }
-      }
+      };
+      
+      // Initialize terrain and exploration
+      initializeTerrainMap();
+      console.log("Terrain map initialized");
+      
+      initializeExploration();
+      gameData.map.explored = JSON.parse(JSON.stringify(exploredMap));
+      console.log("Exploration initialized");
+      
+      updateRenderingArrays();
+      console.log("Rendering arrays updated");
+      
+      // Mark game as started
+      gameStarted = true;
+      isLoading = false;
+      
+      // Center the map on player after a short delay
+      setTimeout(centerMapOnPlayer, 200);
+      
+    } catch (error) {
+      console.error("Error starting new game:", error);
+      loadingError = error.message || "Unknown error occurred while starting the game.";
+      isLoading = false;
     }
-  ];
-
-  let scenarioData = availableScenarios[0];
-  let gameData = {
-    game_id: "game_" + Date.now(),
-    name: "Current Europe Game",
-    scenario_id: scenarioData._id,
-    created_at: new Date().toISOString(),
-    last_saved: new Date().toISOString(),
-    turn: 1,
-    current_player: "player",
-    cheats_used: [],
-    player: null,
-    ai: null,
-    map: null
-  };
-
-  let gameStarted = false;
-
-  let mapSize = scenarioData.map_size;
-  let tileSize = 20;
-  let selectedTile = null;
-
-  let cities = [];
-  let resources = [];
-  let units = [];
-
-  let exploredMap = []; // Tracks which tiles have been explored (1) or not (0)
-
-  const TERRAIN = {
-    DEEP_WATER: 0,
-    SHALLOW_WATER: 1,
-    DESERT: 2,
-    GRASS: 3,
-    FOREST: 4,
-    PLAINS: 5,
-    HILLS: 6,
-    MOUNTAINS: 7,
-    SNOW: 8,
-    JUNGLE: 9
-  };
-
-  let terrainMap = [];
-
-  let offsetX = 0;
-  let offsetY = 0;
-  let isDragging = false;
-  let dragStartX = 0;
-  let dragStartY = 0;
-  let zoomLevel = 0.5;
-
-  function zoomIn() {
-    zoomLevel += 0.1;
-    if (zoomLevel > 2) zoomLevel = 2;
-  }
-
-  function zoomOut() {
-    zoomLevel -= 0.1;
-    if (zoomLevel < 0.2) zoomLevel = 0.2;
-  }
-
-  function startDrag(event) {
-    isDragging = true;
-    dragStartX = event.clientX - offsetX;
-    dragStartY = event.clientY - offsetY;
-  }
-
-  function drag(event) {
-    if (!isDragging) return;
-
-    offsetX = event.clientX - dragStartX;
-    offsetY = event.clientY - dragStartY;
-  }
-
-  function endDrag() {
-    isDragging = false;
   }
 
   function initializeTerrainMap() {
-    terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.GRASS));
+    // First fill everything with deep water
+    terrainMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(TERRAIN.DEEP_WATER));
+    
+    // Create a realistic continent shape using noise/probability
+    const centerX = Math.floor(mapSize.width / 2);
+    const centerY = Math.floor(mapSize.height / 2);
+    const maxRadius = Math.min(mapSize.width, mapSize.height) * 0.4; // Size of the continent
+    
+    // Create landmass using distance from center + noise
+    for (let y = 0; y < mapSize.height; y++) {
+      for (let x = 0; x < mapSize.width; x++) {
+        // Calculate distance from center
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Add some noise to the distance
+        const noise = (Math.random() - 0.5) * maxRadius * 0.5;
+        const adjustedDistance = distance + noise;
+        
+        // Determine terrain based on distance from center
+        if (adjustedDistance < maxRadius * 0.6) {
+          // Main continent
+          terrainMap[y][x] = TERRAIN.PLAINS;
+          
+          // Add terrain variety
+          const terrainVariety = Math.random();
+          if (terrainVariety < 0.3) terrainMap[y][x] = TERRAIN.GRASS;
+          else if (terrainVariety < 0.4) terrainMap[y][x] = TERRAIN.HILLS;
+          else if (terrainVariety < 0.45) terrainMap[y][x] = TERRAIN.FOREST;
+          else if (terrainVariety < 0.48) terrainMap[y][x] = TERRAIN.MOUNTAINS;
+        } else if (adjustedDistance < maxRadius * 0.8) {
+          // Coast and islands
+          const coastal = Math.random();
+          if (coastal < 0.7) {
+            terrainMap[y][x] = TERRAIN.SHALLOW_WATER;
+          } else {
+            // Small islands
+            terrainMap[y][x] = Math.random() < 0.6 ? TERRAIN.GRASS : TERRAIN.PLAINS;
+          }
+        }
+      }
+    }
+    
+    // Create a river
+    let riverX = centerX + Math.floor(Math.random() * 5) - 2;
+    let riverY = 0;
+    
+    while (riverY < mapSize.height) {
+      // Make the river meander
+      riverX += Math.floor(Math.random() * 3) - 1;
+      
+      // Keep river in bounds
+      if (riverX < 0) riverX = 0;
+      if (riverX >= mapSize.width) riverX = mapSize.width - 1;
+      
+      // Add river tile
+      terrainMap[riverY][riverX] = TERRAIN.SHALLOW_WATER;
+      
+      // Sometimes make the river wider
+      if (Math.random() < 0.3 && riverX > 0) {
+        terrainMap[riverY][riverX - 1] = TERRAIN.SHALLOW_WATER;
+      }
+      if (Math.random() < 0.3 && riverX < mapSize.width - 1) {
+        terrainMap[riverY][riverX + 1] = TERRAIN.SHALLOW_WATER;
+      }
+      
+      riverY++;
+    }
+    
+    // Add desert area in one corner
+    const desertX = Math.random() < 0.5 ? 0 : mapSize.width - 6;
+    const desertY = Math.random() < 0.5 ? 0 : mapSize.height - 6;
+    
+    for (let y = desertY; y < desertY + 6 && y < mapSize.height; y++) {
+      for (let x = desertX; x < desertX + 6 && x < mapSize.width; x++) {
+        if (terrainMap[y][x] !== TERRAIN.DEEP_WATER && terrainMap[y][x] !== TERRAIN.SHALLOW_WATER) {
+          if (Math.random() < 0.8) {
+            terrainMap[y][x] = TERRAIN.DESERT;
+          }
+        }
+      }
+    }
+    
+    // Make sure cities and units are on valid terrain
+    if (gameData && gameData.player) {
+      gameData.player.cities.forEach(city => {
+        const x = city.position.x;
+        const y = city.position.y;
+        
+        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
+          const terrainType = terrainMap[y][x];
+          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
+            terrainMap[y][x] = TERRAIN.PLAINS;
+          }
+        }
+      });
+      
+      gameData.player.units.forEach(unit => {
+        const x = unit.position.x;
+        const y = unit.position.y;
+        
+        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
+          const terrainType = terrainMap[y][x];
+          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
+            terrainMap[y][x] = TERRAIN.PLAINS;
+          }
+        }
+      });
+    }
+    
+    if (gameData && gameData.ai) {
+      gameData.ai.cities.forEach(city => {
+        const x = city.position.x;
+        const y = city.position.y;
+        
+        if (y >= 0 && y < mapSize.height && x >= 0 && x < mapSize.width) {
+          const terrainType = terrainMap[y][x];
+          if (terrainType === TERRAIN.DEEP_WATER || terrainType === TERRAIN.SHALLOW_WATER) {
+            terrainMap[y][x] = TERRAIN.PLAINS;
+          }
+        }
+      });
+    }
   }
-
+  
   // Initialize exploration data with fog of war
   function initializeExploration() {
     // Create exploration map (0 = unexplored, 1 = explored)
     exploredMap = Array(mapSize.height).fill().map(() => Array(mapSize.width).fill(0));
     
     // Mark areas around player cities and units as explored
-    const exploreRadius = 4; // How many tiles around objects are visible
+    const exploreRadius = 4;
     
     // Explore around player cities
     if (gameData.player?.cities) {
@@ -248,167 +318,44 @@
     updateAIVisibility();
   }
 
-  // Mark an area as explored and update the game state
+  // Mark an area as explored
   function exploreArea(centerX, centerY, radius) {
     if (!exploredMap || !centerX || !centerY) return;
-    
-    let areaWasExplored = false;
     
     for (let y = Math.max(0, centerY - radius); y <= Math.min(mapSize.height - 1, centerY + radius); y++) {
       for (let x = Math.max(0, centerX - radius); x <= Math.min(mapSize.width - 1, centerX + radius); x++) {
         const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-        if (distance <= radius && exploredMap[y][x] !== 1) {
+        if (distance <= radius) {
           exploredMap[y][x] = 1;
-          areaWasExplored = true;
         }
       }
     }
     
-    // If something new was explored, update visibility and save game state
-    if (areaWasExplored) {
-      updateAIVisibility();
-      saveExplorationState();
-    }
+    updateAIVisibility();
   }
 
-  // This is used to check if a specific tile is explored
+  // Check if a tile is explored
   function isTileExplored(x, y) {
     return exploredMap && exploredMap[y] && exploredMap[y][x] === 1;
   }
   
-  // Update which AI elements should be visible based on explored areas
+  // Update which AI elements should be visible based on exploration
   function updateAIVisibility() {
     if (!gameData?.ai) return;
     
-    // Update AI cities visibility
     if (gameData.ai.cities) {
       gameData.ai.cities.forEach(city => {
-        const x = city.position.x;
-        const y = city.position.y;
-        city.visible = isTileExplored(x, y);
+        city.visible = isTileExplored(city.position.x, city.position.y);
       });
     }
     
-    // Update AI units visibility
     if (gameData.ai.units) {
       gameData.ai.units.forEach(unit => {
-        const x = unit.position.x;
-        const y = unit.position.y;
-        unit.visible = isTileExplored(x, y);
+        unit.visible = isTileExplored(unit.position.x, unit.position.y);
       });
     }
   }
   
-  // Save the current exploration state to the game data and backend
-  async function saveExplorationState() {
-    try {
-      // Update the game data with current exploration state
-      gameData.map.explored = [...exploredMap]; // Create a copy of the exploration data
-      
-      // Save to backend
-      await gameAPI.updateGame(gameData.game_id, gameData);
-      console.log("Exploration state saved");
-    } catch (error) {
-      console.error("Error saving exploration state:", error);
-    }
-  }
-  
-  // This function handles moving units and updating exploration
-  function moveUnit(unitId, newX, newY) {
-    // Find the unit
-    const unit = gameData.player.units.find(u => u.id === unitId);
-    if (!unit) return;
-    
-    // Store old position for updating the UI
-    const oldX = unit.position.x;
-    const oldY = unit.position.y;
-    
-    // Update unit position
-    unit.position.x = newX;
-    unit.position.y = newY;
-    unit.movement_points_left -= 1; // Reduce movement points
-    
-    // Explore the area around the new position
-    exploreArea(newX, newY, 3); // Units can see 3 tiles around them
-    
-    // Update the rendering arrays
-    updateRenderingArrays();
-  }
-
-  function handleTileClick(x, y) {
-    const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS;
-    const city = cities.find(c => c.x === x && c.y === y);
-    const resource = resources.find(r => r.x === x && r.y === y);
-    const unit = units.find(u => u.x === x && u.y === y);
-    const isExplored = exploredMap[y] && exploredMap[y][x] === 1;
-
-    selectedTile = { 
-      x, y, 
-      terrain, 
-      city, 
-      resource, 
-      unit,
-      explored: isExplored
-    };
-  }
-
-  function centerMapOnPlayer() {
-    if (gameData.player?.cities?.length > 0) {
-      const firstCity = gameData.player.cities[0];
-      const containerWidth = document.querySelector('.map-container')?.clientWidth || 800;
-      const containerHeight = document.querySelector('.map-container')?.clientHeight || 600;
-
-      offsetX = containerWidth/2 - firstCity.position.x * tileSize * zoomLevel;
-      offsetY = containerHeight/2 - firstCity.position.y * tileSize * zoomLevel;
-    }
-  }
-
-  function startNewGame() {
-    console.log("Starting new game with scenario:", scenarioData.name);
-
-    try {
-      gameStarted = true;
-
-      gameData = {
-        game_id: "game_" + Date.now(),
-        name: "Current Europe Game",
-        scenario_id: scenarioData._id,
-        created_at: new Date().toISOString(),
-        last_saved: new Date().toISOString(),
-        turn: 1,
-        current_player: "player",
-        cheats_used: [],
-        player: null,
-        ai: null,
-        map: null
-      };
-
-      mapSize = scenarioData.map_size;
-
-      initializeTerrainMap();
-      console.log("Terrain map initialized");
-
-      gameData.player = JSON.parse(JSON.stringify(scenarioData.initial_state.player));
-      gameData.ai = JSON.parse(JSON.stringify(scenarioData.initial_state.ai));
-      gameData.map = JSON.parse(JSON.stringify(scenarioData.initial_state.map));
-      console.log("Game data populated from scenario");
-
-      initializeExploration();
-      gameData.map.explored = JSON.parse(JSON.stringify(exploredMap));
-
-      console.log("Exploration initialized");
-
-      updateRenderingArrays();
-      console.log("Rendering arrays updated");
-
-      setTimeout(centerMapOnPlayer, 200);
-
-    } catch (error) {
-      console.error("Error starting new game:", error);
-      alert("Error starting game: " + error.message);
-    }
-  }
-
   function updateRenderingArrays() {
     cities = [
       ...gameData.player.cities.map(city => ({
@@ -472,30 +419,110 @@
       }));
   }
 
+  function handleTileClick(x, y) {
+    const terrain = terrainMap[y] ? terrainMap[y][x] : TERRAIN.GRASS;
+    const city = cities.find(c => c.x === x && c.y === y);
+    const resource = resources.find(r => r.x === x && r.y === y);
+    const unit = units.find(u => u.x === x && u.y === y);
+    const isExplored = exploredMap[y] && exploredMap[y][x] === 1;
+
+    selectedTile = { 
+      x, y, 
+      terrain, 
+      city, 
+      resource, 
+      unit,
+      explored: isExplored
+    };
+  }
+
+  function centerMapOnPlayer() {
+    if (gameData.player?.cities?.length > 0) {
+      const firstCity = gameData.player.cities[0];
+      const containerWidth = document.querySelector('.map-container')?.clientWidth || 800;
+      const containerHeight = document.querySelector('.map-container')?.clientHeight || 600;
+
+      offsetX = containerWidth/2 - firstCity.position.x * tileSize * zoomLevel;
+      offsetY = containerHeight/2 - firstCity.position.y * tileSize * zoomLevel;
+    }
+  }
+
+  function zoomIn() {
+    zoomLevel += 0.1;
+    if (zoomLevel > 2) zoomLevel = 2;
+  }
+
+  function zoomOut() {
+    zoomLevel -= 0.1;
+    if (zoomLevel < 0.2) zoomLevel = 0.2;
+  }
+
+  function startDrag(event) {
+    isDragging = true;
+    dragStartX = event.clientX - offsetX;
+    dragStartY = event.clientY - offsetY;
+  }
+
+  function drag(event) {
+    if (!isDragging) return;
+    offsetX = event.clientX - dragStartX;
+    offsetY = event.clientY - dragStartY;
+  }
+
+  function endDrag() {
+    isDragging = false;
+  }
+
+  async function saveAndExit() {
+    try {
+      // Save the current game state
+      const saveData = {
+        game_id: gameData.game_id,
+        name: $gameState.gameName || "My Game",
+        scenario_id: $gameState.currentScenario?._id || gameData.scenario_id,
+        // Include all the game state data here
+        player: gameData.player,
+        ai: gameData.ai,
+        map: gameData.map,
+        turn: gameData.turn,
+        current_player: gameData.current_player
+      };
+      
+      await gameAPI.saveGame(saveData);
+      console.log("Game saved successfully");
+      
+      // End the game and navigate back to home
+      endGame();
+      navigate('/home');
+    } catch (error) {
+      console.error("Error saving game:", error);
+      if (confirm("Failed to save game. Do you want to exit anyway?")) {
+        endGame();
+        navigate('/home');
+      }
+    }
+  }
+  
+  function exitWithoutSaving() {
+    if (confirm("Are you sure you want to exit without saving? All progress will be lost.")) {
+      endGame();
+      navigate('/home');
+    }
+  }
+
   function getTerrainColor(terrainType) {
     switch(terrainType) {
-      case TERRAIN.DEEP_WATER:
-        return '#0066cc';
-      case TERRAIN.SHALLOW_WATER:
-        return '#3399ff';
-      case TERRAIN.DESERT:
-        return '#e6cc99';
-      case TERRAIN.GRASS:
-        return '#66cc66';
-      case TERRAIN.FOREST:
-        return '#006633';
-      case TERRAIN.PLAINS:
-        return '#cccc99';
-      case TERRAIN.HILLS:
-        return '#996633';
-      case TERRAIN.MOUNTAINS:
-        return '#666666';
-      case TERRAIN.SNOW:
-        return '#ffffff';
-      case TERRAIN.JUNGLE:
-        return '#339933';
-      default:
-        return '#66cc66';
+      case TERRAIN.DEEP_WATER: return '#0066cc';
+      case TERRAIN.SHALLOW_WATER: return '#3399ff';
+      case TERRAIN.DESERT: return '#e6cc99';
+      case TERRAIN.GRASS: return '#66cc66';
+      case TERRAIN.FOREST: return '#006633';
+      case TERRAIN.PLAINS: return '#cccc99';
+      case TERRAIN.HILLS: return '#996633';
+      case TERRAIN.MOUNTAINS: return '#666666';
+      case TERRAIN.SNOW: return '#ffffff';
+      case TERRAIN.JUNGLE: return '#339933';
+      default: return '#66cc66';
     }
   }
 
@@ -516,33 +543,47 @@
   }
 </script>
 
-{#if !gameStarted}
-  <div class="scenario-selection-screen">
-    <h2>Select Scenario</h2>
-    <div class="scenario-options">
-      {#each availableScenarios as scenario}
-        <div 
-          class="scenario-card" 
-          class:selected={scenarioData._id === scenario._id}
-          on:click={() => scenarioData = scenario}
-        >
-          <h3>{scenario.name}</h3>
-          <p>{scenario.description}</p>
-          <div class="difficulty-badge {scenario.difficulty}">
-            {scenario.difficulty.toUpperCase()}
-          </div>
-        </div>
-      {/each}
+<svelte:head>
+  <!-- Ensure full screen capabilities -->
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</svelte:head>
+
+<div class="map-page" class:paused={showPauseMenu}>
+  {#if isLoading}
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <h2>Initializing Game...</h2>
+      {#if loadingError}
+        <div class="error-message">Error: {loadingError}</div>
+        <button class="retry-button" on:click={initializeGame}>Retry</button>
+      {/if}
     </div>
-    <button class="start-button" on:click|preventDefault={startNewGame}>Start Game</button>
-  </div>
-{:else}
-  <div class="map-page">
+  {:else if loadingError}
+    <div class="error">
+      <h2>Error loading game</h2>
+      <p>{loadingError}</p>
+      <button on:click={() => navigate('/new-game')}>Back to New Game</button>
+    </div>
+  {:else if gameStarted}
+    <!-- Game controls row -->
     <div class="map-controls">
-      <button on:click={zoomIn}>Zoom In (+)</button>
-      <button on:click={zoomOut}>Zoom Out (-)</button>
-      <button on:click={centerMapOnPlayer}>Center Map</button>
-      <span class="game-info">Turn: {gameData.turn} | Player: {gameData.current_player} | Difficulty: {scenarioData.difficulty}</span>
+      <div class="left-controls">
+        <button class="menu-button" on:click={togglePauseMenu}>☰ Menu</button>
+        <span class="game-info">Turn: {gameData.turn} | Difficulty: Normal</span>
+      </div>
+      <div class="right-controls">
+        <button on:click={zoomIn} title="Zoom In">+</button>
+        <button on:click={zoomOut} title="Zoom Out">-</button>
+        <button on:click={centerMapOnPlayer} title="Center Map">⌖</button>
+      </div>
     </div>
     
     <div 
@@ -634,128 +675,219 @@
           {/each}
         {/each}
       </div>
+      
+      <!-- Tile info overlay -->
+      {#if selectedTile}
+        <div class="tile-info-overlay">
+          <div class="tile-info-card">
+            <div class="tile-info-header">
+              <h4>Tile ({selectedTile.x}, {selectedTile.y})</h4>
+              <button class="close-button" on:click={() => selectedTile = null}>×</button>
+            </div>
+            
+            {#if selectedTile.explored}
+              <div class="terrain-info">
+                <h5>Terrain: {getTerrainName(selectedTile.terrain)}</h5>
+                <div class="terrain-sample" style="background-color: {getTerrainColor(selectedTile.terrain)};"></div>
+              </div>
+              
+              {#if selectedTile.city}
+                <div class="city-info">
+                  <h5>City: {selectedTile.city.name}</h5>
+                  <p>Size: {selectedTile.city.size}</p>
+                  <p>Owner: {selectedTile.city.owner === 'player' ? 'You' : 'AI'}</p>
+                </div>
+              {/if}
+              
+              {#if selectedTile.resource}
+                <div class="resource-info">
+                  <h5>Resource: {selectedTile.resource.type}</h5>
+                  <p>Status: {selectedTile.resource.improved ? 'Improved' : 'Not improved'}</p>
+                </div>
+              {/if}
+              
+              {#if selectedTile.unit}
+                <div class="unit-info">
+                  <h5>Unit: {selectedTile.unit.type}</h5>
+                  <p>Owner: {selectedTile.unit.owner === 'player' ? 'You' : 'AI'}</p>
+                </div>
+              {/if}
+              
+              {#if !selectedTile.city && !selectedTile.resource && !selectedTile.unit}
+                <p>Empty tile</p>
+              {/if}
+            {:else}
+              <p>This area is unexplored. Send units to reveal what's there.</p>
+            {/if}
+          </div>
+        </div>
+      {/if}
     </div>
     
-    <div class="info-panel">
-      <h3>{scenarioData.name}</h3>
-      <p>{scenarioData.description}</p>
-      <p>Difficulty: {scenarioData.difficulty}</p>
-      
+    <!-- Pause menu overlay -->
+    {#if showPauseMenu}
+      <div class="pause-menu-overlay">
+        <div class="pause-menu">
+          <div class="pause-header">
+            <h2>Game Paused</h2>
+            <button class="close-button" on:click={togglePauseMenu}>×</button>
+          </div>
+          
+          <div class="menu-options">
+            <button class="menu-option primary" on:click={togglePauseMenu}>
+              Continue Game
+            </button>
+            
+            <button class="menu-option" on:click={saveAndExit}>
+              Save and Exit
+            </button>
+            
+            <button class="menu-option danger" on:click={exitWithoutSaving}>
+              Exit Without Saving
+            </button>
+          </div>
+          
+          <div class="game-details">
+            <p>Game: {$gameState.gameName || "My Game"}</p>
+            <p>Turn: {gameData?.turn || 1}</p>
+          </div>
+        </div>
+      </div>
+    {/if}
+    
+    <!-- Resources and game info overlaid at the bottom -->
+    <div class="resources-overlay">
       <div class="resources-display">
         <div class="resource-item">
           <span class="resource-icon">🌾</span>
-          <span class="resource-amount">{gameData.player?.resources?.food || 0}</span>
+          <span class="resource-amount">{gameData?.player?.resources?.food || 0}</span>
         </div>
         <div class="resource-item">
           <span class="resource-icon">🔨</span>
-          <span class="resource-amount">{gameData.player?.resources?.production || 0}</span>
+          <span class="resource-amount">{gameData?.player?.resources?.production || 0}</span>
         </div>
         <div class="resource-item">
           <span class="resource-icon">📚</span>
-          <span class="resource-amount">{gameData.player?.resources?.science || 0}</span>
+          <span class="resource-amount">{gameData?.player?.resources?.science || 0}</span>
         </div>
         <div class="resource-item">
           <span class="resource-icon">💰</span>
-          <span class="resource-amount">{gameData.player?.resources?.gold || 0}</span>
+          <span class="resource-amount">{gameData?.player?.resources?.gold || 0}</span>
         </div>
       </div>
-      
-      {#if selectedTile}
-        <div class="selected-info">
-          <h4>Selected Tile: ({selectedTile.x}, {selectedTile.y})</h4>
-          
-          {#if selectedTile.explored}
-            <div class="terrain-info">
-              <h5>Terrain: {getTerrainName(selectedTile.terrain)}</h5>
-              <div class="terrain-sample" style="background-color: {getTerrainColor(selectedTile.terrain)};"></div>
-            </div>
-            
-            {#if selectedTile.city}
-              <div class="city-info">
-                <h5>City: {selectedTile.city.name}</h5>
-                <p>Size: {selectedTile.city.size}</p>
-                <p>Owner: {selectedTile.city.owner === 'player' ? 'You' : 'AI'}</p>
-              </div>
-            {/if}
-            
-            {#if selectedTile.resource}
-              <div class="resource-info">
-                <h5>Resource: {selectedTile.resource.type}</h5>
-                <p>Status: {selectedTile.resource.improved ? 'Improved' : 'Not improved'}</p>
-              </div>
-            {/if}
-            
-            {#if selectedTile.unit}
-              <div class="unit-info">
-                <h5>Unit: {selectedTile.unit.type}</h5>
-                <p>Owner: {selectedTile.unit.owner === 'player' ? 'You' : 'AI'}</p>
-              </div>
-            {/if}
-            
-            {#if !selectedTile.city && !selectedTile.resource && !selectedTile.unit}
-              <p>Empty tile</p>
-            {/if}
-          {:else}
-            <p>This area is unexplored. Send units to reveal what's there.</p>
-          {/if}
-        </div>
-      {:else}
-        <p>No tile selected. Click on a tile to see information.</p>
-      {/if}
     </div>
-  </div>
-{/if}
+  {:else}
+    <div class="error">
+      <h2>Game not started</h2>
+      <button on:click={() => navigate('/new-game')}>Start New Game</button>
+    </div>
+  {/if}
+</div>
 
 <style>
   .map-page {
-    display: grid;
-    grid-template-columns: 3fr 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 1rem;
-    height: calc(100vh - 15rem);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .map-page.paused {
+    filter: blur(2px);
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.8);
+    gap: 20px;
+  }
+
+  .loading-spinner {
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-top: 6px solid #4CAF50;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .error-message {
+    color: #ff5252;
+    background-color: rgba(255, 82, 82, 0.1);
+    padding: 10px;
+    border-radius: 5px;
+    max-width: 80%;
+    text-align: center;
+  }
+
+  .retry-button, .back-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    background-color: #4CAF50;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 10px;
+  }
+
+  .back-button {
+    background-color: #607D8B;
   }
   
   .map-controls {
-    grid-column: 1 / 3;
     display: flex;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background-color: #f0f0f0;
-    border-radius: 4px;
+    justify-content: space-between;
+    padding: 0.3rem 0.5rem;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    z-index: 10;
+  }
+  
+  .left-controls, .right-controls {
+    display: flex;
     align-items: center;
+    gap: 0.5rem;
   }
   
   .map-controls button {
-    padding: 0.5rem 1rem;
-    background-color: #4c66af;
+    padding: 0.3rem 0.6rem;
+    background-color: #333;
     color: white;
-    border: none;
+    border: 1px solid #555;
     border-radius: 4px;
     cursor: pointer;
   }
   
-  .map-controls button.active {
-    background-color: #d9534f;
-    font-weight: bold;
+  .menu-button {
+    font-size: 1.1rem;
   }
   
   .game-info {
-    margin-left: auto;
-    margin-right: 20px;
-    background-color: #eee;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-weight: bold;
+    font-size: 0.9rem;
   }
   
   .map-container {
-    grid-column: 1;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    overflow: hidden;
+    flex: 1;
     position: relative;
     cursor: grab;
     background-color: #0066cc;
+    overflow: hidden;
   }
   
   .map-grid {
@@ -770,9 +902,10 @@
     transition: all 0.1s;
   }
   
-  .map-tile.unexplored {
-    background-color: #000 !important;
-    opacity: 0.9;
+  .map-tile.selected {
+    border: 2px solid #ffcc00;
+    box-shadow: 0 0 10px #ffcc00;
+    z-index: 5;
   }
   
   .coord-marker {
@@ -787,56 +920,43 @@
     z-index: 10;
   }
   
-  .scenario-selector {
+  /* Tile info overlay */
+  .tile-info-overlay {
     position: absolute;
-    top: 10px;
+    top: 60px;
     right: 10px;
-    z-index: 100;
-    background: rgba(255,255,255,0.9);
-    padding: 8px;
-    border-radius: 5px;
-    display: flex;
-    gap: 8px;
+    z-index: 20;
+    max-width: 300px;
+    width: 100%;
+    pointer-events: none;
   }
   
-  .scenario-selector select {
-    padding: 4px;
-    border-radius: 4px;
-  }
-  
-  .info-panel {
-    grid-column: 2;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+  .tile-info-card {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 8px;
     padding: 1rem;
-    background-color: #f9f9f9;
-    overflow-y: auto;
+    pointer-events: auto;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   }
   
-  .resources-display {
+  .tile-info-header {
     display: flex;
     justify-content: space-between;
-    margin: 1rem 0;
-    background-color: #fff;
-    padding: 0.5rem;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  
-  .resource-item {
-    display: flex;
     align-items: center;
-    gap: 0.3rem;
+    margin-bottom: 0.5rem;
   }
   
-  .resource-icon {
-    font-size: 1.2rem;
+  .close-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
   }
   
-  .resource-amount {
-    font-weight: bold;
-  }
-  
+  /* City, resource and unit markers */
   .city-marker {
     position: absolute;
     z-index: 5;
@@ -880,93 +1000,34 @@
     text-shadow: 0 0 3px black, 0 0 3px black, 0 0 3px black, 0 0 3px black;
     pointer-events: none;
   }
-
-  .scenario-selection-screen {
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: linear-gradient(to bottom, #2c3e50, #4c669f);
-    color: white;
-    padding: 2rem;
-  }
   
-  .scenario-options {
-    display: flex;
-    gap: 2rem;
-    margin: 2rem 0;
-    width: 100%;
-    max-width: 1200px;
-    justify-content: center;
-  }
-  
-  .scenario-card {
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    padding: 1.5rem;
-    width: 300px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    color: #333;
-    border: 3px solid transparent;
-  }
-  
-  .scenario-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-  }
-  
-  .scenario-card.selected {
-    border-color: #4CAF50;
-    background-color: #f0f7f0;
-  }
-  
-  .difficulty-badge {
+  .resource-marker {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: bold;
+    z-index: 4;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1rem;
+    text-shadow: 0 0 3px white;
   }
   
-  .difficulty-badge.easy {
-    background-color: #4CAF50;
-    color: white;
+  .unit-marker {
+    position: absolute;
+    z-index: 6;
+    bottom: 2px;
+    right: 2px;
+    font-size: 1rem;
   }
   
-  .difficulty-badge.hard {
-    background-color: #f44336;
-    color: white;
+  .unit-marker.enemy {
+    text-shadow: 0 0 3px red;
   }
   
-  .start-button {
-    padding: 0.8rem 2rem;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 1.2rem;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
+  .unit-marker.player {
+    text-shadow: 0 0 3px green;
   }
   
-  .start-button:hover {
-    background-color: #45a049;
-    transform: translateY(-2px);
-  }
-  
-  .map-controls button.toggled {
-    background-color: #C9302C;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
-  }
-
+  /* Fog of war */
   .fog-of-war {
     position: absolute;
     top: 0;
@@ -983,5 +1044,138 @@
     background-color: black;
     opacity: 0.85;
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
+  }
+  
+  /* Pause menu */
+  .pause-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  
+  .pause-menu {
+    background-color: #1a1a1a;
+    border: 2px solid #4CAF50;
+    border-radius: 10px;
+    padding: 2rem;
+    width: 400px;
+    color: white;
+  }
+  
+  .pause-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+  }
+  
+  .menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .menu-option {
+    padding: 0.8rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #333;
+    color: white;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .menu-option:hover {
+    transform: translateY(-2px);
+  }
+  
+  .menu-option.primary {
+    background-color: #4CAF50;
+    font-weight: bold;
+  }
+  
+  .menu-option.danger {
+    background-color: #f44336;
+  }
+  
+  .game-details {
+    font-size: 0.9rem;
+    color: #aaa;
+    border-top: 1px solid #333;
+    padding-top: 1rem;
+  }
+  
+  .game-details p {
+    margin: 0.3rem 0;
+  }
+  
+  /* Resources overlay */
+  .resources-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 0.5rem;
+    z-index: 20;
+  }
+  
+  .resources-display {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    color: white;
+  }
+  
+  .resource-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .resource-icon {
+    font-size: 1.2rem;
+  }
+  
+  .resource-amount {
+    font-weight: bold;
+    font-size: 1.1rem;
+  }
+  
+  /* Terrain info */
+  .terrain-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .terrain-sample {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+  }
+  
+  /* Other info styles */
+  .city-info, .resource-info, .unit-info {
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid #333;
+  }
+  
+  .city-info h5, .resource-info h5, .unit-info h5 {
+    margin-bottom: 0.3rem;
+    color: #4CAF50;
   }
 </style>

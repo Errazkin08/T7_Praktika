@@ -1,6 +1,5 @@
 <script>
   import { navigate } from '../router.js';
-  import { loginUser } from '../api.js';
   import { setUser } from '../stores/auth.js';
   
   let username = "";
@@ -13,18 +12,21 @@
       error = "";
       isLoading = true;
       
+      // For development purposes, allow any login
       console.log("Login attempt:", username);
-      const response = await loginUser(username, password);
+      
+      // Mock login response
+      const fakeUser = {
+        username: username,
+        score: 100,
+        level: 1
+      };
       
       // Store user data in the auth store
-      setUser({
-        username: response.user.username,
-        score: response.user.score,
-        level: response.user.level
-      });
+      setUser(fakeUser);
       
       // Navigate to home page after successful login
-      navigate('/');
+      navigate('/home');
     } catch (err) {
       console.error("Login error:", err);
       error = err.message || "Failed to login. Please check your credentials.";

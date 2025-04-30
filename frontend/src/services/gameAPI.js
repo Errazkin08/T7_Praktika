@@ -118,6 +118,30 @@ export const gameAPI = {
   },
 
   /**
+   * Create a new game
+   */
+  async createGame(gameData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/games`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(gameData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create game: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error creating game:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Delete a saved game
    */
   async deleteGame(gameId) {

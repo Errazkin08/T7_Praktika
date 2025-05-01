@@ -305,6 +305,307 @@ edo
 }
 ```
 
+### Partiden Kudeaketarako
+
+#### Partida berri bat sortu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/game`
+- **Deskribapena:** Partida berri bat sortzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "map": "maparen_datuak",
+    "difficulty": "zailtasun_maila"
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Game added successfully"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+
+#### Uneko partida lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/game`
+- **Deskribapena:** Uneko partida itzultzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    // Partidaren datu guztiak
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "No game found"
+}
+```
+
+#### Partida gorde
+
+- **Metodoa:** POST
+- **Bidea:** `/api/game/save`
+- **Deskribapena:** Uneko partida gordetzen du datu-basean
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Game saved successfully"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Failed to save game"
+}
+```
+
+### Tropen Kudeaketarako
+
+#### Talde militarren motak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/troops/types`
+- **Deskribapena:** Eskuragarri dauden tropa mota guztiak itzultzen ditu
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+[
+    {
+        "type_id": "warrior",
+        "name": "Warrior",
+        "category": "infantry",
+        "health": 100,
+        "attack": 10,
+        "defense": 10,
+        "movement": 2,
+        "cost": {
+            "food": 50,
+            "gold": 10
+        },
+        "abilities": ["basic_attack"],
+        "description": "Basic infantry unit"
+    },
+    // Beste tropa motak...
+]
+```
+
+#### Talde militar mota zehatz bat lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/troops/types/{type_id}`
+- **Deskribapena:** Tropa mota zehatz baten informazioa itzultzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "type_id": "warrior",
+    "name": "Warrior",
+    "category": "infantry",
+    "health": 100,
+    "attack": 10,
+    "defense": 10,
+    "movement": 2,
+    "cost": {
+        "food": 50,
+        "gold": 10
+    },
+    "abilities": ["basic_attack"],
+    "description": "Basic infantry unit"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Troop type not found"
+}
+```
+
+#### Tropa berri bat sortu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/troops`
+- **Deskribapena:** Jokalariaren armadara tropa berri bat gehitzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "type_id": "warrior",
+    "position": [10, 5]
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Troop added successfully",
+    "troop": {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "type_id": "warrior",
+        "name": "Warrior",
+        "health": 100,
+        "attack": 10,
+        "defense": 10,
+        "movement": 2,
+        "position": [10, 5],
+        "status": "ready",
+        "created_at": "2023-05-12T14:20:30.456Z"
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Type ID and position are required"
+}
+```
+edo
+```json
+{
+    "error": "Invalid troop type"
+}
+```
+edo
+```json
+{
+    "error": "Position is out of map bounds"
+}
+```
+
+#### Jokalariaren tropa guztiak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/troops`
+- **Deskribapena:** Jokalariaren tropa guztiak itzultzen ditu
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+[
+    {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "type_id": "warrior",
+        "name": "Warrior",
+        "health": 100,
+        "attack": 10,
+        "defense": 10,
+        "movement": 2,
+        "position": [10, 5],
+        "status": "ready",
+        "created_at": "2023-05-12T14:20:30.456Z"
+    },
+    // Beste tropak...
+]
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+
+#### Tropa mugitu
+
+- **Metodoa:** PUT
+- **Bidea:** `/api/troops/{troop_id}/move`
+- **Deskribapena:** Tropa posizio berri batera mugitzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "position": [12, 6]
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Troop position updated"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Position is required"
+}
+```
+edo
+```json
+{
+    "error": "Position is out of map bounds"
+}
+```
+edo
+```json
+{
+    "error": "Troop not found"
+}
+```
+
+#### Tropa egoera eguneratu
+
+- **Metodoa:** PUT
+- **Bidea:** `/api/troops/{troop_id}/status`
+- **Deskribapena:** Tropa baten egoera eguneratzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "status": "attacked"
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Troop status updated"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Status is required"
+}
+```
+edo
+```json
+{
+    "error": "Invalid status"
+}
+```
+edo
+```json
+{
+    "error": "Troop not found"
+}
+```
+
+#### Tropa guztien egoera berrabiarazi
+
+- **Metodoa:** POST
+- **Bidea:** `/api/troops/reset`
+- **Deskribapena:** Tropa guztien egoera "ready" gisa ezartzen du, txanda berriaren hasieran
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "All troops reset to ready status"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "No troops found for player"
+}
+```
+
 ## Erroreen Kudeaketa
 
 Erroreen kasuan, API-ak ondorengo egiturako erantzunak bueltatzen ditu:

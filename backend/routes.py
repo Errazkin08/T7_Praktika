@@ -160,6 +160,17 @@ def get_first_map_endpoint():
     except Exception as e:
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
     
+@routes_blueprint.route('/api/maps', methods=['GET'])
+def get_maps():
+    """Get all maps from the database"""
+    try:
+        maps = get_all_maps()
+        if not maps or len(maps) == 0:
+            return jsonify({"message": "No maps found"}), 404
+        return jsonify(maps), 200
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+    
 @routes_blueprint.route('/api/game', methods=['POST'])
 def create_game():
     data = request.get_json()

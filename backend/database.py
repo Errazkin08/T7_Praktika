@@ -254,6 +254,13 @@ def get_first_map():
     db = get_db()
     return db.maps.find_one({}, {'_id': 0})
 
+def get_all_maps():
+    """
+    Get all maps from the database
+    """
+    db = get_db()
+    return list(db.maps.find({}, {'_id': 0}))
+
 def add_game(username, difficulty, map):
     """
     Add a new game to the database

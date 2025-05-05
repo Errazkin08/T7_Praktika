@@ -29,6 +29,12 @@
       <h2>Load Game</h2>
       <p>Continue one of your saved games</p>
     </div>
+    
+    <div class="option-card" on:click={() => navigate('/maps')}>
+      <div class="option-icon">🗺️</div>
+      <h2>Mapas</h2>
+      <p>Gestionar los mapas disponibles</p>
+    </div>
   </div>
 </div>
 
@@ -57,9 +63,11 @@
   
   .options-container {
     display: flex;
-    justify-content: center;
-    gap: 2rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: nowrap;
+    margin: 0 auto;
+    max-width: 1000px;
   }
   
   .option-card {
@@ -67,7 +75,8 @@
     border-radius: 8px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     padding: 2rem;
-    width: 300px;
+    width: calc(33.33% - 1rem);
+    flex: 1;
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;

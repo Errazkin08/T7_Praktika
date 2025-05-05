@@ -247,13 +247,29 @@ export const gameAPI = {
       const maps = await response.json();
       
       // Normalize map data to ensure consistent property names
-      return maps.map(map => ({
-        map_id: map.map_id || map._id || `map-${Date.now()}`,
-        width: map.width || 30,
-        height: map.height || 15,
-        difficulty: map.difficulty || 'medium',
-        // Include other properties as needed
-      }));
+      return maps.map(map => {
+        // Preserve the original ID from the database when possible
+        let mapId;
+        if (map._id) {
+          mapId = map._id;
+        } else if (map.map_id) {
+          mapId = map.map_id;
+        } else {
+          // Only use generated ID as a last resort
+          mapId = `map-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+          console.warn(`Generated fallback ID for map: ${mapId}`);
+        }
+        
+        return {
+          map_id: mapId,
+          width: map.width || 30,
+          height: map.height || 15,
+          difficulty: map.difficulty || 'medium',
+          name: map.name || `Mapa ${map.width || 30}x${map.height || 15}`,
+          startPoint: map.startPoint || [15, 7],
+          // Include other properties as needed
+        };
+      });
     } catch (error) {
       console.error("Error fetching maps:", error);
       throw error;
@@ -315,6 +331,26 @@ export const gameAPI = {
       return await response.json();
     } catch (error) {
       console.error("Error creating game with map:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a map by ID
+   */
+  async deleteMap(mapId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/maps/${mapId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete map: ${response.status}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting map ${mapId}:`, error);
       throw error;
     }
   }

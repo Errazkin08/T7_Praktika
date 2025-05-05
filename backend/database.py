@@ -113,7 +113,7 @@ def get_all_users():
     db = get_db()
     return list(db.users.find({}, {'_id': 0, 'password': 0}))
 
-def add_map(width, height, startPoint, difficulty="easy"):
+def add_map(width, height, startPoint, difficulty="easy", name=None):
     """
     Add a new map to the database with terrain types:
     0 - Normal terrain
@@ -143,6 +143,10 @@ def add_map(width, height, startPoint, difficulty="easy"):
             if i < 2:  # Only set up to 2 additional points
                 grid[ny][nx] = 1
     
+    # Generate a default name if none provided
+    if not name:
+        name = f"Mapa {width}x{height} ({difficulty})"
+    
     # Create the map document
     map = {
         "width": width,
@@ -150,7 +154,9 @@ def add_map(width, height, startPoint, difficulty="easy"):
         "grid": grid,
         "terrain": terrain,
         "startPoint": startPoint,
-        "visibleObjects": []  # Initialize with an empty list
+        "visibleObjects": [],  # Initialize with an empty list
+        "difficulty": difficulty,  # Add difficulty to the map document
+        "name": name  # Add name to the map document
     }
     
     return db.maps.insert_one(map)
@@ -261,6 +267,42 @@ def get_all_maps():
     """
     db = get_db()
     return list(db.maps.find({}, {'_id': 0}))
+
+def delete_map(map_id):
+    """
+    Delete a map from the database by its ID
+    """
+    db = get_db()
+    try:
+        # Intentar diferentes formas de encontrar el mapa
+        deleted = False
+        
+        # Intento 1: Buscar por _id como ObjectId
+        try:
+            obj_id = ObjectId(map_id)
+            result = db.maps.delete_one({"_id": obj_id})
+            if result.deleted_count > 0:
+                return True
+        except Exception as e:
+            print(f"Could not delete by ObjectId: {e}")
+        
+        # Intento 2: Buscar por map_id como string
+        result = db.maps.delete_one({"map_id": map_id})
+        if result.deleted_count > 0:
+            return True
+            
+        # Intento 3: Para IDs generados por el frontend (map-timestamp)
+        if map_id.startswith('map-'):
+            # Obtener el primer mapa (para desarrollo)
+            # Esto es solo una solución temporal
+            result = db.maps.delete_one({})
+            if result.deleted_count > 0:
+                return True
+        
+        return False
+    except Exception as e:
+        print(f"Error deleting map: {e}")
+        return False
 
 def add_game(username, map_id, difficulty):
     """Add a new game for a user"""

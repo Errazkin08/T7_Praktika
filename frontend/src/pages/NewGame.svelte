@@ -17,7 +17,8 @@
     width: 30,
     height: 15,
     startPoint: [15, 7],
-    difficulty: "medium"
+    difficulty: "medium",
+    name: ""
   };
   
   // Redirect to welcome page if not logged in
@@ -65,7 +66,12 @@
       
       // Validar datos del mapa
       if (!newMapData.width || !newMapData.height || !newMapData.startPoint || !newMapData.difficulty) {
-        throw new Error("Todos los campos son obligatorios");
+        throw new Error("Los campos de dimensiones, punto de inicio y dificultad son obligatorios");
+      }
+      
+      // Generar un nombre por defecto si no se proporciona
+      if (!newMapData.name) {
+        newMapData.name = `Mapa ${newMapData.width}x${newMapData.height} (${newMapData.difficulty})`;
       }
       
       // Convertir a números si es necesario
@@ -202,6 +208,12 @@
             <h3>Crear Nuevo Mapa</h3>
             
             <div class="form-group">
+              <label for="map-name">Nombre del mapa:</label>
+              <input type="text" id="map-name" bind:value={newMapData.name} 
+                placeholder="Nombre personalizado (opcional)" />
+            </div>
+            
+            <div class="form-group">
               <label for="map-width">Ancho:</label>
               <input type="number" id="map-width" bind:value={newMapData.width} min="10" max="100" />
             </div>
@@ -250,7 +262,7 @@
                   <div class="map-dimensions">{map.width}x{map.height}</div>
                 </div>
                 <div class="map-info">
-                  <h3>Mapa {map.map_id ? map.map_id.substring(0, 8) + '...' : 'sin ID'}</h3>
+                  <h3>{map.name || `Mapa ${map.map_id.substring(0, 8)}...`}</h3>
                   <p>Dificultad: {map.difficulty || 'normal'}</p>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
-                     update_troop_status, reset_troops_status, get_all_maps)
+                     update_troop_status, reset_troops_status, get_all_maps, delete_map)
 import hashlib
 from bson import ObjectId
 import json
@@ -152,6 +152,7 @@ def create_map():
     height = data.get('height')
     startPoint = data.get('startPoint')
     difficulty = data.get('difficulty')
+    name = data.get('name')  # Nuevo campo para el nombre del mapa
     
     # Validate required fields
     if not width or not height or not startPoint or not difficulty:
@@ -168,7 +169,7 @@ def create_map():
         return jsonify({"error": "Difficulty must be 'easy', 'medium', or 'hard'"}), 400
     
     # Create map in database
-    result = add_map(width, height, startPoint, difficulty)
+    result = add_map(width, height, startPoint, difficulty, name)
     
     return jsonify({
         "message": "Map created successfully",
@@ -197,6 +198,27 @@ def get_maps():
         return jsonify(maps), 200
     except Exception as e:
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@routes_blueprint.route('/api/maps/<map_id>', methods=['DELETE'])
+def delete_map_endpoint(map_id):
+    """Delete a map by its ID"""
+    try:
+        # Check if user is logged in
+        if 'username' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        print(f"Attempting to delete map with ID: {map_id}")
+        
+        # Try to delete the map
+        result = delete_map(map_id)
+        
+        if result:
+            return jsonify({"message": "Map deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Map not found or could not be deleted"}), 404
+    except Exception as e:
+        print(f"Error in delete_map_endpoint: {str(e)}")
+        return jsonify({"error": f"Error deleting map: {str(e)}"}), 500
     
 @routes_blueprint.route('/api/game', methods=['POST'])
 def create_game():

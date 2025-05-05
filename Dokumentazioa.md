@@ -391,6 +391,31 @@ edo
 }
 ```
 
+#### Borrar un mapa
+
+- **Metodoa:** DELETE
+- **Bidea:** `/api/maps/{map_id}`
+- **Deskribapena:** Mapa bat ezabatzen du bere ID-aren arabera
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Map deleted successfully"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Map not found or could not be deleted"
+}
+```
+edo
+```json
+{
+    "error": "User not logged in"
+}
+```
+
 ### Partiden Kudeaketarako
 
 #### Partida berri bat sortu

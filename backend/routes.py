@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game,
+from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
                      update_troop_status, reset_troops_status)
 import hashlib
@@ -183,6 +183,13 @@ def save_game_endpoint():
     if save_game():
         return jsonify({"message": "Game saved successfully"}), 200
     return jsonify({"error": "Failed to save game"}), 500
+
+@routes_blueprint.route('/api/game/delete', methods=['DELETE'])
+def delete_game_endpoint():
+    if session.get('game'):
+        delete_game(session['game'].get('game_id'))
+        return jsonify({"message": "Game deleted successfully"}), 200
+    return jsonify({"error": "No game found"}), 404
 
 # Troop Management Endpoints
 

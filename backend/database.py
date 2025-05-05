@@ -283,6 +283,15 @@ def save_game():
         return True
     return False
 
+def delete_game(game_id):
+    """
+    Delete a game from the database
+    """
+    db = get_db()
+    result = db.games.delete_one({"game_id": game_id})
+    session.pop('game', None)  # Remove game from session
+    return result.deleted_count > 0
+
 # Troop related functions
 def get_troop_types():
     """

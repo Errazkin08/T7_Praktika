@@ -12,21 +12,47 @@
       error = "";
       isLoading = true;
       
-      // For development purposes, allow any login
-      console.log("Login attempt:", username);
+      // Call the backend login endpoint
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important to include cookies
+        body: JSON.stringify({ username, password }),
+      });
       
-      // Mock login response
-      const fakeUser = {
-        username: username,
-        score: 100,
-        level: 1
-      };
+      // First check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        // Try to parse error response as JSON, but have a fallback
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || `Error: ${response.status} ${response.statusText}`;
+        } catch (e) {
+          // If JSON parsing fails, use status text
+          errorMessage = `Error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Safely parse the response
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        throw new Error("Invalid response format from server");
+      }
       
       // Store user data in the auth store
-      setUser(fakeUser);
-      
-      // Navigate to home page after successful login
-      navigate('/home');
+      if (data && data.user) {
+        setUser(data.user);
+        
+        // Navigate to home page after successful login
+        navigate('/home');
+      } else {
+        throw new Error("Login response missing user data");
+      }
     } catch (err) {
       console.error("Login error:", err);
       error = err.message || "Failed to login. Please check your credentials.";

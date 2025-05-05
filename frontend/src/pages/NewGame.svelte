@@ -1,146 +1,159 @@
 <script>
   import { navigate } from '../router.js';
   import { user } from '../stores/auth.js';
-  import { gameState, setCurrentScenario, startGame } from '../stores/gameState.js';
+  import { gameState, startGame } from '../stores/gameState.js';
   import { onMount } from 'svelte';
+  import { gameAPI } from '../services/gameAPI.js';
   
   let error = null;
+  let isLoading = true;
+  let existingMaps = [];
+  let selectedMap = null;
+  let gameName = "Mi partida";
+  let showCreateMapForm = false;
+
+  // Datos para crear un nuevo mapa
+  let newMapData = {
+    width: 30,
+    height: 15,
+    startPoint: [15, 7],
+    difficulty: "medium"
+  };
   
   // Redirect to welcome page if not logged in
-  onMount(() => {
+  onMount(async () => {
     try {
       if (!$user) {
         navigate('/');
+        return;
       }
+      
+      // Cargar todos los mapas disponibles
+      await loadExistingMaps();
     } catch (err) {
       console.error("Error in NewGame component:", err);
       error = err.message;
     }
   });
-  
-  // Define available scenarios with different difficulties
-  const availableScenarios = [
-    {
-      _id: "europe_map_01",
-      name: "Europe Map - Easy",
-      description: "An easier scenario with more resources for the player",
-      difficulty: "easy",
-      thumbnail: "europe_easy.jpg",
-      map_size: { width: 30, height: 30 }, // Reduced map size for better performance
-      initial_state: {
-        player: {
-          resources: {
-            food: 50,
-            production: 40,
-            science: 20,
-            gold: 300
-          },
-          cities: [
-            { id: "city1", name: 'London', position: { x: 12, y: 8 }, population: 4, buildings: [], production: { current_item: "warrior", turns_remaining: 2 } },
-            { id: "city2", name: 'Paris', position: { x: 15, y: 12 }, population: 3, buildings: [], production: { current_item: "settler", turns_remaining: 3 } }
-          ],
-          units: [
-            { id: "unit1", type: 'warrior', position: { x: 13, y: 9 }, movement_points: 2, movement_points_left: 2, strength: 6, health: 100 },
-            { id: "unit2", type: 'archer', position: { x: 16, y: 13 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 }
-          ],
-          technologies: [
-            { id: "agriculture", completed: true },
-            { id: "pottery", completed: true },
-            { id: "animal_husbandry", in_progress: true, turns_remaining: 2 }
-          ]
-        },
-        ai: {
-          resources: {
-            food: 30,
-            production: 15,
-            science: 5,
-            gold: 150
-          },
-          cities: [
-            { id: "ai_city1", name: 'Berlin', position: { x: 20, y: 8 }, visible: false },
-            { id: "ai_city2", name: 'Rome', position: { x: 20, y: 18 }, visible: false }
-          ],
-          units: [
-            { id: "ai_unit1", type: 'warrior', position: { x: 19, y: 9 }, visible: false }
-          ],
-          technologies: []
-        },
-        map: {
-          explored: [],
-          visible_objects: [
-            { type: "resource", resource_type: "iron", position: { x: 17, y: 15 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 14, y: 10 }, improved: false }
-          ]
-        }
-      }
-    },
-    {
-      _id: "europe_map_02",
-      name: "Europe Map - Hard",
-      description: "A challenging scenario with stronger AI opponents",
-      difficulty: "hard",
-      thumbnail: "europe_hard.jpg",
-      map_size: { width: 30, height: 30 }, // Reduced map size for better performance
-      initial_state: {
-        player: {
-          resources: {
-            food: 20,
-            production: 15,
-            science: 5,
-            gold: 100
-          },
-          cities: [
-            { id: "city1", name: 'London', position: { x: 10, y: 8 }, population: 2, buildings: [], production: { current_item: "warrior", turns_remaining: 3 } },
-          ],
-          units: [
-            { id: "unit1", type: 'warrior', position: { x: 11, y: 9 }, movement_points: 2, movement_points_left: 2, strength: 5, health: 100 },
-          ],
-          technologies: [
-            { id: "agriculture", completed: true }
-          ]
-        },
-        ai: {
-          resources: {
-            food: 50,
-            production: 35,
-            science: 15,
-            gold: 250
-          },
-          cities: [
-            { id: "ai_city1", name: 'Berlin', position: { x: 20, y: 8 }, visible: false },
-            { id: "ai_city2", name: 'Rome', position: { x: 20, y: 18 }, visible: false },
-            { id: "ai_city3", name: 'Moscow', position: { x: 22, y: 10 }, visible: false }
-          ],
-          units: [
-            { id: "ai_unit1", type: 'warrior', position: { x: 19, y: 9 }, visible: false },
-            { id: "ai_unit2", type: 'archer', position: { x: 21, y: 11 }, visible: false }
-          ],
-          technologies: []
-        },
-        map: {
-          explored: [],
-          visible_objects: [
-            { type: "resource", resource_type: "iron", position: { x: 16, y: 15 }, improved: false },
-            { type: "resource", resource_type: "food", position: { x: 13, y: 10 }, improved: false }
-          ]
-        }
-      }
-    }
-  ];
-  
-  let selectedScenario = availableScenarios[0];
-  let gameName = "My Game";
-  
-  function startNewGame() {
+
+  // Función para cargar los mapas existentes
+  async function loadExistingMaps() {
     try {
-      // Store the selected scenario and game name in the game state
-      startGame(gameName, selectedScenario);
+      isLoading = true;
+      existingMaps = await gameAPI.getAllMaps();
+      if (existingMaps.length > 0) {
+        selectedMap = existingMaps[0];
+      }
+    } catch (err) {
+      console.error("Error loading maps:", err);
+      error = "No se pudieron cargar los mapas. " + err.message;
+      // Crear mapas de ejemplo en caso de error para desarrollo
+      existingMaps = [
+        { map_id: "sample1", width: 30, height: 15, difficulty: "easy" },
+        { map_id: "sample2", width: 40, height: 20, difficulty: "medium" }
+      ];
+      selectedMap = existingMaps[0];
+    } finally {
+      isLoading = false;
+    }
+  }
+  
+  // Función para crear un nuevo mapa
+  async function createNewMap() {
+    try {
+      isLoading = true;
       
-      // Navigate directly to the map
+      // Validar datos del mapa
+      if (!newMapData.width || !newMapData.height || !newMapData.startPoint || !newMapData.difficulty) {
+        throw new Error("Todos los campos son obligatorios");
+      }
+      
+      // Convertir a números si es necesario
+      newMapData.width = Number(newMapData.width);
+      newMapData.height = Number(newMapData.height);
+      
+      if (typeof newMapData.startPoint === 'string') {
+        newMapData.startPoint = newMapData.startPoint.split(',').map(coord => Number(coord.trim()));
+      }
+      
+      // Validar punto de inicio
+      if (newMapData.startPoint.length !== 2 || 
+          isNaN(newMapData.startPoint[0]) || 
+          isNaN(newMapData.startPoint[1])) {
+        throw new Error("El punto de inicio debe ser de formato [x, y]");
+      }
+      
+      // Crear el mapa
+      const result = await gameAPI.createMap(newMapData);
+      
+      console.log("Map created:", result);
+      
+      // Recargar la lista de mapas
+      await loadExistingMaps();
+      
+      // Seleccionar el mapa recién creado si tenemos su ID
+      if (result && result.map_id) {
+        selectedMap = existingMaps.find(map => map.map_id === result.map_id) || existingMaps[0];
+      }
+      
+      // Cerrar el formulario
+      showCreateMapForm = false;
+    } catch (err) {
+      console.error("Error creating map:", err);
+      error = "Error al crear el mapa: " + err.message;
+    } finally {
+      isLoading = false;
+    }
+  }
+  
+  // Función para seleccionar un mapa
+  function selectMap(map) {
+    console.log("Selected map:", map);
+    selectedMap = map;
+  }
+  
+  // Función para iniciar una nueva partida con el mapa seleccionado
+  async function startNewGame() {
+    try {
+      if (!selectedMap) {
+        error = "Debes seleccionar un mapa para comenzar";
+        return;
+      }
+      
+      isLoading = true;
+      
+      // Aseguramos que tenemos un valor de string para map_id
+      const mapId = String(selectedMap.map_id || selectedMap._id);
+      
+      // Datos para crear la partida
+      const gameData = {
+        map: mapId,
+        name: gameName,
+        difficulty: selectedMap.difficulty || "medium"
+      };
+      
+      console.log("Creating game with data:", gameData);
+      
+      // Llamar al endpoint para crear una partida
+      const result = await gameAPI.createGameWithMap(gameData);
+      
+      console.log("Game created:", result);
+      
+      // Almacenar la información del juego en el estado
+      startGame(gameName, {
+        mapId: mapId,
+        difficulty: selectedMap.difficulty,
+        width: selectedMap.width,
+        height: selectedMap.height
+      });
+      
+      // Navegar al mapa para iniciar la partida
       navigate('/map');
     } catch (err) {
       console.error("Error starting game:", err);
-      error = err.message;
+      error = "Error al iniciar la partida: " + err.message;
+    } finally {
+      isLoading = false;
     }
   }
 </script>
@@ -149,48 +162,105 @@
   {#if error}
     <div class="error-message">
       <p>{error}</p>
-      <button on:click={() => window.location.reload()}>Reload Page</button>
+      <button on:click={() => { error = null; }}>Cerrar</button>
+    </div>
+  {/if}
+  
+  <div class="page-header">
+    <h1>Nueva Partida</h1>
+    <button class="back-button" on:click={() => navigate('/home')}>
+      Volver al Inicio
+    </button>
+  </div>
+  
+  {#if isLoading}
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <p>Cargando...</p>
     </div>
   {:else}
-    <div class="page-header">
-      <h1>New Game</h1>
-      <button class="back-button" on:click={() => navigate('/home')}>
-        Back to Dashboard
-      </button>
-    </div>
-    
     <div class="game-configuration">
       <div class="config-section">
-        <h2>Game Settings</h2>
+        <h2>Configuración de la Partida</h2>
         
         <div class="form-group">
-          <label for="game-name">Game Name:</label>
-          <input type="text" id="game-name" bind:value={gameName} />
+          <label for="game-name">Nombre de la Partida:</label>
+          <input type="text" id="game-name" bind:value={gameName} placeholder="Introduce un nombre para tu partida" />
         </div>
       </div>
       
       <div class="config-section">
-        <h2>Select Scenario</h2>
-        
-        <div class="scenario-options">
-          {#each availableScenarios as scenario}
-            <div 
-              class="scenario-card" 
-              class:selected={selectedScenario._id === scenario._id}
-              on:click={() => selectedScenario = scenario}
-            >
-              <h3>{scenario.name}</h3>
-              <p>{scenario.description}</p>
-              <div class="difficulty-badge {scenario.difficulty}">
-                {scenario.difficulty.toUpperCase()}
-              </div>
-            </div>
-          {/each}
+        <div class="section-header">
+          <h2>Selecciona un Mapa</h2>
+          <button class="create-map-button" on:click={() => showCreateMapForm = !showCreateMapForm}>
+            {showCreateMapForm ? 'Cancelar' : 'Crear Nuevo Mapa'}
+          </button>
         </div>
+        
+        {#if showCreateMapForm}
+          <div class="create-map-form">
+            <h3>Crear Nuevo Mapa</h3>
+            
+            <div class="form-group">
+              <label for="map-width">Ancho:</label>
+              <input type="number" id="map-width" bind:value={newMapData.width} min="10" max="100" />
+            </div>
+            
+            <div class="form-group">
+              <label for="map-height">Alto:</label>
+              <input type="number" id="map-height" bind:value={newMapData.height} min="10" max="100" />
+            </div>
+            
+            <div class="form-group">
+              <label for="map-start">Punto de Inicio [x,y]:</label>
+              <input type="text" id="map-start" 
+                bind:value={newMapData.startPoint} 
+                placeholder="15,7" />
+            </div>
+            
+            <div class="form-group">
+              <label for="map-difficulty">Dificultad:</label>
+              <select id="map-difficulty" bind:value={newMapData.difficulty}>
+                <option value="easy">Fácil</option>
+                <option value="medium">Media</option>
+                <option value="hard">Difícil</option>
+              </select>
+            </div>
+            
+            <button class="submit-map-button" on:click={createNewMap} disabled={isLoading}>
+              {isLoading ? 'Creando...' : 'Crear Mapa'}
+            </button>
+          </div>
+        {:else if existingMaps.length === 0}
+          <div class="no-maps">
+            <p>No hay mapas disponibles. Por favor, crea un mapa nuevo.</p>
+          </div>
+        {:else}
+          <div class="maps-grid">
+            {#each existingMaps as map}
+              <div 
+                class="map-card" 
+                class:selected={selectedMap && selectedMap.map_id === map.map_id}
+                on:click={() => selectMap(map)}
+                role="button"
+                tabindex="0"
+                on:keydown={(e) => e.key === 'Enter' && selectMap(map)}
+              >
+                <div class="map-preview">
+                  <div class="map-dimensions">{map.width}x{map.height}</div>
+                </div>
+                <div class="map-info">
+                  <h3>Mapa {map.map_id ? map.map_id.substring(0, 8) + '...' : 'sin ID'}</h3>
+                  <p>Dificultad: {map.difficulty || 'normal'}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </div>
       
-      <button class="start-button" on:click={startNewGame}>
-        Start Game
+      <button class="start-button" on:click={startNewGame} disabled={isLoading || !selectedMap}>
+        {isLoading ? 'Iniciando...' : 'Comenzar Partida'}
       </button>
     </div>
   {/if}
@@ -219,6 +289,29 @@
     cursor: pointer;
   }
   
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  
+  .loading-spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: #4CAF50;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
   .game-configuration {
     background-color: #f8f9fa;
     border-radius: 8px;
@@ -228,6 +321,22 @@
   
   .config-section {
     margin-bottom: 2rem;
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .create-map-button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
   }
   
   .form-group {
@@ -240,59 +349,87 @@
     font-weight: bold;
   }
   
-  input {
+  input, select {
     width: 100%;
     padding: 0.5rem;
     border: 1px solid #ced4da;
     border-radius: 4px;
+    box-sizing: border-box;
   }
   
-  .scenario-options {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
+  .maps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
   }
   
-  .scenario-card {
+  .map-card {
     background-color: white;
     border-radius: 6px;
-    padding: 1.5rem;
-    width: 280px;
+    padding: 1rem;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     cursor: pointer;
     transition: all 0.2s ease;
-    position: relative;
     border: 3px solid transparent;
+    outline: none; /* Remove default focus outline */
   }
   
-  .scenario-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  .map-card:hover {
+    transform: translateY(-3px);
   }
   
-  .scenario-card.selected {
+  .map-card.selected {
     border-color: #4CAF50;
     background-color: #f0fff0;
   }
   
-  .difficulty-badge {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.3rem 0.6rem;
+  .map-card:focus {
+    box-shadow: 0 0 0 3px #4CAF50; /* Add a visible focus indicator for accessibility */
+  }
+  
+  .map-preview {
+    background-color: #e9ecef;
+    height: 100px;
     border-radius: 4px;
-    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .map-dimensions {
     font-weight: bold;
+    color: #495057;
   }
   
-  .difficulty-badge.easy {
-    background-color: #4CAF50;
-    color: white;
+  .map-info h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
   }
   
-  .difficulty-badge.hard {
-    background-color: #f44336;
+  .map-info p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #6c757d;
+  }
+  
+  .create-map-form {
+    background-color: white;
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .submit-map-button {
+    padding: 0.6rem 1.2rem;
+    background-color: #007bff;
     color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
   }
   
   .start-button {
@@ -310,11 +447,16 @@
     transition: all 0.2s ease;
   }
   
-  .start-button:hover {
+  .start-button:hover:not(:disabled) {
     background-color: #45a049;
     transform: translateY(-2px);
   }
-
+  
+  .start-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
   .error-message {
     background-color: #ffebee;
     color: #c62828;
@@ -322,5 +464,25 @@
     border-radius: 4px;
     margin-bottom: 1rem;
     text-align: center;
+    position: relative;
+  }
+  
+  .error-message button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #c62828;
+  }
+  
+  .no-maps {
+    text-align: center;
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    color: #6c757d;
   }
 </style>

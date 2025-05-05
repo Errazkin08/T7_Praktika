@@ -41,3 +41,10 @@ export function pauseGame(isPaused) {
 export function endGame() {
   gameState.set(initialState);
 }
+
+export function updateMapSize(width, height) {
+  gameState.update(state => ({
+    ...state,
+    mapSize: { width, height }
+  }));
+}

@@ -4,6 +4,7 @@ import os
 import datetime
 import random
 import uuid
+from bson import ObjectId
 
 # MongoDB connection string - using environment variable for security
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://mongodb:27017/')
@@ -261,20 +262,80 @@ def get_all_maps():
     db = get_db()
     return list(db.maps.find({}, {'_id': 0}))
 
-def add_game(username, difficulty, map):
-    """
-    Add a new game to the database
-    """
-    db = get_db()
-    game = {
-        "game_id": str(int(datetime.datetime.now().timestamp() * 1000) + 1),
-        "username": username,
-        "difficulty": difficulty,
-        "map": map
-    }
-    #insert in session the actual game
-    session['game'] = game
-    return db.games.insert_one(game)
+def add_game(username, map_id, difficulty):
+    """Add a new game for a user"""
+    try:
+        db = get_db()
+        
+        # Always convert map_id to string to avoid ObjectId serialization issues
+        if isinstance(map_id, ObjectId):
+            map_id_str = str(map_id)
+        else:
+            map_id_str = map_id
+        
+        # Obtener el mapa completo de la base de datos
+        map_data = None
+        try:
+            # Intenta buscar por el ID original (podría ser ObjectId)
+            map_data = db.maps.find_one({"_id": ObjectId(map_id_str)})
+        except:
+            # Si falla, intenta buscar por el ID como string
+            map_data = db.maps.find_one({"_id": map_id_str})
+            
+        # Si no encontramos el mapa, creamos uno básico
+        if not map_data:
+            print(f"Warning: Map with ID {map_id_str} not found, creating basic map")
+            # Crear grid y terreno básicos
+            basic_grid = [[0 for _ in range(30)] for _ in range(15)]
+            basic_terrain = [[0 for _ in range(30)] for _ in range(15)]
+            
+            # Añadir algunos elementos de terreno variados para mayor realismo
+            for y in range(15):
+                for x in range(30):
+                    # Generar terreno simple pseudo-aleatorio basado en la posición
+                    if (x + y) % 7 == 0:
+                        basic_terrain[y][x] = 1  # Agua
+                    elif (x * y) % 13 == 0:
+                        basic_terrain[y][x] = 2  # Terreno mineralizado
+            
+            map_data = {
+                "width": 30,
+                "height": 15,
+                "grid": basic_grid,
+                "terrain": basic_terrain,  # Añadimos el terreno
+                "startPoint": [15, 7],
+                "difficulty": difficulty,
+                "visibleObjects": []  # Igual que en add_map
+            }
+        
+        # Convertir ObjectId a string si existe
+        if "_id" in map_data and isinstance(map_data["_id"], ObjectId):
+            map_data["_id"] = str(map_data["_id"])
+        
+        # Crear un ID único para la partida
+        game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
+            
+        # Crear el documento del juego con el mapa completo
+        game = {
+            "game_id": game_id,
+            "username": username,
+            "difficulty": difficulty,
+            "map_data": map_data  # Guardar el mapa completo
+        }
+        
+        # Guardar una versión segura en la sesión
+        session['game'] = {
+            "game_id": game_id,
+            "username": username,
+            "difficulty": difficulty,
+            "map_id": map_id_str
+        }
+        
+        # Insertar el juego en la base de datos
+        return db.games.insert_one(game)
+    except Exception as e:
+        print(f"Error adding game: {e}")
+        return None
 
 def save_game():
     """

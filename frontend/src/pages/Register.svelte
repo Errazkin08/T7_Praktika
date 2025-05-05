@@ -1,6 +1,6 @@
 <script>
   import { navigate } from '../router.js';
-  import { registerUser } from '../api.js';
+  import { setUser } from '../stores/auth.js';
   
   let username = "";
   let email = "";
@@ -23,11 +23,41 @@
       isLoading = true;
       console.log("Register attempt:", username, email);
       
-      // Call the API
-      await registerUser(username, email, password);
+      // Call the registration API
+      const registerResponse = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }), // Email might not be needed based on your API
+      });
       
-      // Navigate to login after successful registration
-      navigate('/login');
+      if (!registerResponse.ok) {
+        const errorData = await registerResponse.json();
+        throw new Error(errorData.error || "Registration failed. Please try again.");
+      }
+      
+      // After successful registration, login automatically
+      const loginResponse = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      });
+      
+      if (!loginResponse.ok) {
+        throw new Error("Registration successful but login failed. Please try logging in manually.");
+      }
+      
+      const loginData = await loginResponse.json();
+      
+      // Store user data in the auth store
+      setUser(loginData.user);
+      
+      // Navigate to home page after successful registration and login
+      navigate('/home');
       
     } catch (err) {
       console.error("Registration error:", err);

@@ -1,10 +1,18 @@
 from flask import Blueprint, request, jsonify, session
 from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
-                     update_troop_status, reset_troops_status)
+                     update_troop_status, reset_troops_status, get_all_maps)
 import hashlib
+from bson import ObjectId
+import json
 
 routes_blueprint = Blueprint('routes', __name__)
+
+# Helper function to convert ObjectId to string
+def serialize_objectid(obj):
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 #just a proba endpoint
 @routes_blueprint.route('/proba', methods=['GET'])
@@ -37,36 +45,55 @@ def register_user():
 #Login a user
 @routes_blueprint.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
-    
-    # Fetch user from database
-    user = find_user(username)
-    if not user:
-        return jsonify({"error": "Invalid username or password"}), 401
-    
-    # Verify password
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    if password_hash != user['password']:
-        return jsonify({"error": "Invalid username or password"}), 401
-    
-    # Store user in session
-    session['username'] = user['username']
-    session['user_id'] = str(user.get('_id', ''))
-    update_user_login(user['username'])
-    
-    return jsonify({
-        "message": "Login successful",
-        "user": {
-            "username": user['username'],
-            "score": user['score'],
-            "level": user['level']
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+        
+        # Fetch user from database
+        user = find_user(username)
+        if not user:
+            return jsonify({"error": "Invalid username or password"}), 401
+        
+        # Verify password
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        if password_hash != user['password']:
+            return jsonify({"error": "Invalid username or password"}), 401
+        
+        # Store user in session - use only simple data types
+        session['username'] = user['username']
+        
+        if '_id' in user:
+            user_id = str(user['_id'])  # Convert ObjectId to string
+        else:
+            user_id = username  # Fallback to username if no _id
+            
+        session['user_id'] = user_id
+        
+        # Create a safe user object for session
+        session['user'] = {
+            "username": user['username']
         }
-    }), 200
+        
+        # Update last login time
+        update_user_login(user['username'])
+        
+        # Return safe user information
+        return jsonify({
+            "message": "Login successful",
+            "user": {
+                "username": user['username'],
+                "score": user.get('score', 0),
+                "level": user.get('level', 1)
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return jsonify({"error": "An error occurred during login"}), 500
 
 # Logout a user
 @routes_blueprint.route('/api/logout', methods=['POST'])
@@ -173,14 +200,29 @@ def get_maps():
     
 @routes_blueprint.route('/api/game', methods=['POST'])
 def create_game():
-    data = request.get_json()
-    username= session.get('username')
-    if not username:
-        return jsonify({"error": "User not logged in"}), 401
-    map = data.get('map')
-    difficulty = data.get('difficulty')
-    add_game(username, map, difficulty)
-    return jsonify({"message": "Game added successfully"}), 201
+    try:
+        data = request.get_json()
+        username = session.get('username')
+        if not username:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        map_id = data.get('map')
+        difficulty = data.get('difficulty')
+        
+        # Make sure to convert map_id to string if it's an ObjectId
+        if map_id and isinstance(map_id, ObjectId):
+            map_id = str(map_id)
+            
+        # Create the game
+        result = add_game(username, map_id, difficulty)
+        
+        if result:
+            return jsonify({"message": "Game added successfully"}), 201
+        else:
+            return jsonify({"error": "Failed to create game"}), 500
+    except Exception as e:
+        print(f"Error creating game: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @routes_blueprint.route('/api/game', methods=['GET'])
 def get_game():

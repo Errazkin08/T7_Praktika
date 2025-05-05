@@ -4,13 +4,42 @@
 
 const API_BASE_URL = '/api'; // Adjust this to match your backend URL
 
+// Helper function for making authenticated API requests
+async function fetchWithAuth(url, options = {}) {
+  // Ensure credentials are included in all requests
+  const fetchOptions = {
+    ...options,
+    credentials: 'include', // This ensures cookies are sent with the request
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+  };
+  
+  try {
+    const response = await fetch(url, fetchOptions);
+    
+    if (response.status === 401) {
+      console.error('Authentication error - user not logged in');
+      // Optionally redirect to login page
+      // window.location.href = '/login';
+      throw new Error('User not logged in. Please log in to continue.');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error(`Error in fetchWithAuth for ${url}:`, error);
+    throw error;
+  }
+}
+
 export const gameAPI = {
   /**
    * Get all available scenarios
    */
   async getScenarios() {
     try {
-      const response = await fetch(`${API_BASE_URL}/scenarios`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/scenarios`);
       if (!response.ok) {
         throw new Error(`Failed to fetch scenarios: ${response.status}`);
       }
@@ -26,7 +55,7 @@ export const gameAPI = {
    */
   async getScenario(scenarioId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/scenarios/${scenarioId}`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/scenarios/${scenarioId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch scenario: ${response.status}`);
       }
@@ -42,11 +71,8 @@ export const gameAPI = {
    */
   async saveGame(gameData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/games`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/games`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(gameData),
       });
       
@@ -66,11 +92,8 @@ export const gameAPI = {
    */
   async updateGame(gameId, gameData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(gameData),
       });
       
@@ -90,7 +113,7 @@ export const gameAPI = {
    */
   async loadGame(gameId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`);
       if (!response.ok) {
         throw new Error(`Failed to load game: ${response.status}`);
       }
@@ -106,7 +129,7 @@ export const gameAPI = {
    */
   async getSavedGames() {
     try {
-      const response = await fetch(`${API_BASE_URL}/games`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/games`);
       if (!response.ok) {
         throw new Error(`Failed to fetch saved games: ${response.status}`);
       }
@@ -122,11 +145,8 @@ export const gameAPI = {
    */
   async createGame(gameData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/games`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/games`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(gameData),
       });
       
@@ -146,7 +166,7 @@ export const gameAPI = {
    */
   async deleteGame(gameId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`, {
         method: 'DELETE',
       });
       
@@ -166,7 +186,7 @@ export const gameAPI = {
    */
   async getMapData() {
     try {
-      const response = await fetch(`${API_BASE_URL}/map`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/map`);
       if (!response.ok) {
         throw new Error(`Failed to fetch map data: ${response.status}`);
       }
@@ -182,11 +202,8 @@ export const gameAPI = {
    */
   async saveMapData(mapData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/map`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/map`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(mapData),
       });
       
@@ -207,13 +224,97 @@ export const gameAPI = {
    */
   async getFirstMap() {
     try {
-      const response = await fetch(`${API_BASE_URL}/maps/first`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/maps/first`);
       if (!response.ok) {
         throw new Error(`Failed to fetch map: ${response.status}`);
       }
       return await response.json();
     } catch (error) {
       console.error("Error fetching first map:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all maps from the server
+   */
+  async getAllMaps() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/maps`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch maps: ${response.status}`);
+      }
+      const maps = await response.json();
+      
+      // Normalize map data to ensure consistent property names
+      return maps.map(map => ({
+        map_id: map.map_id || map._id || `map-${Date.now()}`,
+        width: map.width || 30,
+        height: map.height || 15,
+        difficulty: map.difficulty || 'medium',
+        // Include other properties as needed
+      }));
+    } catch (error) {
+      console.error("Error fetching maps:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get a map by ID
+   */
+  async getMapById(mapId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/maps/${mapId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch map with ID ${mapId}: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching map ${mapId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create a new map
+   */
+  async createMap(mapData) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/maps`, {
+        method: 'POST',
+        body: JSON.stringify(mapData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create map: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error creating map:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create a new game with a selected map
+   */
+  async createGameWithMap(gameData) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/game`, {
+        method: 'POST',
+        body: JSON.stringify(gameData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to create game: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error creating game with map:", error);
       throw error;
     }
   }

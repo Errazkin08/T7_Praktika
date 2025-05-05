@@ -305,6 +305,92 @@ edo
 }
 ```
 
+#### Mapa bat ID bidez lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/maps/{map_id}`
+- **Deskribapena:** ID espezifikoko mapa bat itzultzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "map_id": "60a1b2c3d4e5f6g7h8i9j0",
+    "width": 30,
+    "height": 15,
+    "grid": [[0,0,0,...],[0,1,0,...],...],
+    "startPoint": [15, 7],
+    "difficulty": "medium"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Map not found"
+}
+```
+
+#### Mapa guztiak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/maps`
+- **Deskribapena:** Datu-baseko mapa guztiak itzultzen ditu
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+[
+    {
+        "map_id": "60a1b2c3d4e5f6g7h8i9j0",
+        "width": 30,
+        "height": 15,
+        "difficulty": "medium"
+    },
+    {
+        "map_id": "70b2c3d4e5f6g7h8i9j0k1",
+        "width": 40,
+        "height": 20,
+        "difficulty": "hard"
+    }
+]
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "No maps found"
+}
+```
+
+#### Mapa eguneratu
+
+- **Metodoa:** PUT
+- **Bidea:** `/api/maps/{map_id}`
+- **Deskribapena:** Existitzen den mapa bat eguneratzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "grid": [[0,0,0,...],[0,1,0,...],...],
+    "difficulty": "hard"
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Map updated successfully"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Map not found"
+}
+```
+edo
+```json
+{
+    "error": "Invalid map data"
+}
+```
+
 ### Partiden Kudeaketarako
 
 #### Partida berri bat sortu
@@ -606,6 +692,240 @@ edo
 }
 ```
 
+### Borroka Sistema
+
+#### Tropa batek beste bat erasotu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/combat/attack`
+- **Deskribapena:** Tropa batek beste tropa bat erasotzean gertatzen dena kudeatzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "attacker_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "defender_id": "a88bc20c-69dd-5483-b678-1f13c4d5680"
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Attack completed",
+    "result": {
+        "damage_dealt": 8,
+        "defender_health_remaining": 42,
+        "defender_destroyed": false,
+        "experience_gained": 10
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Attacker or defender not found"
+}
+```
+edo
+```json
+{
+    "error": "Attacker has already moved this turn"
+}
+```
+edo
+```json
+{
+    "error": "Target is out of range"
+}
+```
+
+#### Tropa sendatu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/troops/{troop_id}/heal`
+- **Deskribapena:** Tropa bat sendatzeko
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "heal_amount": 20
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Troop healed successfully",
+    "new_health": 90
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Troop not found"
+}
+```
+edo
+```json
+{
+    "error": "Heal amount is required"
+}
+```
+
+### Baliabideen Kudeaketa
+
+#### Jokalariaren baliabideak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/resources`
+- **Deskribapena:** Jokalariaren uneko baliabide guztiak erakusten ditu
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "gold": 500,
+    "food": 300,
+    "wood": 250,
+    "stone": 150,
+    "last_updated": "2023-05-15T10:30:45.123Z"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+
+#### Baliabideak eguneratu
+
+- **Metodoa:** PUT
+- **Bidea:** `/api/resources/update`
+- **Deskribapena:** Jokalariaren baliabideak aldatzeko (gehitu edo kendu)
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "gold": 100,
+    "food": -50,
+    "wood": 25,
+    "stone": 0
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Resources updated successfully",
+    "resources": {
+        "gold": 600,
+        "food": 250,
+        "wood": 275,
+        "stone": 150
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Insufficient resources"
+}
+```
+edo
+```json
+{
+    "error": "User not logged in"
+}
+```
+
+### Eraikinen Kudeaketa
+
+#### Eraikin berri bat sortu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/buildings`
+- **Deskribapena:** Jokalariaren hirira eraikin berri bat gehitzen du
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "building_type": "barracks",
+    "position": [15, 8]
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Building created successfully",
+    "building": {
+        "id": "b27dc10b-58cc-4372-a567-0e02b2c3d479",
+        "type": "barracks",
+        "level": 1,
+        "health": 500,
+        "position": [15, 8],
+        "production_rate": {
+            "troops": 1
+        },
+        "created_at": "2023-05-15T10:40:20.456Z"
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Building type and position are required"
+}
+```
+edo
+```json
+{
+    "error": "Insufficient resources"
+}
+```
+edo
+```json
+{
+    "error": "Invalid building position"
+}
+```
+
+#### Eraikin bat hobetu
+
+- **Metodoa:** PUT
+- **Bidea:** `/api/buildings/{building_id}/upgrade`
+- **Deskribapena:** Dagoen eraikin baten maila igotzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Building upgraded successfully",
+    "building": {
+        "id": "b27dc10b-58cc-4372-a567-0e02b2c3d479",
+        "type": "barracks",
+        "level": 2,
+        "health": 600,
+        "production_rate": {
+            "troops": 2
+        }
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "Building not found"
+}
+```
+edo
+```json
+{
+    "error": "Insufficient resources for upgrade"
+}
+```
+edo
+```json
+{
+    "error": "Building already at maximum level"
+}
+```
+
 ## Erroreen Kudeaketa
 
 Erroreen kasuan, API-ak ondorengo egiturako erantzunak bueltatzen ditu:
@@ -690,6 +1010,63 @@ Ondorengo endpoints-ak etorkizunean inplementatzeko planifikaturik daude:
     ],
     "updated_state": {
         // Jokoaren egoera eguneratua
+    }
+}
+```
+
+### Ikerketa Sistema
+
+#### Eskuragarri dauden ikerketak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/research`
+- **Deskribapena:** Jokalariaren eskuragarri dauden ikerketa guztiak erakusten ditu
+- **Inplementazioa:** Ez
+- **Erantzuna:**
+```json
+[
+    {
+        "id": "tech_improved_farming",
+        "name": "Improved Farming",
+        "description": "Increases food production by 20%",
+        "required_resources": {
+            "gold": 300,
+            "science": 50
+        },
+        "completion_time": 300,
+        "prerequisites": [],
+        "status": "available"
+    },
+    {
+        "id": "tech_iron_weapons",
+        "name": "Iron Weapons",
+        "description": "Increases troop attack by 15%",
+        "required_resources": {
+            "gold": 500,
+            "science": 100
+        },
+        "completion_time": 600,
+        "prerequisites": ["tech_improved_mining"],
+        "status": "locked"
+    }
+]
+```
+
+#### Ikerketa berri bat hasi
+
+- **Metodoa:** POST
+- **Bidea:** `/api/research/{research_id}/start`
+- **Deskribapena:** Ikerketa berri bat hasten du
+- **Inplementazioa:** Ez
+- **Erantzuna:**
+```json
+{
+    "message": "Research started successfully",
+    "research": {
+        "id": "tech_improved_farming",
+        "name": "Improved Farming",
+        "completion_at": "2023-05-15T12:40:20.456Z",
+        "progress": 0
     }
 }
 ```

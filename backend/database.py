@@ -433,10 +433,53 @@ def delete_game(game_id):
     """
     Delete a game from the database
     """
+    try:
+        db = get_db()
+        
+        # Try different formats of game_id
+        deleted = False
+        
+        # Try as is
+        result = db.games.delete_one({"game_id": game_id})
+        if result.deleted_count > 0:
+            deleted = True
+        
+        # Try as integer if it's not already
+        if not deleted and isinstance(game_id, str):
+            try:
+                numeric_id = int(game_id)
+                result = db.games.delete_one({"game_id": numeric_id})
+                if result.deleted_count > 0:
+                    deleted = True
+            except ValueError:
+                pass
+        
+        # Try by _id if it could be an ObjectId
+        if not deleted and isinstance(game_id, str):
+            try:
+                if len(game_id) == 24:  # ObjectId is 24 chars
+                    obj_id = ObjectId(game_id)
+                    result = db.games.delete_one({"_id": obj_id})
+                    if result.deleted_count > 0:
+                        deleted = True
+            except Exception:
+                pass
+        
+        # If the game was in the session, remove it
+        if 'game' in session and session.get('game', {}).get('game_id') == game_id:
+            session.pop('game', None)
+        
+        return deleted
+    except Exception as e:
+        print(f"Error in delete_game: {e}")
+        raise
+
+def get_user_games(username):
+    """
+    Get all games for a specific user
+    """
     db = get_db()
-    result = db.games.delete_one({"game_id": game_id})
-    session.pop('game', None)  # Remove game from session
-    return result.deleted_count > 0
+    return list(db.games.find({"username": username}))
 
 # Troop related functions
 def get_troop_types():

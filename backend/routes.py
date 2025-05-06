@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
-                     update_troop_status, reset_troops_status, get_all_maps, delete_map, get_map)
+                     update_troop_status, reset_troops_status, get_all_maps, delete_map, get_map, get_user_games, get_db)
 import hashlib
 from bson import ObjectId
 import json
@@ -308,6 +308,105 @@ def delete_game_endpoint():
         delete_game(session['game'].get('game_id'))
         return jsonify({"message": "Game deleted successfully"}), 200
     return jsonify({"error": "No game found"}), 404
+
+@routes_blueprint.route('/api/user/games', methods=['GET'])
+def get_user_games_endpoint():
+    """Get all games for the current user"""
+    try:
+        # Check if user is logged in
+        if 'username' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        username = session['username']
+        games = get_user_games(username)
+        
+        # Convert ObjectId to string for JSON serialization
+        for game in games:
+            if '_id' in game:
+                game['_id'] = str(game['_id'])
+        
+        return jsonify(games), 200
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@routes_blueprint.route('/api/user/games/<game_id>', methods=['DELETE'])
+def delete_user_game_endpoint(game_id):
+    """Delete a specific game for the current user"""
+    try:
+        # Check if user is logged in
+        if 'username' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        username = session['username']
+        print(f"Attempting to delete game {game_id} for user {username}")
+        
+        # Get the database connection
+        db = get_db()
+        
+        # Get the game to verify ownership
+        game = db.games.find_one({"game_id": game_id})
+        print(f"Found game: {game is not None}")
+        
+        if not game:
+            # Try to find with different ID formats
+            try:
+                # Try as string first
+                print(f"Trying to find game with string ID: {game_id}")
+                game = db.games.find_one({"game_id": str(game_id)})
+                
+                # Then try as integer
+                if not game:
+                    print(f"Trying to find game with numeric ID")
+                    numeric_id = int(game_id)
+                    game = db.games.find_one({"game_id": numeric_id})
+                    if game:
+                        game_id = numeric_id  # Update game_id for deletion
+                        print(f"Found game with numeric ID: {numeric_id}")
+            except (ValueError, TypeError) as e:
+                print(f"Error converting game_id: {str(e)}")
+                
+            # If still not found, return 404
+            if not game:
+                print("Game not found after all attempts")
+                return jsonify({"error": "Game not found"}), 404
+        
+        # Print game details for debugging
+        print(f"Game details: ID={game.get('game_id')}, Owner={game.get('username')}")
+        
+        # Verify that the game belongs to the current user
+        if game.get("username") != username:
+            return jsonify({"error": "Not authorized to delete this game"}), 403
+        
+        # Delete the game directly from database to avoid any issues
+        try:
+            print(f"Attempting direct deletion of game_id: {game_id}")
+            result = db.games.delete_one({"game_id": game_id})
+            if result.deleted_count > 0:
+                print(f"Game successfully deleted with direct DB call")
+                return jsonify({"message": "Game deleted successfully"}), 200
+            
+            # Try different format just in case
+            print(f"Trying deletion with alternate formats")
+            if isinstance(game_id, str):
+                try:
+                    numeric_id = int(game_id)
+                    result = db.games.delete_one({"game_id": numeric_id})
+                    if result.deleted_count > 0:
+                        print(f"Game deleted with numeric ID")
+                        return jsonify({"message": "Game deleted successfully (numeric ID)"}), 200
+                except ValueError:
+                    pass
+            
+            # If we get here, deletion failed
+            print("Failed to delete game after multiple attempts")
+            return jsonify({"error": "Failed to delete game"}), 500
+            
+        except Exception as delete_error:
+            print(f"Exception during direct deletion: {str(delete_error)}")
+            return jsonify({"error": f"Database error: {str(delete_error)}"}), 500
+    except Exception as e:
+        print(f"Exception in delete_user_game_endpoint: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 # Troop Management Endpoints
 

@@ -228,6 +228,79 @@ edo
 }
 ```
 
+#### Erabiltzailearen partida guztiak lortu
+
+- **Metodoa:** GET
+- **Bidea:** `/api/user/games`
+- **Deskribapena:** Uneko erabiltzaileak gordetako partida guztiak itzultzen ditu
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+[
+  {
+    "game_id": "1621523625123",
+    "username": "erabiltzailea",
+    "difficulty": "medium",
+    "map_data": {
+      "width": 30,
+      "height": 15,
+      "grid": [[0,0,0,...],[0,1,0,...],...],
+      "startPoint": [15, 7]
+    },
+    "created_at": "2023-05-20T15:30:22Z"
+  },
+  {
+    "game_id": "1621524567890",
+    "username": "erabiltzailea",
+    "difficulty": "hard",
+    "map_data": {
+      "width": 40,
+      "height": 20,
+      "grid": [[0,0,0,...],[0,1,0,...],...],
+      "startPoint": [20, 10]
+    },
+    "created_at": "2023-05-21T10:15:45Z"
+  }
+]
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+
+#### Erabiltzailearen partida bat ezabatu
+
+- **Metodoa:** DELETE
+- **Bidea:** `/api/user/games/{game_id}`
+- **Deskribapena:** Erabiltzailearen partida zehatz bat ezabatzen du
+- **Inplementazioa:** Bai
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "message": "Game deleted successfully"
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+edo
+```json
+{
+    "error": "Game not found"
+}
+```
+edo
+```json
+{
+    "error": "Not authorized to delete this game"
+}
+```
+
 ### Mapen Kudeaketarako
 
 #### Mapa berri bat sortu

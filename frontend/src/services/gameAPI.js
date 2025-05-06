@@ -354,5 +354,41 @@ export const gameAPI = {
       console.error(`Error deleting map ${mapId}:`, error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Get all games for the current user
+   */
+  async getUserGames() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/user/games`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user games: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching user games:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a specific game for the current user
+   */
+  async deleteUserGame(gameId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/user/games/${gameId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete game: ${response.status}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting game ${gameId}:`, error);
+      throw error;
+    }
+  },
 };

@@ -13,7 +13,8 @@
   // Propiedades del mapa
   let mapData = null;
   let tileSize = 32; // Tamaño de cada celda en píxeles
-  let grid = []; // Grid del mapa
+  let grid = []; // Grid del mapa (fog of war)
+  let terrain = []; // Terreno del mapa
   let mapWidth = 0;
   let mapHeight = 0;
   let startPoint = [0, 0];
@@ -30,18 +31,20 @@
   // Información de selección
   let selectedTile = null;
   
-  // Constantes para tipos de terreno
-  const TERRAIN = {
-    DEEP_WATER: 0,
-    PLAINS: 1,
-    FOREST: 2,
-    MOUNTAINS: 3,
-    HILLS: 4,
-    DESERT: 5,
-    SHALLOW_WATER: 6,
-    GRASS: 7,
-    SNOW: 8,
-    JUNGLE: 9
+  // Fog of War
+  let showFogOfWar = true; // Estado para mostrar/ocultar el fog of war
+  
+  // Constantes para tipos de terreno real (según API)
+  const TERRAIN_TYPES = {
+    NORMAL: 0, // Tierra normal
+    WATER: 1,  // Agua
+    MINERAL: 2  // Mineral
+  };
+  
+  // Constantes para fog of war
+  const FOG_OF_WAR = {
+    HIDDEN: 0, // No visible
+    VISIBLE: 1 // Visible
   };
 
   onMount(async () => {
@@ -103,26 +106,33 @@
           // Configurar propiedades del mapa
           mapWidth = mapData.width || 30;
           mapHeight = mapData.height || 15;
-          grid = mapData.grid || [];
+          grid = mapData.grid || []; // Este es el fog of war
+          terrain = mapData.terrain || []; // Este es el terreno real
           startPoint = mapData.startPoint || [15, 7];
           difficulty = mapData.difficulty || "medium";
           
-          // Si no tenemos grid, creamos uno
+          // Si no tenemos grid o terrain, los inicializamos
           if (!grid || !grid.length || grid.length !== mapHeight) {
-            initializeGrid();
+            initializeFogOfWar();
+          }
+          
+          if (!terrain || !terrain.length || terrain.length !== mapHeight) {
+            initializeTerrain();
           }
         } else {
           // Si no hay datos, inicializar con valores predeterminados
           mapWidth = 30;
           mapHeight = 15;
-          initializeGrid();
+          initializeFogOfWar();
+          initializeTerrain();
         }
       } catch (apiError) {
         console.error("Error loading map:", apiError);
         // En caso de error, inicializar con valores predeterminados
         mapWidth = 30;
         mapHeight = 15;
-        initializeGrid();
+        initializeFogOfWar();
+        initializeTerrain();
       }
       
       isLoading = false;
@@ -135,23 +145,45 @@
     }
   }
   
-  function initializeGrid() {
-    grid = Array(mapHeight).fill().map(() => Array(mapWidth).fill(TERRAIN.GRASS));
+  // Función para inicializar el fog of war
+  function initializeFogOfWar() {
+    grid = Array(mapHeight).fill().map(() => Array(mapWidth).fill(FOG_OF_WAR.HIDDEN));
+    
+    // Si tenemos un punto de inicio, hacemos visible esa zona
+    if (startPoint && startPoint.length === 2) {
+      const [startX, startY] = startPoint;
+      const visibilityRadius = 3;
+      
+      for (let y = Math.max(0, startY - visibilityRadius); y <= Math.min(mapHeight - 1, startY + visibilityRadius); y++) {
+        for (let x = Math.max(0, startX - visibilityRadius); x <= Math.min(mapWidth - 1, startX + visibilityRadius); x++) {
+          // Calculamos la distancia al punto de inicio
+          const distance = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+          
+          // Si está dentro del radio de visibilidad, lo hacemos visible
+          if (distance <= visibilityRadius) {
+            grid[y][x] = FOG_OF_WAR.VISIBLE;
+          }
+        }
+      }
+    }
+  }
+  
+  // Función para inicializar el terreno
+  function initializeTerrain() {
+    terrain = Array(mapHeight).fill().map(() => Array(mapWidth).fill(TERRAIN_TYPES.NORMAL));
     
     // Generar un terreno aleatorio básico
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const rnd = Math.random();
         
-        if (rnd < 0.05) grid[y][x] = TERRAIN.DEEP_WATER;
-        else if (rnd < 0.1) grid[y][x] = TERRAIN.SHALLOW_WATER;
-        else if (rnd < 0.3) grid[y][x] = TERRAIN.PLAINS;
-        else if (rnd < 0.5) grid[y][x] = TERRAIN.GRASS;
-        else if (rnd < 0.7) grid[y][x] = TERRAIN.FOREST;
-        else if (rnd < 0.85) grid[y][x] = TERRAIN.HILLS;
-        else if (rnd < 0.9) grid[y][x] = TERRAIN.MOUNTAINS;
-        else if (rnd < 0.95) grid[y][x] = TERRAIN.DESERT;
-        else grid[y][x] = TERRAIN.JUNGLE;
+        if (rnd < 0.15) {
+          terrain[y][x] = TERRAIN_TYPES.WATER; // 15% agua
+        } else if (rnd < 0.25) {
+          terrain[y][x] = TERRAIN_TYPES.MINERAL; // 10% minerales
+        } else {
+          terrain[y][x] = TERRAIN_TYPES.NORMAL; // 75% tierra normal
+        }
       }
     }
     
@@ -159,13 +191,13 @@
     if (startPoint && startPoint.length === 2) {
       const [startX, startY] = startPoint;
       if (startX >= 0 && startX < mapWidth && startY >= 0 && startY < mapHeight) {
-        grid[startY][startX] = TERRAIN.GRASS;
+        terrain[startY][startX] = TERRAIN_TYPES.NORMAL;
         
         // También hacer el área alrededor adecuada para empezar
         for (let y = Math.max(0, startY - 1); y <= Math.min(mapHeight - 1, startY + 1); y++) {
           for (let x = Math.max(0, startX - 1); x <= Math.min(mapWidth - 1, startX + 1); x++) {
-            if (grid[y][x] === TERRAIN.DEEP_WATER || grid[y][x] === TERRAIN.MOUNTAINS) {
-              grid[y][x] = TERRAIN.GRASS;
+            if (terrain[y][x] === TERRAIN_TYPES.WATER) {
+              terrain[y][x] = TERRAIN_TYPES.NORMAL;
             }
           }
         }
@@ -173,57 +205,61 @@
     }
   }
 
+  // Función para centrar el mapa en el punto de inicio
   function centerMapOnStartPoint() {
     if (startPoint && startPoint.length === 2) {
       const [startX, startY] = startPoint;
-      const containerWidth = document.querySelector('.map-container')?.clientWidth || 800;
-      const containerHeight = document.querySelector('.map-container')?.clientHeight || 600;
-
-      offsetX = containerWidth / 2 - startX * tileSize * zoomLevel;
-      offsetY = containerHeight / 2 - startY * tileSize * zoomLevel;
+      // Calcula la posición central de la pantalla
+      const containerWidth = window.innerWidth;
+      const containerHeight = window.innerHeight;
+      
+      // Ajusta el offset para centrar el punto de inicio
+      offsetX = (containerWidth / 2) - (startX * tileSize * zoomLevel);
+      offsetY = (containerHeight / 2) - (startY * tileSize * zoomLevel);
     }
+  }
+  
+  // Función para alternar el fog of war
+  function toggleFogOfWar() {
+    showFogOfWar = !showFogOfWar;
   }
   
   function getTerrainColor(terrainType) {
     switch (terrainType) {
-      case TERRAIN.DEEP_WATER: return '#0066cc';
-      case TERRAIN.SHALLOW_WATER: return '#3399ff';
-      case TERRAIN.DESERT: return '#e6cc99';
-      case TERRAIN.GRASS: return '#66cc66';
-      case TERRAIN.FOREST: return '#006633';
-      case TERRAIN.PLAINS: return '#cccc99';
-      case TERRAIN.HILLS: return '#996633';
-      case TERRAIN.MOUNTAINS: return '#666666';
-      case TERRAIN.SNOW: return '#ffffff';
-      case TERRAIN.JUNGLE: return '#339933';
-      default: return '#66cc66'; // Grass as default
+      case TERRAIN_TYPES.WATER: return '#3399ff'; // Azul para agua
+      case TERRAIN_TYPES.MINERAL: return '#cc9900'; // Dorado para minerales
+      case TERRAIN_TYPES.NORMAL: return '#66cc66'; // Verde para tierra normal
+      default: return '#66cc66'; // Verde por defecto
     }
   }
   
   function getTerrainName(terrainType) {
     switch (terrainType) {
-      case TERRAIN.DEEP_WATER: return 'Aguas profundas';
-      case TERRAIN.SHALLOW_WATER: return 'Aguas poco profundas';
-      case TERRAIN.DESERT: return 'Desierto';
-      case TERRAIN.GRASS: return 'Pradera';
-      case TERRAIN.FOREST: return 'Bosque';
-      case TERRAIN.PLAINS: return 'Llanuras';
-      case TERRAIN.HILLS: return 'Colinas';
-      case TERRAIN.MOUNTAINS: return 'Montañas';
-      case TERRAIN.SNOW: return 'Nieve';
-      case TERRAIN.JUNGLE: return 'Jungla';
+      case TERRAIN_TYPES.WATER: return 'Agua';
+      case TERRAIN_TYPES.MINERAL: return 'Terreno mineralizado';
+      case TERRAIN_TYPES.NORMAL: return 'Tierra';
       default: return 'Desconocido';
     }
   }
   
   function handleTileClick(x, y) {
-    const terrain = grid[y] ? grid[y][x] : TERRAIN.GRASS;
-    
-    selectedTile = {
-      x, y,
-      terrain,
-      terrainName: getTerrainName(terrain)
-    };
+    // Si el tile no es visible y el fog of war está activado, no mostramos información
+    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
+      selectedTile = {
+        x, y,
+        terrainName: 'Desconocido (no explorado)',
+        isExplored: false
+      };
+    } else {
+      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
+      
+      selectedTile = {
+        x, y,
+        terrain: terrainType,
+        terrainName: getTerrainName(terrainType),
+        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
+      };
+    }
   }
   
   function zoomIn() {
@@ -309,6 +345,9 @@
         <span class="game-info">Tamaño del mapa: {mapWidth}x{mapHeight} | Dificultad: {difficulty}</span>
       </div>
       <div class="right-controls">
+        <button on:click={toggleFogOfWar} title="{showFogOfWar ? 'Desactivar' : 'Activar'} Niebla de Guerra" class:active={showFogOfWar}>
+          {showFogOfWar ? '👁️' : '🌫️'} Niebla
+        </button>
         <button on:click={zoomIn} title="Aumentar zoom">+</button>
         <button on:click={zoomOut} title="Reducir zoom">-</button>
         <button on:click={centerMapOnStartPoint} title="Centrar mapa">⌖</button>
@@ -329,25 +368,29 @@
       >
         {#each Array(mapHeight) as _, y}
           {#each Array(mapWidth) as _, x}
-            {@const terrain = grid[y] ? grid[y][x] : TERRAIN.GRASS}
+            {@const isVisible = !showFogOfWar || (grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE)}
+            {@const terrainType = terrain[y] && terrain[y][x] !== undefined ? terrain[y][x] : TERRAIN_TYPES.NORMAL}
             
             <div 
               class="map-tile"
+              class:fog={showFogOfWar && !isVisible}
+              class:water={isVisible && terrainType === TERRAIN_TYPES.WATER}
+              class:mineral={isVisible && terrainType === TERRAIN_TYPES.MINERAL}
               style="
                 left: {x * tileSize}px;
                 top: {y * tileSize}px;
                 width: {tileSize}px;
                 height: {tileSize}px;
-                background-color: {getTerrainColor(terrain)};
+                background-color: {isVisible ? getTerrainColor(terrainType) : '#000'};
               "
               on:click={() => handleTileClick(x, y)}
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
             >
-              {#if x % 10 === 0 && y % 10 === 0}
+              {#if x % 10 === 0 && y % 10 === 0 && isVisible}
                 <div class="coord-marker">{x},{y}</div>
               {/if}
               
-              {#if startPoint && startPoint[0] === x && startPoint[1] === y}
+              {#if startPoint && startPoint[0] === x && startPoint[1] === y && isVisible}
                 <div class="start-marker">
                   <span class="start-icon">🏠</span>
                 </div>
@@ -368,13 +411,21 @@
           
           <div class="terrain-info">
             <h5>Terreno: {selectedTile.terrainName}</h5>
-            <div class="terrain-sample" style="background-color: {getTerrainColor(selectedTile.terrain)};"></div>
+            {#if selectedTile.isExplored !== false}
+              <div class="terrain-sample" style="background-color: {getTerrainColor(selectedTile.terrain)};"></div>
+            {/if}
           </div>
           
           {#if startPoint && startPoint[0] === selectedTile.x && startPoint[1] === selectedTile.y}
             <div class="start-info">
               <h5>Punto de inicio del mapa</h5>
               <p>Esta es la posición inicial recomendada para comenzar la partida.</p>
+            </div>
+          {/if}
+          
+          {#if selectedTile.isExplored === false}
+            <div class="fog-info">
+              <p>Esta zona no ha sido explorada todavía.</p>
             </div>
           {/if}
         </div>
@@ -530,10 +581,51 @@
     transition: all 0.1s;
   }
   
-  .map-tile.selected {
-    border: 2px solid #ffcc00;
-    box-shadow: 0 0 10px #ffcc00;
-    z-index: 5;
+  .map-tile.fog {
+    background-color: #000 !important;
+    border: 1px solid #222;
+  }
+  
+  .map-tile.water {
+    background-color: #3399ff;
+    border: 1px solid rgba(0, 0, 150, 0.3);
+    animation: waterWave 2s infinite alternate;
+  }
+  
+  @keyframes waterWave {
+    from { border-color: rgba(0, 0, 150, 0.3); }
+    to { border-color: rgba(100, 200, 255, 0.7); }
+  }
+  
+  .map-tile.mineral {
+    background-color: #cc9900;
+    border: 1px solid rgba(150, 100, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .map-tile.mineral::after {
+    content: "💎";
+    position: absolute;
+    font-size: 0.7rem;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.7;
+  }
+  
+  .right-controls button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 5px;
+    font-size: 0.9rem;
+  }
+  
+  .right-controls button.active {
+    background-color: #4CAF50;
+    border-color: #2E7D32;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
   }
   
   .coord-marker {
@@ -640,6 +732,19 @@
   .start-info p {
     margin: 0;
     font-size: 0.9rem;
+  }
+  
+  .fog-info {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+  }
+  
+  .fog-info p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #aaa;
   }
   
   .pause-menu-overlay {

@@ -245,6 +245,7 @@ export const gameAPI = {
         throw new Error(`Failed to fetch maps: ${response.status}`);
       }
       const maps = await response.json();
+      console.log("Fetched maps:", maps);
       
       // Normalize map data to ensure consistent property names
       return maps.map(map => {

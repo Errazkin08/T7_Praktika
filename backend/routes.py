@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
-                     update_troop_status, reset_troops_status, get_all_maps, delete_map)
+                     update_troop_status, reset_troops_status, get_all_maps, delete_map, get_map)
 import hashlib
 from bson import ObjectId
 import json
@@ -192,11 +192,32 @@ def get_first_map_endpoint():
 def get_maps():
     """Get all maps from the database"""
     try:
+        print("Getting all maps...")
         maps = get_all_maps()
-        if not maps or len(maps) == 0:
+        
+        # Asegurar que los mapas sean serializables a JSON
+        json_safe_maps = []
+        for map_doc in maps:
+            # Crear una copia segura para JSON
+            safe_map = {}
+            for key, value in map_doc.items():
+                if key == '_id' or key == 'map_id':
+                    safe_map[key] = str(value)
+                elif isinstance(value, list) and not key in ['grid', 'terrain']:
+                    # Para listas que no son la cuadrícula o el terreno (que son matrices)
+                    safe_map[key] = [str(item) if isinstance(item, ObjectId) else item for item in value]
+                else:
+                    safe_map[key] = value
+            json_safe_maps.append(safe_map)
+            
+        print(f"Returning {len(json_safe_maps)} maps")
+        
+        if not json_safe_maps or len(json_safe_maps) == 0:
             return jsonify({"message": "No maps found"}), 404
-        return jsonify(maps), 200
+        
+        return jsonify(json_safe_maps), 200
     except Exception as e:
+        print(f"Error getting maps: {e}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @routes_blueprint.route('/api/maps/<map_id>', methods=['DELETE'])
@@ -219,6 +240,28 @@ def delete_map_endpoint(map_id):
     except Exception as e:
         print(f"Error in delete_map_endpoint: {str(e)}")
         return jsonify({"error": f"Error deleting map: {str(e)}"}), 500
+
+@routes_blueprint.route('/api/maps/<map_id>', methods=['GET'])
+def get_map_edpoint(map_id):
+    """Get a specific map by its ID"""
+    try:
+        # Check if user is logged in
+        if 'username' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        # Fetch the map from the database
+        map_data = get_map(map_id)
+        
+        if not map_data:
+            return jsonify({"error": "Map not found"}), 404
+        
+        # Convert ObjectId to string for JSON serialization
+        map_data['_id'] = str(map_data['_id'])
+        
+        return jsonify(map_data), 200
+    except Exception as e:
+        print(f"Error getting map: {e}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
     
 @routes_blueprint.route('/api/game', methods=['POST'])
 def create_game():

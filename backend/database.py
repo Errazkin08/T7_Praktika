@@ -259,14 +259,50 @@ def get_first_map():
     Get the first map from the database
     """
     db = get_db()
-    return db.maps.find_one({}, {'_id': 0})
+    return db.maps.find_one({})
+
+def get_map(map_id):
+    """
+    Get a map by its ID
+    """
+    db = get_db()
+    try:
+        # Convert map_id to ObjectId if necessary
+        if isinstance(map_id, str) and len(map_id) == 24:
+            obj_id = ObjectId(map_id)
+            map_doc = db.maps.find_one({"_id": obj_id})
+        else:
+            map_doc = db.maps.find_one({"map_id": map_id})
+        
+        # Convert ObjectId to string for JSON serialization
+        if map_doc and '_id' in map_doc:
+            map_doc['_id'] = str(map_doc['_id'])
+        
+        return map_doc
+    except Exception as e:
+        print(f"Error in get_map(): {str(e)}")
+        return None
 
 def get_all_maps():
     """
     Get all maps from the database
     """
     db = get_db()
-    return list(db.maps.find({}, {'_id': 0}))
+    maps = []
+    try:
+        # Encuentra todos los mapas y procesa cada uno para asegurar serialización JSON segura
+        for map_doc in db.maps.find():
+            # Convertir ObjectId a string para evitar problemas de serialización JSON
+            if '_id' in map_doc:
+                map_doc['map_id'] = str(map_doc['_id'])
+                map_doc['_id'] = str(map_doc['_id'])
+            maps.append(map_doc)
+        print(f"Found {len(maps)} maps in database")
+        return maps
+    except Exception as e:
+        print(f"Error in get_all_maps(): {str(e)}")
+        # En caso de error, devuelve una lista vacía en lugar de lanzar excepción
+        return []
 
 def delete_map(map_id):
     """

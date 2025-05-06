@@ -3,10 +3,12 @@
   import { user } from '../stores/auth.js';
   import { onMount } from 'svelte';
   import { gameAPI } from '../services/gameAPI.js';
+  import { startGame } from '../stores/gameState.js';
   
   let savedGames = [];
   let isLoading = true;
   let error = null;
+  let confirmingDelete = null;
   
   // Redirect to welcome page if not logged in
   onMount(async () => {
@@ -15,42 +17,89 @@
       return;
     }
     
-    // Try to load saved games from API
+    // Load user's saved games
+    await loadUserGames();
+  });
+
+  async function loadUserGames() {
     try {
       isLoading = true;
-      savedGames = await gameAPI.getSavedGames();
+      error = null;
+      savedGames = await gameAPI.getUserGames();
+      console.log("Loaded saved games:", savedGames);
     } catch (err) {
       console.error("Error loading saved games:", err);
-      error = "Failed to load saved games. The API endpoint might not be implemented yet.";
-      // For demo purposes, we can add some mock data
+      error = "Failed to load saved games: " + err.message;
+      // Fallback to sample data for testing
       savedGames = [
-        /* This is just example data that would come from the API */
         {
           game_id: "sample1",
           name: "My First Empire",
-          scenario_id: "europe_map_01",
-          created_at: "2023-04-10T15:30:22Z",
-          last_saved: "2023-04-12T18:45:33Z",
-          turn: 12
-        },
-        {
-          game_id: "sample2",
-          name: "World Domination",
-          scenario_id: "europe_map_02",
-          created_at: "2023-04-05T09:20:15Z",
-          last_saved: "2023-04-11T21:37:42Z",
-          turn: 28
+          difficulty: "medium",
+          created_at: new Date().toISOString(),
+          last_saved: new Date().toISOString()
         }
       ];
     } finally {
       isLoading = false;
     }
-  });
+  }
   
-  function loadGame(gameId) {
-    // In the future, this will load the game via API
-    console.log(`Loading game: ${gameId}`);
-    navigate('/map'); // For now, just navigate to the map
+  async function loadGame(gameId) {
+    try {
+      isLoading = true;
+      const gameData = await gameAPI.loadGame(gameId);
+      
+      // Initialize game state with loaded data
+      startGame(
+        gameData.name || "Loaded Game", 
+        {
+          mapId: gameData.map_id,
+          difficulty: gameData.difficulty,
+          width: gameData.map_data?.width || 30,
+          height: gameData.map_data?.height || 15
+        }
+      );
+      
+      // Navigate to map
+      navigate('/map');
+    } catch (err) {
+      console.error("Error loading game:", err);
+      error = "Failed to load game: " + err.message;
+      isLoading = false;
+    }
+  }
+  
+  async function deleteGame(event, gameId) {
+    // Prevent event propagation to avoid loading the game
+    event.stopPropagation();
+    
+    // Set the game to confirm deletion
+    confirmingDelete = gameId;
+  }
+  
+  async function confirmDelete() {
+    if (!confirmingDelete) return;
+    
+    try {
+      isLoading = true;
+      await gameAPI.deleteUserGame(confirmingDelete);
+      
+      // Reload games list
+      await loadUserGames();
+      
+      // Reset confirmation
+      confirmingDelete = null;
+    } catch (err) {
+      console.error("Error deleting game:", err);
+      error = "Failed to delete game: " + err.message;
+    } finally {
+      isLoading = false;
+    }
+  }
+  
+  function cancelDelete() {
+    confirmingDelete = null;
   }
   
   function formatDate(dateString) {
@@ -90,20 +139,36 @@
         {#each savedGames as game}
           <div class="game-card" on:click={() => loadGame(game.game_id)}>
             <div class="game-info">
-              <h3>{game.name}</h3>
-              <p class="scenario-name">Scenario: {game.scenario_id}</p>
+              <h3>{game.name || `Game ${game.game_id}`}</h3>
+              <p class="scenario-name">Difficulty: {game.difficulty || 'medium'}</p>
               <p class="game-details">
-                Turn: {game.turn} | 
-                Created: {formatDate(game.created_at)} | 
-                Last Played: {formatDate(game.last_saved)}
+                Created: {formatDate(game.created_at)}
               </p>
             </div>
-            <button class="load-button">Load Game</button>
+            <div class="card-actions">
+              <button class="load-button">Load Game</button>
+              <button class="delete-button" on:click={(e) => deleteGame(e, game.game_id)}>
+                Delete
+              </button>
+            </div>
           </div>
         {/each}
       </div>
     {/if}
   </div>
+  
+  {#if confirmingDelete}
+    <div class="confirm-dialog-overlay">
+      <div class="confirm-dialog">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete this game? This action cannot be undone.</p>
+        <div class="dialog-buttons">
+          <button class="cancel-button" on:click={cancelDelete}>Cancel</button>
+          <button class="confirm-button" on:click={confirmDelete}>Delete</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -209,5 +274,77 @@
     color: #6c757d;
     font-size: 0.9rem;
     margin: 0.3rem 0;
+  }
+  
+  .card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .delete-button {
+    padding: 0.5rem 1rem;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .delete-button:hover {
+    background-color: #c82333;
+  }
+  
+  .confirm-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .confirm-dialog {
+    background-color: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .confirm-dialog h3 {
+    margin-top: 0;
+    color: #dc3545;
+  }
+  
+  .dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  
+  .cancel-button {
+    padding: 0.5rem 1rem;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .confirm-button {
+    padding: 0.5rem 1rem;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
   }
 </style>

@@ -398,6 +398,17 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "width": map_data.get("width", 30),
             "height": map_data.get("height", 15)
         }
+        settler= get_troop_type("settler", map_data["startPoint"])
+
+        warrior= get_troop_type("warrior", map_data["startPoint"])#cambia el startPoint sumandole 1 a la coordenada x siempre que sea posible sino suma 1 a la coordenada y
+        if map_data["startPoint"][0] + 1 < map_size["width"]:
+            warrior["position"][0] += 1
+        elif map_data["startPoint"][1] + 1 < map_size["height"]:
+            warrior["position"][1] += 1
+        elif map_data["startPoint"][0] - 1 >= 0:
+            warrior["position"][0] -= 1
+        elif map_data["startPoint"][1] - 1 >= 0:
+            warrior["position"][1] -= 1
             
         # Crear el documento del juego con el mapa completo
         game = {
@@ -405,9 +416,26 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "username": username,
             "name": game_name,  # Store the user-provided name
             "difficulty": difficulty,
+            "turn": 1,
+            "current_player": "player",
+            "cheats_used": [],
+
             "map_id": map_id_str,
             "map_size": map_size,  # Explicitly store map size
             "map_data": map_data,  # Guardar el mapa completo
+            "player": {
+                "units": [settler, warrior],
+                "cities": [],
+                "resources": {
+                    "food": 100,
+                    "gold": 50,
+                    "wood": 20
+                },
+            },
+            "ia": {
+                "units": [],
+                "cities": []
+            },
             "created_at": datetime.datetime.now(),
             "last_saved": datetime.datetime.now()
         }
@@ -545,6 +573,7 @@ def get_troop_types():
             "health": 100,
             "attack": 10,
             "defense": 10,
+            "position": [0, 0],
             "movement": 2,
             "cost": {
                 "food": 50,
@@ -560,6 +589,7 @@ def get_troop_types():
             "health": 80,
             "attack": 15,
             "defense": 5,
+            "position": [0, 0],
             "movement": 2,
             "range": 2,
             "cost": {
@@ -577,6 +607,7 @@ def get_troop_types():
             "health": 120,
             "attack": 15,
             "defense": 8,
+            "position": [0, 0],
             "movement": 4,
             "cost": {
                 "food": 70,
@@ -592,6 +623,7 @@ def get_troop_types():
             "health": 50,
             "attack": 0,
             "defense": 1,
+            "position": [0, 0],
             "movement": 2,
             "cost": {
                 "food": 100,
@@ -607,6 +639,7 @@ def get_troop_types():
             "health": 40,
             "attack": 0,
             "defense": 1,
+            "position": [0, 0],
             "movement": 2,
             "cost": {
                 "food": 50,
@@ -618,13 +651,14 @@ def get_troop_types():
     ]
     return troop_types
 
-def get_troop_type(type_id):
+def get_troop_type(type_id, position):
     """
     Get a specific troop type by its ID
     """
     troop_types = get_troop_types()
     for troop_type in troop_types:
         if troop_type["type_id"] == type_id:
+            troop_type["position"] = position
             return troop_type
     return None
 

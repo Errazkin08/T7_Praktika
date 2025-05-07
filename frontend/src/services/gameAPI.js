@@ -421,4 +421,20 @@ export const gameAPI = {
       throw error;
     }
   },
+
+  /**
+   * Get the current game from the session
+   */
+  async getCurrentGame() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/current-game`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch current game: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching current game:', error);
+      return null;
+    }
+  },
 };

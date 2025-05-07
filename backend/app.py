@@ -44,6 +44,12 @@ def after_request(response):
             # Recursively check for other ObjectIds in the game object
     return response
 
+@app.route('/api/current-game', methods=['GET'])
+def get_current_game():
+    if 'game' in session:
+        return jsonify(session['game'])
+    return jsonify(None), 404
+
 @app.teardown_appcontext
 def teardown_db(exception):
     close_db(exception)

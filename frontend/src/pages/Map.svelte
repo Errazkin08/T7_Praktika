@@ -19,7 +19,7 @@
   let mapHeight = 0;
   let startPoint = [0, 0];
   let difficulty = "medium";
-  
+
   // Propiedades de navegación
   let offsetX = 0;
   let offsetY = 0;
@@ -27,25 +27,28 @@
   let dragStartX = 0;
   let dragStartY = 0;
   let zoomLevel = 1.0;
-  
+
   // Información de selección
   let selectedTile = null;
-  
+
   // Fog of War
   let showFogOfWar = true; // Estado para mostrar/ocultar el fog of war
-  
+
   // Constantes para tipos de terreno real (según API)
   const TERRAIN_TYPES = {
     NORMAL: 0, // Tierra normal
     WATER: 1,  // Agua
     MINERAL: 2  // Mineral
   };
-  
+
   // Constantes para fog of war
   const FOG_OF_WAR = {
     HIDDEN: 0, // No visible
     VISIBLE: 1 // Visible
   };
+
+  let units = []; // Array to store units from the game JSON
+  let gameData = null; // To store session game data
 
   onMount(async () => {
     try {
@@ -54,17 +57,17 @@
         navigate('/');
         return;
       }
-      
+
       // Escuchar eventos de teclado para el menú de pausa
       window.addEventListener('keydown', handleKeyPress);
-      
+
       // Obtener el ID del mapa seleccionado del estado del juego o usar uno predeterminado
       selectedMapId = $gameState?.currentScenario?.mapId;
       console.log("Selected map ID:", selectedMapId);
-      
+
       // Inicializar el juego
       await initializeGame();
-      
+
       return () => {
         window.removeEventListener('keydown', handleKeyPress);
       };
@@ -84,59 +87,86 @@
     showPauseMenu = !showPauseMenu;
     pauseGame(showPauseMenu);
   }
-  
+
   async function initializeGame() {
     try {
       isLoading = true;
       loadingError = null;
-      
-      // Intentar obtener el mapa del backend
+
+      // Intentar obtener el juego de la sesión primero
       try {
-        if (selectedMapId) {
-          // Si tenemos un ID específico, intentamos cargarlo
-          mapData = await gameAPI.getMapById(selectedMapId);
-        } else {
-          // De lo contrario, cargamos el primer mapa disponible
-          mapData = await gameAPI.getFirstMap();
-        }
-        
-        if (mapData) {
-          console.log("Loaded map data:", mapData);
-          
-          // Configurar propiedades del mapa
-          mapWidth = mapData.width || 30;
-          mapHeight = mapData.height || 15;
-          grid = mapData.grid || []; // Este es el fog of war
-          terrain = mapData.terrain || []; // Este es el terreno real
+        // First, try to load game data from the session via an API call
+        gameData = await gameAPI.getCurrentGame();
+        console.log("Game data from session:", gameData);
+
+        if (gameData) {
+          // We have game data from session, use this for map rendering
+          console.log("Using game data from session");
+
+          // Get map data from the game object
+          mapData = gameData.map_data || {};
+          console.log("Map data from session game:", mapData);
+
+          // Configure map properties from the map_data
+          mapWidth = gameData.map_size?.width || mapData.width || 30;
+          mapHeight = gameData.map_size?.height || mapData.height || 15;
+          grid = mapData.grid || [];
+          terrain = mapData.terrain || [];
           startPoint = mapData.startPoint || [15, 7];
-          difficulty = mapData.difficulty || "medium";
-          
-          // Si no tenemos grid o terrain, los inicializamos
-          if (!grid || !grid.length || grid.length !== mapHeight) {
-            initializeFogOfWar();
-          }
-          
-          if (!terrain || !terrain.length || terrain.length !== mapHeight) {
-            initializeTerrain();
+          difficulty = gameData.difficulty || mapData.difficulty || "medium";
+
+          // Load units from player.units
+          if (gameData.player && Array.isArray(gameData.player.units)) {
+            units = gameData.player.units;
+            console.log("Units loaded from session game:", units);
+          } else {
+            units = [];
+            console.log("No units found in session game data");
           }
         } else {
-          // Si no hay datos, inicializar con valores predeterminados
-          mapWidth = 30;
-          mapHeight = 15;
+          // If no game in session, try to load a map directly
+          if (selectedMapId) {
+            // Si tenemos un ID específico, intentamos cargarlo
+            mapData = await gameAPI.getMapById(selectedMapId);
+            console.log("Loaded map by ID:", mapData);
+          } else {
+            // De lo contrario, cargamos el primer mapa disponible
+            mapData = await gameAPI.getFirstMap();
+            console.log("Loaded first available map:", mapData);
+          }
+
+          if (mapData) {
+            // Configure map properties
+            mapWidth = mapData.width || 30;
+            mapHeight = mapData.height || 15;
+            grid = mapData.grid || [];
+            terrain = mapData.terrain || [];
+            startPoint = mapData.startPoint || [15, 7];
+            difficulty = mapData.difficulty || "medium";
+            units = []; // No units when just loading a map
+          }
+        }
+
+        // Si no tenemos grid o terrain, los inicializamos
+        if (!grid || !grid.length || grid.length !== mapHeight) {
           initializeFogOfWar();
+        }
+
+        if (!terrain || !terrain.length || terrain.length !== mapHeight) {
           initializeTerrain();
         }
       } catch (apiError) {
-        console.error("Error loading map:", apiError);
+        console.error("Error loading game/map:", apiError);
         // En caso de error, inicializar con valores predeterminados
         mapWidth = 30;
         mapHeight = 15;
         initializeFogOfWar();
         initializeTerrain();
+        units = [];
       }
-      
+
       isLoading = false;
-      
+
       // Centrar el mapa
       setTimeout(centerMapOnStartPoint, 200);
     } catch (error) {
@@ -144,21 +174,21 @@
       isLoading = false;
     }
   }
-  
+
   // Función para inicializar el fog of war
   function initializeFogOfWar() {
     grid = Array(mapHeight).fill().map(() => Array(mapWidth).fill(FOG_OF_WAR.HIDDEN));
-    
+
     // Si tenemos un punto de inicio, hacemos visible esa zona
     if (startPoint && startPoint.length === 2) {
       const [startX, startY] = startPoint;
       const visibilityRadius = 3;
-      
+
       for (let y = Math.max(0, startY - visibilityRadius); y <= Math.min(mapHeight - 1, startY + visibilityRadius); y++) {
         for (let x = Math.max(0, startX - visibilityRadius); x <= Math.min(mapWidth - 1, startX + visibilityRadius); x++) {
           // Calculamos la distancia al punto de inicio
           const distance = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-          
+
           // Si está dentro del radio de visibilidad, lo hacemos visible
           if (distance <= visibilityRadius) {
             grid[y][x] = FOG_OF_WAR.VISIBLE;
@@ -167,16 +197,16 @@
       }
     }
   }
-  
+
   // Función para inicializar el terreno
   function initializeTerrain() {
     terrain = Array(mapHeight).fill().map(() => Array(mapWidth).fill(TERRAIN_TYPES.NORMAL));
-    
+
     // Generar un terreno aleatorio básico
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const rnd = Math.random();
-        
+
         if (rnd < 0.15) {
           terrain[y][x] = TERRAIN_TYPES.WATER; // 15% agua
         } else if (rnd < 0.25) {
@@ -186,13 +216,13 @@
         }
       }
     }
-    
+
     // Asegurar que el punto de inicio sea terreno adecuado
     if (startPoint && startPoint.length === 2) {
       const [startX, startY] = startPoint;
       if (startX >= 0 && startX < mapWidth && startY >= 0 && startY < mapHeight) {
         terrain[startY][startX] = TERRAIN_TYPES.NORMAL;
-        
+
         // También hacer el área alrededor adecuada para empezar
         for (let y = Math.max(0, startY - 1); y <= Math.min(mapHeight - 1, startY + 1); y++) {
           for (let x = Math.max(0, startX - 1); x <= Math.min(mapWidth - 1, startX + 1); x++) {
@@ -212,18 +242,18 @@
       // Calcula la posición central de la pantalla
       const containerWidth = window.innerWidth;
       const containerHeight = window.innerHeight;
-      
+
       // Ajusta el offset para centrar el punto de inicio
       offsetX = (containerWidth / 2) - (startX * tileSize * zoomLevel);
       offsetY = (containerHeight / 2) - (startY * tileSize * zoomLevel);
     }
   }
-  
+
   // Función para alternar el fog of war
   function toggleFogOfWar() {
     showFogOfWar = !showFogOfWar;
   }
-  
+
   function getTerrainColor(terrainType) {
     switch (terrainType) {
       case TERRAIN_TYPES.WATER: return '#3399ff'; // Azul para agua
@@ -232,7 +262,7 @@
       default: return '#66cc66'; // Verde por defecto
     }
   }
-  
+
   function getTerrainName(terrainType) {
     switch (terrainType) {
       case TERRAIN_TYPES.WATER: return 'Agua';
@@ -241,7 +271,7 @@
       default: return 'Desconocido';
     }
   }
-  
+
   function handleTileClick(x, y) {
     // Si el tile no es visible y el fog of war está activado, no mostramos información
     if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
@@ -252,7 +282,7 @@
       };
     } else {
       const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
-      
+
       selectedTile = {
         x, y,
         terrain: terrainType,
@@ -261,33 +291,33 @@
       };
     }
   }
-  
+
   function zoomIn() {
     zoomLevel += 0.1;
     if (zoomLevel > 2) zoomLevel = 2;
   }
-  
+
   function zoomOut() {
     zoomLevel -= 0.1;
     if (zoomLevel < 0.2) zoomLevel = 0.2;
   }
-  
+
   function startDrag(event) {
     isDragging = true;
     dragStartX = event.clientX - offsetX;
     dragStartY = event.clientY - offsetY;
   }
-  
+
   function drag(event) {
     if (!isDragging) return;
     offsetX = event.clientX - dragStartX;
     offsetY = event.clientY - dragStartY;
   }
-  
+
   function endDrag() {
     isDragging = false;
   }
-  
+
   async function saveAndExit() {
     try {
       // Implementación básica: solo volvemos al inicio
@@ -301,11 +331,29 @@
       }
     }
   }
-  
+
   function exitWithoutSaving() {
     if (confirm("¿Estás seguro de que quieres salir sin guardar? Se perderá todo el progreso.")) {
       endGame();
       navigate('/home');
+    }
+  }
+
+  function getUnitIcon(unitType) {
+    // Return an appropriate icon for each unit type
+    switch (unitType) {
+      case "settler":
+        return "🏠";
+      case "warrior":
+        return "⚔️";
+      case "archer":
+        return "🏹";
+      case "cavalry":
+        return "🐎";
+      case "builder":
+        return "🔨";
+      default:
+        return "❓";
     }
   }
 </script>
@@ -390,10 +438,22 @@
                 <div class="coord-marker">{x},{y}</div>
               {/if}
               
-              {#if startPoint && startPoint[0] === x && startPoint[1] === y && isVisible}
-                <div class="start-marker">
-                  <span class="start-icon">🏠</span>
-                </div>
+              <!-- Display units on map - only showing one unit per tile -->
+              {#if units && units.length > 0 && isVisible}
+                {@const unitAtPosition = units.find(unit => 
+                  unit && 
+                  unit.position && 
+                  Array.isArray(unit.position) && 
+                  unit.position.length >= 2 && 
+                  unit.position[0] === x && 
+                  unit.position[1] === y
+                )}
+                
+                {#if unitAtPosition}
+                  <div class="unit-marker" title={unitAtPosition.name || unitAtPosition.type_id}>
+                    <span class="unit-icon">{getUnitIcon(unitAtPosition.type_id)}</span>
+                  </div>
+                {/if}
               {/if}
             </div>
           {/each}
@@ -838,5 +898,29 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+  }
+
+  .unit-marker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 15; /* Ensure units appear above terrain */
+    transition: transform 0.2s ease; /* Smooth hover effect */
+  }
+  
+  .unit-marker:hover {
+    transform: scale(1.2); /* Slightly enlarge on hover */
+    z-index: 20; /* Bring to front when hovering */
+  }
+  
+  .unit-icon {
+    font-size: 1.6rem; /* Larger icon */
+    filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.9));
+    text-shadow: 1px 1px 2px black;
   }
 </style>

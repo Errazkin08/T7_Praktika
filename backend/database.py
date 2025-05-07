@@ -4,10 +4,26 @@ import os
 import datetime
 import random
 import uuid
+import json
 from bson import ObjectId
 
 # MongoDB connection string - using environment variable for security
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://mongodb:27017/')
+
+# Add this utility function for JSON serialization
+class JSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        return super(JSONEncoder, self).default(obj)
+
+def sanitize_for_json(obj):
+    """
+    Convert any MongoDB ObjectId or datetime objects to strings for JSON serialization
+    """
+    return json.loads(JSONEncoder().encode(obj))
 
 def get_db():
     """
@@ -385,22 +401,20 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                 "difficulty": difficulty,
                 "visibleObjects": []  # Igual que en add_map
             }
-        
-        # Convertir ObjectId a string si existe
-        if "_id" in map_data and isinstance(map_data["_id"], ObjectId):
-            map_data["_id"] = str(map_data["_id"])
-        
-        # Crear un ID único para la partida
-        game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
-        
+            
         # Extract map size properly
         map_size = {
             "width": map_data.get("width", 30),
             "height": map_data.get("height", 15)
         }
-        settler= get_troop_type("settler", map_data["startPoint"])
+        
+        # Create a copy of the start point for each unit to avoid shared references
+        settler = get_troop_type("settler", map_data["startPoint"][:])  # Create a copy of the list
 
-        warrior= get_troop_type("warrior", map_data["startPoint"])#cambia el startPoint sumandole 1 a la coordenada x siempre que sea posible sino suma 1 a la coordenada y
+        # Create a separate copy for the warrior
+        warrior = get_troop_type("warrior", map_data["startPoint"][:])  # Create another copy
+        
+        # Adjust warrior position to be adjacent to start point
         if map_data["startPoint"][0] + 1 < map_size["width"]:
             warrior["position"][0] += 1
         elif map_data["startPoint"][1] + 1 < map_size["height"]:
@@ -410,6 +424,9 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
         elif map_data["startPoint"][1] - 1 >= 0:
             warrior["position"][1] -= 1
             
+        # Create a timestamp-based game ID
+        game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
+        
         # Crear el documento del juego con el mapa completo
         game = {
             "game_id": game_id,
@@ -440,17 +457,10 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "last_saved": datetime.datetime.now()
         }
         
-        # Guardar una versión segura en la sesión
-        session['game'] = {
-            "game_id": game_id,
-            "username": username,
-            "name": game_name,  # Include name in session
-            "difficulty": difficulty,
-            "map_id": map_id_str,
-            "map_size": map_size  # Include map size in session
-        }
+        # Convert the game object to be JSON serializable before storing in session
+        session['game'] = sanitize_for_json(game)
         
-        # Insertar el juego en la base de datos
+        # Return the original game object for storing in MongoDB
         return db.games.insert_one(game)
     except Exception as e:
         print(f"Error adding game: {e}")
@@ -464,10 +474,27 @@ def save_game():
     game = session.get('game')
     
     if game:
-        # Save the game to the database
-        db.games.delete_one({"game_id": game['game_id']})  # Remove old game if exists
-        db.games.insert_one(game)
-        return True
+        try:
+            # Update the last_saved timestamp
+            game['last_saved'] = datetime.datetime.now().isoformat()
+            
+            # We need to convert any string dates back to datetime for MongoDB
+            if 'created_at' in game and isinstance(game['created_at'], str):
+                try:
+                    game['created_at'] = datetime.datetime.fromisoformat(game['created_at'])
+                except:
+                    game['created_at'] = datetime.datetime.now()
+            
+            # Replace the game in the database
+            db.games.delete_one({"game_id": game['game_id']})
+            db.games.insert_one(game)
+            
+            # Update session with the sanitized version
+            session['game'] = sanitize_for_json(game)
+            return True
+        except Exception as e:
+            print(f"Error saving game: {e}")
+            return False
     return False
 
 def delete_game(game_id):

@@ -57,7 +57,7 @@
       const gameData = await gameAPI.loadGame(gameId);
       console.log("Loaded game data:", gameData);
       
-      // Extract map data
+      // Extract map data - handle possibly different structures
       const mapData = gameData.map_data || {};
       const mapSize = gameData.map_size || {};
       
@@ -66,7 +66,10 @@
       const mapHeight = mapSize.height || mapData.height || 15;
       const gameName = gameData.name || `Game ${gameId.substring(0, 6)}`;
       const difficulty = gameData.difficulty || 'medium';
-      const mapId = gameData.map_id || mapData._id;
+      const mapId = gameData.map_id || (mapData._id ? mapData._id : null);
+      
+      // Get turn number (it might be called 'turn' in the database)
+      const turnNumber = gameData.turnNumber || gameData.turn || 1;
       
       console.log(`Loading game "${gameName}" with map size ${mapWidth}x${mapHeight}`);
       
@@ -78,7 +81,7 @@
           difficulty: difficulty,
           width: mapWidth,
           height: mapHeight,
-          turnNumber: gameData.turnNumber || 1
+          turnNumber: turnNumber
         }
       );
       
@@ -131,9 +134,9 @@
   }
   
   function getMapSizeDisplay(game) {
-    if (game.map_size) {
+    if (game.map_size && typeof game.map_size.width !== 'undefined' && typeof game.map_size.height !== 'undefined') {
       return `${game.map_size.width}x${game.map_size.height}`;
-    } else if (game.map_data && game.map_data.width && game.map_data.height) {
+    } else if (game.map_data && typeof game.map_data.width !== 'undefined' && typeof game.map_data.height !== 'undefined') {
       return `${game.map_data.width}x${game.map_data.height}`;
     }
     return 'Unknown size';

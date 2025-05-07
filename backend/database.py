@@ -543,7 +543,21 @@ def get_user_games(username):
     Get all games for a specific user
     """
     db = get_db()
-    return list(db.games.find({"username": username}))
+    games = []
+    try:
+        # Get all games for the user
+        games_cursor = db.games.find({"username": username})
+        
+        # Process each game to ensure JSON serialization works
+        for game in games_cursor:
+            # Use the sanitize_for_json helper to handle ObjectId and datetime objects
+            sanitized_game = sanitize_for_json(game)
+            games.append(sanitized_game)
+            
+        return games
+    except Exception as e:
+        print(f"Error in get_user_games: {str(e)}")
+        return []
 
 def get_game_by_id_from_db(game_id, username=None):
     """

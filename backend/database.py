@@ -144,6 +144,15 @@ def add_map(width, height, startPoint, difficulty="easy", name=None):
     # Create a terrain grid (0=normal, 1=water, 2=mineralized)
     terrain = generate_terrain(width, height, difficulty)
     
+    # Remove water tiles within a 4-tile perimeter around the start point
+    x_start, y_start = startPoint
+    for y in range(max(0, y_start - 4), min(height, y_start + 5)):
+        for x in range(max(0, x_start - 4), min(width, x_start + 5)):
+            # Calculate Manhattan distance from start point
+            distance = abs(x - x_start) + abs(y - y_start)
+            if distance <= 4 and terrain[y][x] == 1:  # If it's water and within perimeter
+                terrain[y][x] = 0  # Change to normal terrain
+    
     # Set visibility for a 3x3 area around the start point
     x, y = startPoint
     

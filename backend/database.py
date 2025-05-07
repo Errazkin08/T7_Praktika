@@ -340,7 +340,7 @@ def delete_map(map_id):
         print(f"Error deleting map: {e}")
         return False
 
-def add_game(username, map_id, difficulty):
+def add_game(username, map_id, difficulty, game_name="New Game"):
     """Add a new game for a user"""
     try:
         db = get_db()
@@ -392,21 +392,34 @@ def add_game(username, map_id, difficulty):
         
         # Crear un ID único para la partida
         game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
+        
+        # Extract map size properly
+        map_size = {
+            "width": map_data.get("width", 30),
+            "height": map_data.get("height", 15)
+        }
             
         # Crear el documento del juego con el mapa completo
         game = {
             "game_id": game_id,
             "username": username,
+            "name": game_name,  # Store the user-provided name
             "difficulty": difficulty,
-            "map_data": map_data  # Guardar el mapa completo
+            "map_id": map_id_str,
+            "map_size": map_size,  # Explicitly store map size
+            "map_data": map_data,  # Guardar el mapa completo
+            "created_at": datetime.datetime.now(),
+            "last_saved": datetime.datetime.now()
         }
         
         # Guardar una versión segura en la sesión
         session['game'] = {
             "game_id": game_id,
             "username": username,
+            "name": game_name,  # Include name in session
             "difficulty": difficulty,
-            "map_id": map_id_str
+            "map_id": map_id_str,
+            "map_size": map_size  # Include map size in session
         }
         
         # Insertar el juego en la base de datos
@@ -480,6 +493,43 @@ def get_user_games(username):
     """
     db = get_db()
     return list(db.games.find({"username": username}))
+
+def get_game_by_id_from_db(game_id, username=None):
+    """
+    Get a game by its ID. If username is provided, verify that the game belongs to this user.
+    """
+    db = get_db()
+    try:
+        # Try different ways to find the game
+        
+        # First try by game_id as is
+        game = db.games.find_one({"game_id": game_id})
+        
+        # If not found, try as integer if it's a string
+        if not game and isinstance(game_id, str):
+            try:
+                numeric_id = int(game_id)
+                game = db.games.find_one({"game_id": numeric_id})
+            except ValueError:
+                pass
+            
+        # If still not found, try by ObjectId if it's a valid one
+        if not game and isinstance(game_id, str) and len(game_id) == 24:
+            try:
+                obj_id = ObjectId(game_id)
+                game = db.games.find_one({"_id": obj_id})
+            except Exception:
+                pass
+                
+        # If game is found and username is provided, check ownership
+        if game and username and game.get('username') != username:
+            print(f"Game {game_id} belongs to {game.get('username')}, not to {username}")
+            return None
+            
+        return game
+    except Exception as e:
+        print(f"Error getting game by ID: {e}")
+        return None
 
 # Troop related functions
 def get_troop_types():

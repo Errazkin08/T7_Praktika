@@ -113,11 +113,30 @@ export const gameAPI = {
    */
   async loadGame(gameId) {
     try {
+      console.log(`Requesting game data for ID: ${gameId}`);
       const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`);
+      
       if (!response.ok) {
-        throw new Error(`Failed to load game: ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage = `Failed to load game: ${response.status}`;
+        
+        try {
+          // Try to parse the error response as JSON
+          const errorData = JSON.parse(errorText);
+          console.error(`Error response (${response.status}):`, errorData);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (parseError) {
+          console.error(`Error response (${response.status}):`, errorText);
+        }
+        
+        throw new Error(errorMessage);
       }
-      return await response.json();
+      
+      const data = await response.json();
+      console.log("Successfully loaded game data:", data);
+      return data;
     } catch (error) {
       console.error(`Error loading game ${gameId}:`, error);
       throw error;
@@ -365,7 +384,18 @@ export const gameAPI = {
       if (!response.ok) {
         throw new Error(`Failed to fetch user games: ${response.status}`);
       }
-      return await response.json();
+      const games = await response.json();
+      
+      // Process games to ensure they have all required fields
+      return games.map(game => ({
+        ...game,
+        name: game.name || `Game ${game.game_id.substring(0, 6)}`,
+        difficulty: game.difficulty || 'medium',
+        map_size: game.map_size || {
+          width: game.map_data?.width || 30,
+          height: game.map_data?.height || 15
+        }
+      }));
     } catch (error) {
       console.error("Error fetching user games:", error);
       throw error;

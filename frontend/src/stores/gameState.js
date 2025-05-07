@@ -27,7 +27,11 @@ export function startGame(name, scenario) {
     gameInProgress: true,
     gameName: name,
     currentScenario: scenario,
-    turnNumber: 1
+    turnNumber: scenario.turnNumber || 1,
+    mapSize: { 
+      width: scenario.width || 30, 
+      height: scenario.height || 15 
+    }
   }));
 }
 
@@ -46,5 +50,12 @@ export function updateMapSize(width, height) {
   gameState.update(state => ({
     ...state,
     mapSize: { width, height }
+  }));
+}
+
+export function nextTurn() {
+  gameState.update(state => ({
+    ...state,
+    turnNumber: state.turnNumber + 1
   }));
 }

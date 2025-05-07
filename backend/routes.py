@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify, session
 from database import (add_user, find_user, save_game, get_all_users, update_user_login, add_map, get_first_map, add_game, delete_game,
                      get_troop_types, get_troop_type, add_troop_to_player, get_player_troops, update_troop_position,
-                     update_troop_status, reset_troops_status, get_all_maps, delete_map, get_map, get_user_games, get_db)
+                     update_troop_status, reset_troops_status, get_all_maps, delete_map, get_map, get_user_games, 
+                     get_db, get_game_by_id_from_db)
 import hashlib
 from bson import ObjectId
 import json
+import datetime
 
 routes_blueprint = Blueprint('routes', __name__)
 
@@ -112,8 +114,8 @@ def check_session():
                 "authenticated": True,
                 "user": {
                     "username": user['username'],
-                    "score": user['score'],
-                    "level": user['level']
+                    "score": user.get('score', 0),
+                    "level": user.get('level', 1)
                 }
             }), 200
     return jsonify({"authenticated": False}), 401
@@ -128,13 +130,13 @@ def get_user(username):
     
     return jsonify({
         "username": user['username'],
-        "score": user['score'],
-        "level": user['level']
+        "score": user.get('score', 0),
+        "level": user.get('level', 1)
     }), 200
 
 #Get all users from the database
 @routes_blueprint.route('/api/users/', methods=['GET'])
-def get_all_users():
+def get_all_users_endpoint():
     try:
         # Query all users from the database
         users = get_all_users()
@@ -242,7 +244,7 @@ def delete_map_endpoint(map_id):
         return jsonify({"error": f"Error deleting map: {str(e)}"}), 500
 
 @routes_blueprint.route('/api/maps/<map_id>', methods=['GET'])
-def get_map_edpoint(map_id):
+def get_map_endpoint(map_id):
     """Get a specific map by its ID"""
     try:
         # Check if user is logged in
@@ -273,13 +275,14 @@ def create_game():
         
         map_id = data.get('map')
         difficulty = data.get('difficulty')
+        game_name = data.get('name', "New Game")  # Get name from request, default if not provided
         
         # Make sure to convert map_id to string if it's an ObjectId
         if map_id and isinstance(map_id, ObjectId):
             map_id = str(map_id)
             
-        # Create the game
-        result = add_game(username, map_id, difficulty)
+        # Create the game with the provided name
+        result = add_game(username, map_id, difficulty, game_name)
         
         if result:
             return jsonify({"message": "Game added successfully"}), 201
@@ -406,6 +409,57 @@ def delete_user_game_endpoint(game_id):
             return jsonify({"error": f"Database error: {str(delete_error)}"}), 500
     except Exception as e:
         print(f"Exception in delete_user_game_endpoint: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@routes_blueprint.route('/api/games/<game_id>', methods=['GET'])
+def get_game_by_id(game_id):
+    """Get a specific game by its ID"""
+    try:
+        # Check if user is logged in
+        if 'username' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        username = session['username']
+        print(f"Loading game {game_id} for user {username}")
+        
+        # Get the complete game from the database
+        game = get_game_by_id_from_db(game_id, username)
+        
+        if not game:
+            return jsonify({"error": "Game not found"}), 404
+        
+        # Convert any ObjectId to string for JSON serialization
+        if '_id' in game:
+            game['_id'] = str(game['_id'])
+        
+        # Extract map data and size for easy access
+        map_data = game.get('map_data', {})
+        map_size = game.get('map_size', {})
+        if not map_size and map_data:
+            map_size = {
+                "width": map_data.get("width", 30),
+                "height": map_data.get("height", 15)
+            }
+        
+        # Store the complete game in the session
+        session['game'] = {
+            "game_id": game['game_id'],
+            "username": username,
+            "name": game.get('name', "Loaded Game"),
+            "difficulty": game.get('difficulty', 'medium'),
+            "map_id": game.get('map_id', None),
+            "map_size": map_size,
+            "map_data": map_data,  # Include complete map data
+            "turnNumber": game.get('turnNumber', 1),
+            "troops": game.get('troops', {}),  # Include any troops data
+            "resources": game.get('resources', {})  # Include any resources data
+        }
+        
+        print(f"Game {game_id} loaded successfully into session")
+        
+        return jsonify(game), 200
+    except Exception as e:
+        print(f"Error getting game: {e}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 # Troop Management Endpoints

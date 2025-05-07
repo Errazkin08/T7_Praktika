@@ -36,6 +36,7 @@
           game_id: "sample1",
           name: "My First Empire",
           difficulty: "medium",
+          map_size: { width: 30, height: 15 },
           created_at: new Date().toISOString(),
           last_saved: new Date().toISOString()
         }
@@ -48,20 +49,42 @@
   async function loadGame(gameId) {
     try {
       isLoading = true;
+      error = null;
+      
+      console.log(`Attempting to load game with ID: ${gameId}`);
+      
+      // Fetch complete game data from server
       const gameData = await gameAPI.loadGame(gameId);
+      console.log("Loaded game data:", gameData);
+      
+      // Extract map data
+      const mapData = gameData.map_data || {};
+      const mapSize = gameData.map_size || {};
+      
+      // Use the values from the loaded game, with fallbacks
+      const mapWidth = mapSize.width || mapData.width || 30;
+      const mapHeight = mapSize.height || mapData.height || 15;
+      const gameName = gameData.name || `Game ${gameId.substring(0, 6)}`;
+      const difficulty = gameData.difficulty || 'medium';
+      const mapId = gameData.map_id || mapData._id;
+      
+      console.log(`Loading game "${gameName}" with map size ${mapWidth}x${mapHeight}`);
       
       // Initialize game state with loaded data
       startGame(
-        gameData.name || "Loaded Game", 
+        gameName, 
         {
-          mapId: gameData.map_id,
-          difficulty: gameData.difficulty,
-          width: gameData.map_data?.width || 30,
-          height: gameData.map_data?.height || 15
+          mapId: mapId,
+          difficulty: difficulty,
+          width: mapWidth,
+          height: mapHeight,
+          turnNumber: gameData.turnNumber || 1
         }
       );
       
-      // Navigate to map
+      console.log("Game loaded and state updated, navigating to map");
+      
+      // Navigate to map to start playing (the backend already has the game in session)
       navigate('/map');
     } catch (err) {
       console.error("Error loading game:", err);
@@ -106,32 +129,53 @@
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   }
+  
+  function getMapSizeDisplay(game) {
+    if (game.map_size) {
+      return `${game.map_size.width}x${game.map_size.height}`;
+    } else if (game.map_data && game.map_data.width && game.map_data.height) {
+      return `${game.map_data.width}x${game.map_data.height}`;
+    }
+    return 'Unknown size';
+  }
+  
+  function getDifficultyDisplay(difficulty) {
+    switch(difficulty) {
+      case 'easy': return 'Fácil';
+      case 'medium': return 'Media';
+      case 'hard': return 'Difícil';
+      default: return difficulty || 'Media';
+    }
+  }
 </script>
 
 <div class="load-game-page">
   <div class="page-header">
-    <h1>Load Game</h1>
+    <h1>Cargar Partida</h1>
     <button class="back-button" on:click={() => navigate('/home')}>
-      Back to Dashboard
+      Volver al Inicio
     </button>
   </div>
   
   <div class="games-container">
     {#if isLoading}
       <div class="loading-state">
-        <p>Loading saved games...</p>
+        <div class="loading-spinner"></div>
+        <p>Cargando partidas guardadas...</p>
       </div>
     {:else if error}
       <div class="error-state">
         <p>{error}</p>
-        <p class="note">Note: This is a development version, so we're showing sample data.</p>
+        <button class="retry-button" on:click={loadUserGames}>
+          Reintentar
+        </button>
       </div>
     {:else if savedGames.length === 0}
       <div class="empty-state">
-        <h2>No Saved Games</h2>
-        <p>You don't have any saved games yet. Start a new game first!</p>
+        <h2>No hay partidas guardadas</h2>
+        <p>Aún no tienes partidas guardadas. ¡Comienza una nueva partida!</p>
         <button class="new-game-button" on:click={() => navigate('/new-game')}>
-          Start New Game
+          Iniciar Nueva Partida
         </button>
       </div>
     {:else}
@@ -139,16 +183,38 @@
         {#each savedGames as game}
           <div class="game-card" on:click={() => loadGame(game.game_id)}>
             <div class="game-info">
-              <h3>{game.name || `Game ${game.game_id}`}</h3>
-              <p class="scenario-name">Difficulty: {game.difficulty || 'medium'}</p>
-              <p class="game-details">
-                Created: {formatDate(game.created_at)}
-              </p>
+              <h3>{game.name || `Partida ${game.game_id.substring(0, 6)}...`}</h3>
+              
+              <div class="game-stats">
+                <div class="stat">
+                  <span class="stat-label">Dificultad:</span>
+                  <span class="stat-value">{getDifficultyDisplay(game.difficulty)}</span>
+                </div>
+                
+                <div class="stat">
+                  <span class="stat-label">Tamaño de mapa:</span>
+                  <span class="stat-value">{getMapSizeDisplay(game)}</span>
+                </div>
+                
+                {#if game.created_at}
+                <div class="stat">
+                  <span class="stat-label">Creado:</span>
+                  <span class="stat-value">{formatDate(game.created_at)}</span>
+                </div>
+                {/if}
+                
+                {#if game.last_saved && game.last_saved !== game.created_at}
+                <div class="stat">
+                  <span class="stat-label">Guardado:</span>
+                  <span class="stat-value">{formatDate(game.last_saved)}</span>
+                </div>
+                {/if}
+              </div>
             </div>
             <div class="card-actions">
-              <button class="load-button">Load Game</button>
+              <button class="load-button">Cargar Partida</button>
               <button class="delete-button" on:click={(e) => deleteGame(e, game.game_id)}>
-                Delete
+                Borrar
               </button>
             </div>
           </div>
@@ -160,11 +226,11 @@
   {#if confirmingDelete}
     <div class="confirm-dialog-overlay">
       <div class="confirm-dialog">
-        <h3>Confirm Deletion</h3>
-        <p>Are you sure you want to delete this game? This action cannot be undone.</p>
+        <h3>Confirmar Borrado</h3>
+        <p>¿Estás seguro de que quieres borrar esta partida? Esta acción no se puede deshacer.</p>
         <div class="dialog-buttons">
-          <button class="cancel-button" on:click={cancelDelete}>Cancel</button>
-          <button class="confirm-button" on:click={confirmDelete}>Delete</button>
+          <button class="cancel-button" on:click={cancelDelete}>Cancelar</button>
+          <button class="confirm-button" on:click={confirmDelete}>Borrar</button>
         </div>
       </div>
     </div>
@@ -211,14 +277,33 @@
     text-align: center;
   }
   
+  .loading-spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: #4CAF50;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
   .error-state {
     color: #dc3545;
   }
   
-  .error-state .note {
-    color: #6c757d;
+  .retry-button {
+    padding: 0.5rem 1rem;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
     margin-top: 1rem;
-    font-style: italic;
   }
   
   .new-game-button, .load-button {
@@ -253,6 +338,7 @@
     padding: 1.5rem;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease;
+    cursor: pointer;
   }
   
   .game-card:hover {
@@ -260,26 +346,42 @@
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
   }
   
+  .game-info {
+    flex: 1;
+  }
+  
   .game-info h3 {
     margin: 0 0 0.5rem;
     font-size: 1.3rem;
   }
   
-  .scenario-name {
-    color: #495057;
-    margin: 0.3rem 0;
+  .game-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.8rem;
   }
   
-  .game-details {
-    color: #6c757d;
+  .stat {
+    display: flex;
     font-size: 0.9rem;
-    margin: 0.3rem 0;
+  }
+  
+  .stat-label {
+    font-weight: bold;
+    color: #495057;
+    margin-right: 0.5rem;
+  }
+  
+  .stat-value {
+    color: #6c757d;
   }
   
   .card-actions {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    min-width: 130px;
   }
   
   .delete-button {

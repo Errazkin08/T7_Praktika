@@ -9,7 +9,7 @@ Erabiliko ditugun teknologiak:
 
 ---
 ## Exekutatzeko komandoa:
-**1.Aldia bada:**
+**Lehenengo aldia bada:**
 ```
 docker-compose up --build 
 ```

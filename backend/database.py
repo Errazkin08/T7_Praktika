@@ -144,20 +144,16 @@ def add_map(width, height, startPoint, difficulty="easy", name=None):
     # Create a terrain grid (0=normal, 1=water, 2=mineralized)
     terrain = generate_terrain(width, height, difficulty)
     
-    # Set the start point to 1 in grid
+    # Set visibility for a 3x3 area around the start point
     x, y = startPoint
-    grid[y][x] = 1
     
-    # For easy difficulty, set 2 more points around start point to 1
-    if difficulty == "easy":
-        # Define possible adjacent positions (up, down, left, right)
-        adjacent = [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]
-        # Filter valid positions within grid boundaries
-        valid_positions = [(nx, ny) for nx, ny in adjacent if 0 <= nx < width and 0 <= ny < height]
-        # Choose up to 2 positions
-        for i, (nx, ny) in enumerate(valid_positions):
-            if i < 2:  # Only set up to 2 additional points
-                grid[ny][nx] = 1
+    # Loop through a 3x3 grid centered at the start point
+    for dy in range(-1, 2):  # -1, 0, 1
+        for dx in range(-1, 2):  # -1, 0, 1
+            nx, ny = x + dx, y + dy
+            # Check if position is within map boundaries
+            if 0 <= nx < width and 0 <= ny < height:
+                grid[ny][nx] = 1  # Set to visible (1) in fog of war grid
     
     # Generate a default name if none provided
     if not name:

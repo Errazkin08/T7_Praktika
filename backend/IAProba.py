@@ -2,7 +2,7 @@
 import requests
 import time
 import json
-from typing import Dict,Optional, Any
+from typing import Dict, Optional, Any
 
 class GroqAPIClient:
     """Cliente para realizar llamadas a la API de Groq con manejo de errores y cambio de modelos."""
@@ -11,8 +11,8 @@ class GroqAPIClient:
     
     # Lista de modelos disponibles en Groq (agrega o quita según necesidad)
     MODELS = [
-        "llama3-8b-8192",
         "llama3-70b-8192",
+        "llama3-8b-8192",
         "meta-llama/llama-4-maverick-17b-128e-instruct",
         "deepseek-r1-distill-llama-70b",
         
@@ -46,7 +46,7 @@ class GroqAPIClient:
         print(f"Cambiando al modelo: {self.current_model}")
         return self.current_model
     
-    def call_api(self, prompt: str, temperature: float = 0.7) -> Dict[str, Any]:
+    def call_api(self, prompt: str, temperature: float = 0.3) -> Dict[str, Any]:
         """
         Realiza una llamada a la API de Groq con manejo de errores.
         
@@ -81,7 +81,7 @@ class GroqAPIClient:
                 if response.status_code == 200:
                     data = response.json()
                     print(f"Respuesta exitosa recibida (tokens: {data.get('usage', {}).get('total_tokens', 'N/A')})")
-                    retries=0
+                    retries = 0
                     return data
                 
                 # Manejar errores comunes
@@ -134,25 +134,81 @@ class GroqAPIClient:
                 content = message.get("content", "").strip()
                 
                 print(content)
+                return content
                 
         except Exception as e:
             print(f"Error en la llamada #{str(e)}") 
+            return ""
 
-def main():
-    # El prompt fijo que se usará en todas las llamadas
-    PROMPT = """Explicame como funciona El civilization."""
+def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
+    """
+    Función para interactuar con la IA de juego.
+    
+    Args:
+        prompt: El prompt principal para la IA.
+        game_state: Estado actual del juego en formato JSON.
+        rules: Las reglas del juego.
+    
+    Returns:
+        Respuesta de la IA, generalmente en formato JSON.
+    """
     try:
         # Inicializar el cliente
         client = GroqAPIClient()
         
-        # Ejecutar las llamadas a la API
-        for i in range(1000):
-            client.run_call(
-                prompt=PROMPT
-            )
+        # Siempre incluimos las instrucciones del sistema en cada llamada
+        system_instructions = f"""
+        Eres una IA que controla un jugador en un juego de estrategia por turnos. 
+        Tu objetivo es tomar decisiones estratégicas según el estado del juego que recibirás.
+        Debes responder EXCLUSIVAMENTE en formato JSON según el esquema proporcionado.
+        
+        Estas son las reglas del juego:
+        {rules if rules else 'Reglas no especificadas.'}
+        
+        No añadas explicaciones adicionales, solo devuelve el JSON válido con tus acciones y razonamiento.
+        """
+        
+        # Construimos el prompt completo con las instrucciones del sistema y el estado del juego
+        game_prompt = f"""
+        {system_instructions}
+        
+        Basado en el estado actual del juego y tus objetivos, genera tu siguiente turno de acciones.
+        
+        IMPORTANTE: NO puedes usar directamente los elementos map_data.startPoint, grid y visibleObjects del JSON 
+        del estado del juego. Estos son datos internos del motor de juego.
+        
+        Información sobre el terreno:
+        - 0: Tierra (terreno normal)
+        - 1: Agua (no transitable)
+        - 2: Terreno con minerales (recursos)
+        
+        Estado actual del juego:
+        {json.dumps(game_state) if game_state else 'No hay estado de juego disponible.'}
+        
+        {prompt}
+        
+        Responde ÚNICAMENTE con un JSON válido siguiendo esta estructura:
+        {{
+          "ai_turn_id": "[ID único para este turno]",
+          "game_id": "[ID del juego actual]",
+          "turn_number": [número del turno actual],
+          "actions": [
+            {{
+              "action_id": [número secuencial de acción],
+              "type": "[tipo de acción]",
+              // otros campos según el tipo de acción
+              "state_before": {{ /* estado resumido antes de la acción */ }},
+              "state_after": {{ /* estado resumido después de la acción */ }}
+            }},
+            // más acciones...
+          ],
+          "reasoning": "[Explicación breve de tu estrategia en este turno]"
+        }}
+        """
+        
+        # Ejecutar la llamada a la API y devolver directamente el resultado
+        return client.run_call(prompt=game_prompt)
         
     except Exception as e:
         print(f"Error en la ejecución: {str(e)}")
-        
-if __name__ == "__main__":
-    main()
+        return json.dumps({"error": str(e)})

@@ -7,6 +7,7 @@ import hashlib
 from bson import ObjectId
 import json
 import datetime
+from IAProba import iaDeitu
 
 routes_blueprint = Blueprint('routes', __name__)
 
@@ -585,3 +586,34 @@ def update_game_session():
     except Exception as e:
         print(f"Error updating game session: {e}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@routes_blueprint.route('/api/ai/action', methods=['POST'])
+def ai_action():
+    """
+    Endpoint para obtener acciones de la IA basadas en el estado del juego
+    """
+    # Verificar si el usuario está autenticado
+    if 'username' not in session:
+        return jsonify({"error": "User not logged in"}), 401
+    
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    # Extraer los parámetros para la función iaDeitu
+    prompt = data.get('prompt', '')
+    game_state = data.get('game_state', None)
+    rules = data.get('rules', None)
+    
+    # Llamar a la función iaDeitu
+    try:
+        result = iaDeitu(prompt, game_state, rules)
+        
+        # Devolver el resultado como JSON
+        return jsonify({
+            "result": result
+        })
+    except Exception as e:
+        return jsonify({"error": f"AI processing error: {str(e)}"}), 500

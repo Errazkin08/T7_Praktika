@@ -458,4 +458,45 @@ export const gameAPI = {
       return null;
     }
   },
+
+  /**
+   * Update the game session data
+   */
+  async updateGameSession(gameData) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/update-game-session`, {
+        method: 'POST',
+        body: JSON.stringify(gameData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to update game session: ${response.status}` }));
+        throw new Error(errorData.error || `Failed to update game session: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error updating game session:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Tells the backend to save the current game from session to the database.
+   */
+  async saveCurrentGameSession() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/current-game/save`, { // Endpoint from app.py
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to save current game session: ${response.status}` }));
+        throw new Error(errorData.error || `Failed to save current game session: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error saving current game session:", error);
+      throw error;
+    }
+  },
 };

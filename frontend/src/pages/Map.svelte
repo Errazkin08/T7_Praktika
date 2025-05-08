@@ -50,6 +50,11 @@
   let units = []; // Array to store units from the game JSON
   let gameData = null; // To store session game data
 
+  // Unit movement state
+  let selectedUnit = null;
+  let validMoveTargets = [];
+  let movementInProgress = false;
+
   onMount(async () => {
     try {
       // Verificar si el usuario está autenticado
@@ -272,8 +277,39 @@
     }
   }
 
+  // Enhanced tile click handler to support unit selection and movement
   function handleTileClick(x, y) {
-    // Si el tile no es visible y el fog of war está activado, no mostramos información
+    // If a unit is already selected and we click on a valid move target
+    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
+      moveUnitToPosition(selectedUnit, x, y);
+      return;
+    }
+    
+    // Check if there's a unit at this position to select
+    const unitAtPosition = units.find(unit => 
+      unit && 
+      unit.position && 
+      Array.isArray(unit.position) && 
+      unit.position[0] === x && 
+      unit.position[1] === y
+    );
+    
+    // If we found a unit and it's not exhausted, select it
+    if (unitAtPosition && (!unitAtPosition.status || unitAtPosition.status !== 'exhausted')) {
+      selectUnit(unitAtPosition);
+      return;
+    } else if (unitAtPosition) {
+      // If unit is exhausted, just show a message
+      alert("Esta unidad ya ha agotado sus movimientos este turno.");
+      selectedUnit = null;
+      validMoveTargets = [];
+    } else {
+      // No unit found, clear selection
+      selectedUnit = null;
+      validMoveTargets = [];
+    }
+    
+    // Handle regular tile info (original behavior)
     if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
       selectedTile = {
         x, y,
@@ -290,6 +326,170 @@
         isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
       };
     }
+  }
+
+  // Select a unit and calculate its possible move targets
+  function selectUnit(unit) {
+    selectedUnit = unit;
+    validMoveTargets = [];
+    
+    // Get unit's available movement points
+    const movementPoints = unit.movement || 2;
+    
+    // Get current position
+    const [unitX, unitY] = unit.position;
+    
+    // For each movement point, calculate valid adjacent tiles
+    calculateValidMoveTargets(unitX, unitY, movementPoints);
+  }
+  
+  // Calculate valid movement targets based on unit's position and movement points
+  function calculateValidMoveTargets(startX, startY, movementPoints) {
+    // Reset valid targets
+    validMoveTargets = [];
+    
+    // Use breadth-first search to find all reachable tiles within movement points
+    const queue = [[startX, startY, movementPoints]];
+    const visited = {};
+    
+    while (queue.length > 0) {
+      const [x, y, remainingMovement] = queue.shift();
+      
+      // Skip if out of bounds
+      if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) continue;
+      
+      // Skip if this is water terrain
+      if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
+      
+      // Skip if already visited with better movement
+      const key = `${x},${y}`;
+      if (visited[key] !== undefined && visited[key] >= remainingMovement) continue;
+      
+      // Mark as visited with current movement
+      visited[key] = remainingMovement;
+      
+      // Add to valid targets if not the starting position
+      if (x !== startX || y !== startY) {
+        validMoveTargets.push({ x, y, remainingMovement });
+      }
+      
+      // If we still have movement points, explore adjacent tiles
+      if (remainingMovement > 0) {
+        // Only allow orthogonal movement (no diagonals)
+        queue.push([x+1, y, remainingMovement-1]); // Right
+        queue.push([x-1, y, remainingMovement-1]); // Left
+        queue.push([x, y+1, remainingMovement-1]); // Down
+        queue.push([x, y-1, remainingMovement-1]); // Up
+      }
+    }
+  }
+  
+  // Move the selected unit to a target position
+  async function moveUnitToPosition(unit, targetX, targetY) {
+    if (movementInProgress) return;
+    movementInProgress = true;
+    
+    try {
+      const targetInfo = validMoveTargets.find(target => 
+        target.x === targetX && target.y === targetY
+      );
+      
+      if (!targetInfo) {
+        console.error("Target position not in valid moves");
+        movementInProgress = false;
+        return;
+      }
+      
+      const localUnitIndex = units.findIndex(u => u === unit); // Find in local reactive 'units' array
+      
+      if (localUnitIndex !== -1) {
+        const originalUnitPosition = [...units[localUnitIndex].position]; // Capture original position from local unit
+
+        // Update position in local 'units' array for Svelte reactivity
+        units[localUnitIndex].position = [targetX, targetY];
+        
+        const totalMovement = units[localUnitIndex].movement || 2;
+        const movementRemaining = targetInfo.remainingMovement;
+        
+        if (movementRemaining <= 0) {
+          units[localUnitIndex].status = 'exhausted';
+        } else {
+          units[localUnitIndex].status = 'moved';
+        }
+        
+        units = [...units]; // Trigger Svelte reactivity
+        
+        // Update the unit in the main 'gameData' object, which will be sent to session
+        if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
+          let gameDataUnitIndex = -1;
+
+          // Try to find by a unique ID (e.g., unit._id if it's from DB)
+          // Ensure 'unit.id' is the correct unique identifier.
+          if (unit.id) { // 'unit' here is the one selected from the 'units' array
+            gameDataUnitIndex = gameData.player.units.findIndex(u => u.id === unit.id);
+          }
+          
+          // Fallback: if no ID or ID match failed, try by type and original position
+          if (gameDataUnitIndex === -1) {
+            gameDataUnitIndex = gameData.player.units.findIndex(u =>
+              u.type_id === unit.type_id && // 'unit.type_id' from selected unit
+              u.position && Array.isArray(u.position) &&
+              u.position[0] === originalUnitPosition[0] &&
+              u.position[1] === originalUnitPosition[1]
+            );
+          }
+          
+          if (gameDataUnitIndex !== -1) {
+            gameData.player.units[gameDataUnitIndex].position = [targetX, targetY];
+            gameData.player.units[gameDataUnitIndex].status = units[localUnitIndex].status;
+            
+            console.log(`Unit updated in gameData: ID ${unit.id || 'N/A'}, New Pos [${targetX},${targetY}], Status ${units[localUnitIndex].status}`);
+
+            try {
+              await gameAPI.updateGameSession(gameData); // Send the whole gameData to update session
+              console.log('Game session updated on server.');
+            } catch (error) {
+              console.error("Failed to update game session on server:", error);
+              // Optionally, revert local changes or notify user
+            }
+          } else {
+            console.warn("Moved unit not found in gameData.player.units. Session not updated for this unit.");
+          }
+        }
+        
+        updateFogOfWarAroundPosition(targetX, targetY, 2);
+        
+        selectedUnit = null;
+        validMoveTargets = [];
+      } else {
+         console.error("Selected unit not found in local 'units' array.");
+      }
+    } catch(err) {
+      console.error("Error in moveUnitToPosition:", err);
+    } 
+    finally {
+      movementInProgress = false;
+    }
+  }
+  
+  // Update fog of war around a position
+  function updateFogOfWarAroundPosition(centerX, centerY, radius) {
+    if (!showFogOfWar) return;
+    
+    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapHeight - 1, centerY + radius); y++) {
+      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapWidth - 1, centerX + radius); x++) {
+        // Calculate distance to center
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        
+        // If within radius, mark as visible
+        if (distance <= radius && grid[y] && grid[y][x] !== undefined) {
+          grid[y][x] = FOG_OF_WAR.VISIBLE;
+        }
+      }
+    }
+    
+    // Force update of grid to trigger reactivity
+    grid = [...grid];
   }
 
   function zoomIn() {
@@ -320,15 +520,22 @@
 
   async function saveAndExit() {
     try {
-      // Implementación básica: solo volvemos al inicio
-      endGame();
+      if (gameData) {
+        // Step 1: Ensure the latest gameData (with all local changes) is in the backend session
+        console.log("Updating game session before saving and exiting...", gameData);
+        await gameAPI.updateGameSession(gameData);
+        
+        // Step 2: Tell the backend to persist the session's game to the database
+        console.log("Requesting backend to save current game session to DB...");
+        await gameAPI.saveCurrentGameSession();
+        console.log("Game saved and session persisted.");
+      }
+      endGame(); // This should clear local stores (like $gameState)
       navigate('/home');
     } catch (error) {
-      console.error("Error saving game:", error);
-      if (confirm("Error al guardar la partida. ¿Deseas salir de todas formas?")) {
-        endGame();
-        navigate('/home');
-      }
+      console.error("Error saving and exiting game:", error);
+      // Provide more specific feedback if possible
+      alert(`Error saving game: ${error.message}. Please try again or exit without saving.`);
     }
   }
 
@@ -418,12 +625,24 @@
           {#each Array(mapWidth) as _, x}
             {@const isVisible = !showFogOfWar || (grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE)}
             {@const terrainType = terrain[y] && terrain[y][x] !== undefined ? terrain[y][x] : TERRAIN_TYPES.NORMAL}
+            {@const isValidMoveTarget = validMoveTargets.some(target => target.x === x && target.y === y)}
+            {@const unitAtPosition = units.find(unit => 
+              unit && 
+              unit.position && 
+              Array.isArray(unit.position) && 
+              unit.position.length >= 2 && 
+              unit.position[0] === x && 
+              unit.position[1] === y
+            )}
+            {@const isSelectedUnit = selectedUnit && unitAtPosition === selectedUnit}
             
             <div 
               class="map-tile"
               class:fog={showFogOfWar && !isVisible}
               class:water={isVisible && terrainType === TERRAIN_TYPES.WATER}
               class:mineral={isVisible && terrainType === TERRAIN_TYPES.MINERAL}
+              class:valid-move={isVisible && isValidMoveTarget}
+              class:selected-unit-tile={isVisible && isSelectedUnit}
               style="
                 left: {x * tileSize}px;
                 top: {y * tileSize}px;
@@ -438,22 +657,15 @@
                 <div class="coord-marker">{x},{y}</div>
               {/if}
               
-              <!-- Display units on map - only showing one unit per tile -->
-              {#if units && units.length > 0 && isVisible}
-                {@const unitAtPosition = units.find(unit => 
-                  unit && 
-                  unit.position && 
-                  Array.isArray(unit.position) && 
-                  unit.position.length >= 2 && 
-                  unit.position[0] === x && 
-                  unit.position[1] === y
-                )}
-                
-                {#if unitAtPosition}
-                  <div class="unit-marker" title={unitAtPosition.name || unitAtPosition.type_id}>
-                    <span class="unit-icon">{getUnitIcon(unitAtPosition.type_id)}</span>
-                  </div>
-                {/if}
+              {#if unitAtPosition && isVisible}
+                <div 
+                  class="unit-marker" 
+                  class:selected={isSelectedUnit}
+                  class:exhausted={unitAtPosition.status === 'exhausted'}
+                  title="{unitAtPosition.name || unitAtPosition.type_id} {unitAtPosition.status ? '(' + unitAtPosition.status + ')' : ''}"
+                >
+                  <span class="unit-icon">{getUnitIcon(unitAtPosition.type_id)}</span>
+                </div>
               {/if}
             </div>
           {/each}
@@ -672,6 +884,16 @@
     left: 50%;
     transform: translate(-50%, -50%);
     opacity: 0.7;
+  }
+  
+  .map-tile.valid-move {
+    box-shadow: inset 0 0 10px rgba(255, 255, 0, 0.7);
+    cursor: pointer;
+    border: 1px dashed #ffcc00;
+  }
+  
+  .map-tile.selected-unit-tile {
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.9);
   }
   
   .right-controls button {
@@ -918,9 +1140,19 @@
     z-index: 20; /* Bring to front when hovering */
   }
   
-  .unit-icon {
-    font-size: 1.6rem; /* Larger icon */
-    filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.9));
-    text-shadow: 1px 1px 2px black;
+  .unit-marker.selected {
+    animation: pulse 1.5s infinite;
+    z-index: 25;
+  }
+  
+  .unit-marker.exhausted {
+    opacity: 0.6;
+    filter: grayscale(70%);
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
   }
 </style>

@@ -4,13 +4,16 @@ from routes import routes_blueprint
 from database import init_db, close_db
 import os
 from bson import ObjectId
+import datetime
 import json
 
-# Custom JSON encoder to handle MongoDB ObjectId
+# Custom JSON encoder to handle MongoDB ObjectId and datetime
 class MongoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ObjectId):
             return str(obj)
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
         return super().default(obj)
 
 app = Flask(__name__)
@@ -49,6 +52,17 @@ def get_current_game():
     if 'game' in session:
         return jsonify(session['game'])
     return jsonify(None), 404
+
+@app.route('/api/current-game/save', methods=['POST'])
+def save_current_game_session():
+    """Endpoint to save the current game session state without full game saving"""
+    if 'game' in session:
+        from database import save_game
+        result = save_game()
+        if result:
+            return jsonify({"success": True, "message": "Game state saved"})
+        return jsonify({"success": False, "message": "Failed to save game state"}), 500
+    return jsonify({"success": False, "message": "No active game"}), 404
 
 @app.teardown_appcontext
 def teardown_db(exception):

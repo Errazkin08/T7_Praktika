@@ -11,6 +11,18 @@ from IAProba import iaDeitu
 
 routes_blueprint = Blueprint('routes', __name__)
 
+# Helper function to convert ObjectId and datetime objects in a nested structure
+def convert_bson_types(obj):
+    if isinstance(obj, list):
+        return [convert_bson_types(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: convert_bson_types(v) for k, v in obj.items()}
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    if isinstance(obj, datetime.datetime):
+        return obj.isoformat()
+    return obj
+
 # Helper function to convert ObjectId to string
 def serialize_objectid(obj):
     if isinstance(obj, ObjectId):
@@ -416,51 +428,33 @@ def delete_user_game_endpoint(game_id):
 def get_game_by_id(game_id):
     """Get a specific game by its ID"""
     try:
-        # Check if user is logged in
-        if 'username' not in session:
-            return jsonify({"error": "User not logged in"}), 401
+        if 'username' not in session: # Check for username in session
+            return jsonify({"error": "Unauthorized - User not logged in"}), 401
+
+        current_username = session['username']
         
-        username = session['username']
-        print(f"Loading game {game_id} for user {username}")
-        
-        # Get the complete game from the database
-        game = get_game_by_id_from_db(game_id, username)
-        
-        if not game:
-            return jsonify({"error": "Game not found"}), 404
-        
-        # Convert any ObjectId to string for JSON serialization
-        if '_id' in game:
-            game['_id'] = str(game['_id'])
-        
-        # Extract map data and size for easy access
-        map_data = game.get('map_data', {})
-        map_size = game.get('map_size', {})
-        if not map_size and map_data:
-            map_size = {
-                "width": map_data.get("width", 30),
-                "height": map_data.get("height", 15)
-            }
-        
-        # Store the complete game in the session
-        session['game'] = {
-            "game_id": game['game_id'],
-            "username": username,
-            "name": game.get('name', "Loaded Game"),
-            "difficulty": game.get('difficulty', 'medium'),
-            "map_id": game.get('map_id', None),
-            "map_size": map_size,
-            "map_data": map_data,  # Include complete map data
-            "turnNumber": game.get('turnNumber', 1),
-            "troops": game.get('troops', {}),  # Include any troops data
-            "resources": game.get('resources', {})  # Include any resources data
-        }
-        
-        print(f"Game {game_id} loaded successfully into session")
-        
-        return jsonify(game), 200
+        # Fetch the game document using the get_game_by_id_from_db function
+        # This function should handle finding the game by its game_id
+        # and optionally verify ownership if username is passed.
+        game_doc = get_game_by_id_from_db(game_id, username=current_username)
+
+        if game_doc:
+            # Ensure the game document is fully processed for BSON types
+            processed_game = convert_bson_types(game_doc)
+            
+            # Update the session with the loaded game
+            session['game'] = processed_game 
+            session.modified = True # Explicitly mark session as modified
+            
+            return jsonify(processed_game)
+        else:
+            # Game not found or does not belong to the user
+            return jsonify({"error": "Game not found or access denied"}), 404
     except Exception as e:
-        print(f"Error getting game: {e}")
+        # Log the full error for debugging
+        import traceback
+        print(f"Error in get_game_by_id for game_id {game_id}: {e}")
+        print(traceback.format_exc())
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 # Troop Management Endpoints
@@ -568,6 +562,30 @@ def reset_troops_endpoint():
     return jsonify({
         "message": message
     }), 200
+
+@routes_blueprint.route('/api/update-game-session', methods=['POST'])
+def update_game_session():
+    """Update the game data in the session"""
+    try:
+        if 'user' not in session or session['user'] is None:
+            return jsonify({"error": "User not logged in"}), 401
+        
+        # Get the updated game data from the request
+        updated_game = request.get_json()
+        if not updated_game:
+            return jsonify({"error": "No game data provided"}), 400
+        
+        # Ensure the data stored in session is clean
+        processed_game_data = convert_bson_types(updated_game)
+        session['game'] = processed_game_data
+        
+        # Mark session as modified if necessary, Flask usually does this automatically
+        session.modified = True 
+        
+        return jsonify({"message": "Game session updated successfully"}), 200
+    except Exception as e:
+        print(f"Error updating game session: {e}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @routes_blueprint.route('/api/ai/action', methods=['POST'])
 def ai_action():

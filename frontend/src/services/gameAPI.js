@@ -458,4 +458,46 @@ export const gameAPI = {
       return null;
     }
   },
+
+  /**
+   * Get AI action based on current game state
+   * @param {Object} gameState - Current game state data
+   * @param {string} prompt - Optional prompt to guide AI
+   * @param {string} rules - Optional game rules for AI
+   */
+  async getAIAction(gameState, prompt = '', rules = null) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/ai/action`, {
+        method: 'POST',
+        body: JSON.stringify({
+          game_state: gameState,
+          prompt: prompt,
+          rules: rules
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Failed to get AI action: ${response.status}`;
+        
+        try {
+          // Try to parse the error response as JSON
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (parseError) {
+          // If can't parse as JSON, use the raw text
+          errorMessage = errorText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error getting AI action:", error);
+      throw error;
+    }
+  }
 };

@@ -1024,6 +1024,72 @@ edo
 }
 ```
 
+### IA Sistema
+
+#### IA Ekintza Lortu
+
+- **Metodoa:** POST
+- **Bidea:** `/api/ai/action`
+- **Deskribapena:** IAk jokoaren egoeran oinarritutako ekintzak sortzeko
+- **Inplementazioa:** Bai
+- **Eskaera Gorputza:**
+```json
+{
+    "game_state": {
+        // Jokoaren egoera osoa
+    },
+    "prompt": "Zeintzuk dira zure hurrengo ekintzak?",
+    "rules": "Jokoaren arauak..."
+}
+```
+- **Erantzuna (arrakastarekin):**
+```json
+{
+    "result": {
+        "ai_turn_id": "turn123456",
+        "game_id": "game789012",
+        "turn_number": 5,
+        "actions": [
+            {
+                "action_id": 1,
+                "type": "move_troop",
+                "troop_id": "troop123",
+                "destination": [15, 8],
+                "state_before": { /* Ekintzaren aurreko egoera */ },
+                "state_after": { /* Ekintzaren ondorengo egoera */ }
+            },
+            {
+                "action_id": 2,
+                "type": "attack",
+                "attacker_id": "troop123",
+                "defender_id": "enemy456",
+                "state_before": { /* Ekintzaren aurreko egoera */ },
+                "state_after": { /* Ekintzaren ondorengo egoera */ }
+            }
+        ],
+        "reasoning": "Nire estrategia izan da..."
+    }
+}
+```
+- **Erantzuna (erroreekin):**
+```json
+{
+    "error": "User not logged in"
+}
+```
+edo
+```json
+{
+    "error": "Request body is required"
+}
+```
+edo
+```json
+{
+    "error": "AI processing error: [error message]"
+}
+```
+
 ## Erroreen Kudeaketa
 
 Erroreen kasuan, API-ak ondorengo egiturako erantzunak bueltatzen ditu:

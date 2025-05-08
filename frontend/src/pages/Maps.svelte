@@ -83,19 +83,29 @@
         console.error(`Error al borrar mapa ${mapIdToDelete}:`, err);
         
         // Si el mapa no existe (404), lo consideramos como borrado para fines de la interfaz
-        if (err.message && err.message.includes('404')) {
+        if (err.message && (err.message.includes('404') || err.message.includes('no existe'))) {
           console.log("El mapa no existía en el servidor, actualizando interfaz de todas formas");
         } else {
           throw err; // Propagar otros errores
         }
       }
       
-      // Reload maps after deletion
-      await loadMaps();
+      // Remove the deleted map from the local array without reloading
+      maps = maps.filter(map => map.map_id !== mapIdToDelete);
+      
+      // If after deletion there are no maps left, ensure we display the empty state
+      if (maps.length === 0) {
+        console.log("No maps left after deletion");
+      }
       
       // Reset state
       showConfirmDialog = false;
       mapToDelete = null;
+      
+      // Only reload if we still have maps
+      if (maps.length > 0) {
+        await loadMaps();
+      }
     } catch (err) {
       console.error("Error deleting map:", err);
       error = "Error al borrar el mapa: " + err.message;

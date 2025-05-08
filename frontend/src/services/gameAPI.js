@@ -261,10 +261,30 @@ export const gameAPI = {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/maps`);
       if (!response.ok) {
+        // If it's a 404, it might mean there are no maps - return empty array
+        if (response.status === 404) {
+          console.log("No maps found (404 response)");
+          return [];
+        }
         throw new Error(`Failed to fetch maps: ${response.status}`);
       }
-      const maps = await response.json();
+      
+      // Parse response - handle empty responses
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === '') {
+        console.log("Empty response when fetching maps - returning empty array");
+        return [];
+      }
+      
+      // Parse the JSON response
+      const maps = JSON.parse(responseText);
       console.log("Fetched maps:", maps);
+      
+      // If response is not an array, return empty array
+      if (!Array.isArray(maps)) {
+        console.warn("Maps response is not an array, returning empty array instead");
+        return [];
+      }
       
       // Normalize map data to ensure consistent property names
       return maps.map(map => {
@@ -292,7 +312,8 @@ export const gameAPI = {
       });
     } catch (error) {
       console.error("Error fetching maps:", error);
-      throw error;
+      // Return empty array instead of throwing error
+      return [];
     }
   },
 

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { navigate } from '../router.js';
   import { gameAPI } from '../services/gameAPI.js';
-  import { gameState, pauseGame, endGame } from '../stores/gameState.js';
+  import { gameState, pauseGame, endGame, currentTurn, currentPlayer } from '../stores/gameState.js';
   import { user } from '../stores/auth.js';
 
   let showPauseMenu = false;
@@ -70,7 +70,8 @@
       selectedMapId = $gameState?.currentScenario?.mapId;
       console.log("Selected map ID:", selectedMapId);
 
-      // Inicializar el juego
+      // Inicializar el juego. This function will set gameData, 
+      // and from it, the currentTurn and currentPlayer Svelte stores.
       await initializeGame();
 
       return () => {
@@ -120,6 +121,10 @@
           startPoint = mapData.startPoint || [15, 7];
           difficulty = gameData.difficulty || mapData.difficulty || "medium";
 
+          // Initialize turn and player Svelte stores from loaded gameData
+          currentTurn.set(gameData.turn || 1);
+          currentPlayer.set(gameData.current_player || "player");
+
           // Load units from player.units
           if (gameData.player && Array.isArray(gameData.player.units)) {
             units = gameData.player.units;
@@ -149,6 +154,51 @@
             startPoint = mapData.startPoint || [15, 7];
             difficulty = mapData.difficulty || "medium";
             units = []; // No units when just loading a map
+
+            // Initialize gameData structure for a new game
+            gameData = {
+              name: "New Game",
+              difficulty: difficulty,
+              turn: 1, // Source of truth for turn number
+              current_player: "player", // Source of truth for current player
+              map_id: selectedMapId || mapData.map_id || mapData._id,
+              map_size: { width: mapWidth, height: mapHeight },
+              map_data: mapData,
+              player: {
+                units: [],
+                cities: [],
+                resources: { food: 100, gold: 50, wood: 20 } 
+              },
+              ia: { units: [], cities: [] },
+              created_at: new Date().toISOString(),
+              last_saved: new Date().toISOString()
+            };
+
+            // Set Svelte stores from the newly initialized gameData
+            currentTurn.set(gameData.turn);
+            currentPlayer.set(gameData.current_player);
+
+            // If starting units are defined (e.g. settler, warrior at startPoint)
+            const settlerType = { type_id: "settler", movement: 2, name: "Settler" }; // Example
+            const warriorType = { type_id: "warrior", movement: 2, name: "Warrior" }; // Example
+            
+            let initialUnits = [];
+            if (startPoint) {
+                const settler = { ...settlerType, id: `settler-${Date.now()}`, position: [...startPoint], status: 'ready' };
+                initialUnits.push(settler);
+
+                let warriorPos = [...startPoint];
+                if (startPoint[0] + 1 < mapWidth) warriorPos[0] += 1;
+                else if (startPoint[1] + 1 < mapHeight) warriorPos[1] += 1;
+                else if (startPoint[0] - 1 >= 0) warriorPos[0] -= 1;
+                else warriorPos[1] -=1; // Basic placement
+
+                const warrior = { ...warriorType, id: `warrior-${Date.now()}`, position: warriorPos, status: 'ready' };
+                initialUnits.push(warrior);
+            }
+            gameData.player.units = initialUnits;
+            units = [...gameData.player.units]; // Sync local units
+            console.log("Initialized gameData for a new game scenario:", gameData);
           }
         }
 
@@ -345,41 +395,53 @@
   
   // Calculate valid movement targets based on unit's position and movement points
   function calculateValidMoveTargets(startX, startY, movementPoints) {
-    // Reset valid targets
     validMoveTargets = [];
-    
-    // Use breadth-first search to find all reachable tiles within movement points
     const queue = [[startX, startY, movementPoints]];
-    const visited = {};
-    
+    const visited = {}; // Stores { "x,y": remainingMovement }
+  
     while (queue.length > 0) {
       const [x, y, remainingMovement] = queue.shift();
-      
+  
       // Skip if out of bounds
       if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) continue;
-      
-      // Skip if this is water terrain
+  
+      // Skip if this is water terrain (units can't move on water)
       if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
-      
-      // Skip if already visited with better movement
+  
+      // Check if another unit (not the selected one) occupies this tile
+      // This check is primarily for the tiles being considered as potential next steps.
+      // The starting tile (startX, startY) is implicitly allowed.
+      if (x !== startX || y !== startY) { // Don't check the unit's current tile for occupation by others
+        const occupyingUnit = units.find(u => u !== selectedUnit && u.position[0] === x && u.position[1] === y);
+        if (occupyingUnit) {
+          continue; // Tile is occupied by another unit
+        }
+      }
+  
       const key = `${x},${y}`;
+      // Skip if already visited with more or equal remaining movement
       if (visited[key] !== undefined && visited[key] >= remainingMovement) continue;
-      
-      // Mark as visited with current movement
+  
       visited[key] = remainingMovement;
-      
+  
       // Add to valid targets if not the starting position
       if (x !== startX || y !== startY) {
         validMoveTargets.push({ x, y, remainingMovement });
       }
-      
+  
       // If we still have movement points, explore adjacent tiles
       if (remainingMovement > 0) {
-        // Only allow orthogonal movement (no diagonals)
-        queue.push([x+1, y, remainingMovement-1]); // Right
-        queue.push([x-1, y, remainingMovement-1]); // Left
-        queue.push([x, y+1, remainingMovement-1]); // Down
-        queue.push([x, y-1, remainingMovement-1]); // Up
+        const neighbors = [
+          [x + 1, y], [x - 1, y], // Right, Left
+          [x, y + 1], [x, y - 1]  // Down, Up
+        ];
+  
+        for (const [nx, ny] of neighbors) {
+          // Check bounds before adding to queue
+          if (nx >= 0 && nx < mapWidth && ny >= 0 && ny < mapHeight) {
+            queue.push([nx, ny, remainingMovement - 1]);
+          }
+        }
       }
     }
   }
@@ -387,7 +449,16 @@
   // Move the selected unit to a target position
   async function moveUnitToPosition(unit, targetX, targetY) {
     if (movementInProgress) return;
-    movementInProgress = true;
+    
+    // Check if the target tile is occupied by another unit
+    const occupyingUnit = units.find(u => u !== unit && u.position[0] === targetX && u.position[1] === targetY);
+    if (occupyingUnit) {
+      alert(`Cannot move to tile (${targetX}, ${targetY}). It is occupied by another unit (${occupyingUnit.name || occupyingUnit.type_id}).`);
+      movementInProgress = false; // Ensure this is reset if we return early
+      return;
+    }
+
+    movementInProgress = true; // Set true only after passing the occupation check
     
     try {
       const targetInfo = validMoveTargets.find(target => 
@@ -396,43 +467,38 @@
       
       if (!targetInfo) {
         console.error("Target position not in valid moves");
-        movementInProgress = false;
+        // movementInProgress = false; // Already handled in finally
         return;
       }
       
-      const localUnitIndex = units.findIndex(u => u === unit); // Find in local reactive 'units' array
+      const localUnitIndex = units.findIndex(u => u === unit);
       
       if (localUnitIndex !== -1) {
-        const originalUnitPosition = [...units[localUnitIndex].position]; // Capture original position from local unit
+        const originalUnitPosition = [...units[localUnitIndex].position]; 
 
-        // Update position in local 'units' array for Svelte reactivity
         units[localUnitIndex].position = [targetX, targetY];
         
-        const totalMovement = units[localUnitIndex].movement || 2;
-        const movementRemaining = targetInfo.remainingMovement;
+        // const totalMovement = units[localUnitIndex].movement || 2; // This is the unit's max movement
+        const movementRemainingAfterThisMove = targetInfo.remainingMovement;
         
-        if (movementRemaining <= 0) {
+        if (movementRemainingAfterThisMove <= 0) {
           units[localUnitIndex].status = 'exhausted';
         } else {
           units[localUnitIndex].status = 'moved';
         }
         
-        units = [...units]; // Trigger Svelte reactivity
+        units = [...units]; 
         
-        // Update the unit in the main 'gameData' object, which will be sent to session
         if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
           let gameDataUnitIndex = -1;
 
-          // Try to find by a unique ID (e.g., unit._id if it's from DB)
-          // Ensure 'unit.id' is the correct unique identifier.
-          if (unit.id) { // 'unit' here is the one selected from the 'units' array
+          if (unit.id) { 
             gameDataUnitIndex = gameData.player.units.findIndex(u => u.id === unit.id);
           }
           
-          // Fallback: if no ID or ID match failed, try by type and original position
           if (gameDataUnitIndex === -1) {
             gameDataUnitIndex = gameData.player.units.findIndex(u =>
-              u.type_id === unit.type_id && // 'unit.type_id' from selected unit
+              u.type_id === unit.type_id && 
               u.position && Array.isArray(u.position) &&
               u.position[0] === originalUnitPosition[0] &&
               u.position[1] === originalUnitPosition[1]
@@ -444,14 +510,6 @@
             gameData.player.units[gameDataUnitIndex].status = units[localUnitIndex].status;
             
             console.log(`Unit updated in gameData: ID ${unit.id || 'N/A'}, New Pos [${targetX},${targetY}], Status ${units[localUnitIndex].status}`);
-
-            try {
-              await gameAPI.updateGameSession(gameData); // Send the whole gameData to update session
-              console.log('Game session updated on server.');
-            } catch (error) {
-              console.error("Failed to update game session on server:", error);
-              // Optionally, revert local changes or notify user
-            }
           } else {
             console.warn("Moved unit not found in gameData.player.units. Session not updated for this unit.");
           }
@@ -490,6 +548,49 @@
     
     // Force update of grid to trigger reactivity
     grid = [...grid];
+  }
+
+  async function endTurn() {
+    if (!gameData) {
+      console.error("Cannot end turn, game data is not loaded.");
+      return;
+    }
+
+    console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
+
+    // AI's turn (placeholder)
+    gameData.current_player = "ia";
+    currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
+    alert("IA's Turn (Not Implemented - Placeholder). Click OK to continue to next player turn.");
+
+    // Switch back to player and increment turn
+    gameData.current_player = "player";
+    gameData.turn = (gameData.turn || 0) + 1;
+    currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
+    currentTurn.set(gameData.turn); // Update Svelte store from gameData
+
+    // Reset player unit statuses
+    if (gameData.player && Array.isArray(gameData.player.units)) {
+      gameData.player.units.forEach(unit => {
+        unit.status = "ready"; // Or your default ready status
+      });
+      // Update the local 'units' array for Svelte reactivity
+      units = [...gameData.player.units];
+      console.log("Player units status reset for new turn.");
+    }
+    
+    // Deselect any selected unit
+    selectedUnit = null;
+    validMoveTargets = [];
+
+    // Save the updated game state to the session
+    try {
+      await gameAPI.updateGameSession(gameData);
+      console.log(`Game session updated for Turn ${gameData.turn}.`);
+    } catch (error) {
+      console.error("Failed to update game session after ending turn:", error);
+      alert("Error saving turn data to server. Please check console.");
+    }
   }
 
   function zoomIn() {
@@ -597,9 +698,14 @@
     <div class="map-controls">
       <div class="left-controls">
         <button class="menu-button" on:click={togglePauseMenu}>☰ Menú</button>
-        <span class="game-info">Tamaño del mapa: {mapWidth}x{mapHeight} | Dificultad: {difficulty}</span>
+        <span class="game-info">
+          Turno: {$currentTurn} | Jugador: {$currentPlayer} | Mapa: {mapWidth}x{mapHeight} | Dificultad: {difficulty}
+        </span>
       </div>
       <div class="right-controls">
+        <button class="end-turn-button" on:click={endTurn} title="Finalizar Turno">
+          Terminar Turno
+        </button>
         <button on:click={toggleFogOfWar} title="{showFogOfWar ? 'Desactivar' : 'Activar'} Niebla de Guerra" class:active={showFogOfWar}>
           {showFogOfWar ? '👁️' : '🌫️'} Niebla
         </button>
@@ -831,6 +937,21 @@
   .game-info {
     margin-left: 1rem;
     font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  
+  .end-turn-button {
+    padding: 0.3rem 0.6rem;
+    background-color: #ffc107;
+    color: #212529;
+    border: 1px solid #dda700;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  .end-turn-button:hover {
+    background-color: #e0a800;
   }
   
   .map-container {

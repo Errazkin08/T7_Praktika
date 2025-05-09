@@ -55,6 +55,51 @@
   let validMoveTargets = [];
   let movementInProgress = false;
 
+  // Function to get terrain background URL based on type
+  function getTerrainImageUrl(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.WATER: return './ia_assets/ura_tile.jpg'; // Try with ./ prefix
+      case TERRAIN_TYPES.NORMAL: return './ia_assets/belarra_tile.jpg'; // Try with ./ prefix
+      default: return null; // For other types, we'll fall back to color
+    }
+  }
+
+  // Keep original color function as fallback for terrains without images
+  function getTerrainColor(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.WATER: return '#3399ff'; // Azul para agua
+      case TERRAIN_TYPES.MINERAL: return '#cc9900'; // Dorado para minerales
+      case TERRAIN_TYPES.NORMAL: return '#66cc66'; // Verde para tierra normal
+      default: return '#66cc66'; // Verde por defecto
+    }
+  }
+
+  // Update unit icon function to use images when available
+  function getUnitImageUrl(unitType) {
+    switch (unitType) {
+      case "warrior": return './ia_assets/warrior.png'; // Updated to match format
+      default: return null; // For other unit types, we'll fall back to emoji
+    }
+  }
+
+  function getUnitIcon(unitType) {
+    // Return an appropriate icon for each unit type as fallback
+    switch (unitType) {
+      case "settler":
+        return "🏠";
+      case "warrior":
+        return "⚔️";
+      case "archer":
+        return "🏹";
+      case "cavalry":
+        return "🐎";
+      case "builder":
+        return "🔨";
+      default:
+        return "❓";
+    }
+  }
+
   onMount(async () => {
     try {
       // Verificar si el usuario está autenticado
@@ -307,15 +352,6 @@
   // Función para alternar el fog of war
   function toggleFogOfWar() {
     showFogOfWar = !showFogOfWar;
-  }
-
-  function getTerrainColor(terrainType) {
-    switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return '#3399ff'; // Azul para agua
-      case TERRAIN_TYPES.MINERAL: return '#cc9900'; // Dorado para minerales
-      case TERRAIN_TYPES.NORMAL: return '#66cc66'; // Verde para tierra normal
-      default: return '#66cc66'; // Verde por defecto
-    }
   }
 
   function getTerrainName(terrainType) {
@@ -646,24 +682,6 @@
       navigate('/home');
     }
   }
-
-  function getUnitIcon(unitType) {
-    // Return an appropriate icon for each unit type
-    switch (unitType) {
-      case "settler":
-        return "🏠";
-      case "warrior":
-        return "⚔️";
-      case "archer":
-        return "🏹";
-      case "cavalry":
-        return "🐎";
-      case "builder":
-        return "🔨";
-      default:
-        return "❓";
-    }
-  }
 </script>
 
 <svelte:head>
@@ -741,6 +759,7 @@
               unit.position[1] === y
             )}
             {@const isSelectedUnit = selectedUnit && unitAtPosition === selectedUnit}
+            {@const terrainImageUrl = isVisible ? getTerrainImageUrl(terrainType) : null}
             
             <div 
               class="map-tile"
@@ -754,7 +773,9 @@
                 top: {y * tileSize}px;
                 width: {tileSize}px;
                 height: {tileSize}px;
-                background-color: {isVisible ? getTerrainColor(terrainType) : '#000'};
+                background-color: {isVisible && !terrainImageUrl ? getTerrainColor(terrainType) : '#000'};
+                background-image: {terrainImageUrl ? `url('${terrainImageUrl}')` : 'none'};
+                background-size: cover;
               "
               on:click={() => handleTileClick(x, y)}
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
@@ -764,13 +785,22 @@
               {/if}
               
               {#if unitAtPosition && isVisible}
+                {@const unitImageUrl = getUnitImageUrl(unitAtPosition.type_id)}
                 <div 
                   class="unit-marker" 
                   class:selected={isSelectedUnit}
                   class:exhausted={unitAtPosition.status === 'exhausted'}
                   title="{unitAtPosition.name || unitAtPosition.type_id} {unitAtPosition.status ? '(' + unitAtPosition.status + ')' : ''}"
                 >
-                  <span class="unit-icon">{getUnitIcon(unitAtPosition.type_id)}</span>
+                  {#if unitImageUrl}
+                    <img 
+                      src={unitImageUrl} 
+                      alt={unitAtPosition.type_id} 
+                      class="unit-image"
+                    />
+                  {:else}
+                    <span class="unit-icon">{getUnitIcon(unitAtPosition.type_id)}</span>
+                  {/if}
                 </div>
               {/if}
             </div>
@@ -972,6 +1002,8 @@
     border: 1px solid rgba(0, 0, 0, 0.2);
     box-sizing: border-box;
     transition: all 0.1s;
+    background-position: center;
+    background-repeat: no-repeat;
   }
   
   .map-tile.fog {
@@ -1256,19 +1288,16 @@
     transition: transform 0.2s ease; /* Smooth hover effect */
   }
   
-  .unit-marker:hover {
-    transform: scale(1.2); /* Slightly enlarge on hover */
-    z-index: 20; /* Bring to front when hovering */
+  .unit-image {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.7));
   }
   
-  .unit-marker.selected {
-    animation: pulse 1.5s infinite;
-    z-index: 25;
-  }
-  
-  .unit-marker.exhausted {
+  .unit-marker.exhausted .unit-image {
     opacity: 0.6;
-    filter: grayscale(70%);
+    filter: grayscale(70%) drop-shadow(0 0 2px rgba(0,0,0,0.7));
   }
   
   @keyframes pulse {

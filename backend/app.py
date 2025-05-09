@@ -4,16 +4,14 @@ from routes import routes_blueprint
 from database import init_db, close_db
 import os
 from bson import ObjectId
-import datetime
 import json
+from IAProba import iaDeitu
 
-# Custom JSON encoder to handle MongoDB ObjectId and datetime
+# Custom JSON encoder to handle MongoDB ObjectId
 class MongoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ObjectId):
             return str(obj)
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
         return super().default(obj)
 
 app = Flask(__name__)
@@ -53,16 +51,37 @@ def get_current_game():
         return jsonify(session['game'])
     return jsonify(None), 404
 
-@app.route('/api/current-game/save', methods=['POST'])
-def save_current_game_session():
-    """Endpoint to save the current game session state without full game saving"""
-    if 'game' in session:
-        from database import save_game
-        result = save_game()
-        if result:
-            return jsonify({"success": True, "message": "Game state saved"})
-        return jsonify({"success": False, "message": "Failed to save game state"}), 500
-    return jsonify({"success": False, "message": "No active game"}), 404
+@app.route('/api/ai/action', methods=['POST'])
+def ai_action():
+    """
+    Endpoint para obtener acciones de la IA basadas en el estado del juego
+    """
+    # Verificar si el usuario está autenticado
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "User not logged in"}), 401
+    
+    # Obtener datos de la solicitud
+    data = request.json
+    
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    # Extraer los parámetros para la función iaDeitu
+    prompt = data.get('prompt', '')
+    game_state = data.get('game_state', None)
+    rules = data.get('rules', None)
+    
+    # Llamar a la función iaDeitu
+    try:
+        result = iaDeitu(prompt, game_state, rules)
+        
+        # Devolver el resultado como JSON
+        return jsonify({
+            "result": result
+        })
+    except Exception as e:
+        return jsonify({"error": f"AI processing error: {str(e)}"}), 500
 
 @app.teardown_appcontext
 def teardown_db(exception):

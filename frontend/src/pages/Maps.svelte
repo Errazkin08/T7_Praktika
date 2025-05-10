@@ -282,7 +282,7 @@
           {/if}
         </div>
       {:else}
-        <div class="maps-grid">
+        <div class="maps-grid scrollable-container">
           {#each maps as map}
             <div class="map-card">
               <div class="map-preview">

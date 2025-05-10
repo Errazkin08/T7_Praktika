@@ -248,7 +248,7 @@
             <p>No hay mapas disponibles. Por favor, crea un mapa nuevo.</p>
           </div>
         {:else}
-          <div class="maps-grid">
+          <div class="maps-grid scrollable-container">
             {#each existingMaps as map}
               <div 
                 class="map-card" 
@@ -374,6 +374,11 @@
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1rem;
     margin-top: 1rem;
+  }
+  
+  .maps-grid.scrollable-container {
+    max-height: 400px;
+    overflow-y: auto;
   }
   
   .map-card {

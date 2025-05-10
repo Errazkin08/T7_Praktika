@@ -182,7 +182,7 @@
         </button>
       </div>
     {:else}
-      <div class="games-list">
+      <div class="games-list scrollable-container">
         {#each savedGames as game}
           <div class="game-card" on:click={() => loadGame(game.game_id)}>
             <div class="game-info">
@@ -330,6 +330,11 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  
+  .games-list.scrollable-container {
+    max-height: 400px;
+    overflow-y: auto;
   }
   
   .game-card {

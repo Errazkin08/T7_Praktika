@@ -8,10 +8,10 @@ html {
 
 /* Map-specific styles */
 
-/* Remove global overflow hidden */
+/* Specifically for map page only - use important to override global styles */
 body.map-active,
 html.map-active {
-    overflow: hidden;
+    overflow: hidden !important;
 }
 
 /* Improved toast notification styles */

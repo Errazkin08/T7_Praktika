@@ -2,6 +2,7 @@
   import { currentRoute, navigate } from './router.js';
   import routes from './routes';
   import { user, clearUser } from './stores/auth.js';
+  import ScrollManager from './components/ScrollManager.svelte';
   
   // Get the component for the current route
   $: component = routes[$currentRoute] || routes['*'];
@@ -17,6 +18,8 @@
   $: showHeader = !isMapPage;
   $: showFooter = !isMapPage && !isAuthPage;
 </script>
+
+<ScrollManager />
 
 {#if showHeader}
 <header class:minimal={isAuthPage}>

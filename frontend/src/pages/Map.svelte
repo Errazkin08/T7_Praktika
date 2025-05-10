@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { navigate } from '../router.js';
   import { gameAPI } from '../services/gameAPI.js';
   import { gameState, pauseGame, endGame, currentTurn, currentPlayer } from '../stores/gameState.js';
@@ -158,6 +158,13 @@
       console.error("Error mounting Map component:", err);
       loadingError = err.message;
     }
+  });
+  
+  // Add explicit onDestroy to ensure cleanup happens
+  onDestroy(() => {
+    document.body.classList.remove('map-active');
+    document.documentElement.classList.remove('map-active');
+    window.removeEventListener('keydown', handleKeyPress);
   });
 
   function handleKeyPress(event) {

@@ -63,52 +63,168 @@
   let toastType = "success"; // Can be "success", "error", "warning"
   let toastTimeout;
 
+  // Add new state variables for city founding
+  let showCityFoundingModal = false;
+  let newCityName = "";
+  let settlerToFoundCity = null;
+  let cities = []; // Array to store all cities
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
-    // Clear any existing timeout to prevent multiple toasts
     if (toastTimeout) clearTimeout(toastTimeout);
-    
-    // Set toast properties
     toastMessage = message;
     toastType = type;
     showToast = true;
-    
-    // Hide toast after duration
     toastTimeout = setTimeout(() => {
       showToast = false;
     }, duration);
   }
 
+  // Function to display the found city modal
+  function showFoundCityDialog(settler) {
+    settlerToFoundCity = settler;
+    newCityName = `Ciudad ${Math.floor(Math.random() * 1000)}`;
+    showCityFoundingModal = true;
+  }
+
+  // Function to cancel city founding
+  function cancelCityFounding() {
+    showCityFoundingModal = false;
+    settlerToFoundCity = null;
+    newCityName = "";
+  }
+
+  // Function to found a city at the current settler's position
+  function foundCity() {
+    if (!settlerToFoundCity || !newCityName.trim()) {
+      showToastNotification("Se requiere un nombre para la ciudad", "error");
+      return;
+    }
+
+    try {
+      const [x, y] = settlerToFoundCity.position;
+      if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) {
+        showToastNotification("No se puede fundar una ciudad en el agua", "error");
+        return;
+      }
+
+      const existingCity = cities.find(city => 
+        (city.position.x === x && city.position.y === y) || 
+        (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+      );
+
+      if (existingCity) {
+        showToastNotification("Ya existe una ciudad en esta posición", "error");
+        return;
+      }
+
+      const requiredResources = { food: 100, gold: 50 };
+      const playerResources = gameData?.player?.resources || {};
+      
+      if (playerResources.food < requiredResources.food || playerResources.gold < requiredResources.gold) {
+        showToastNotification(`Recursos insuficientes. Se necesita: ${requiredResources.food} comida, ${requiredResources.gold} oro`, "error");
+        return;
+      }
+
+      const cityId = `city-${Date.now()}`;
+      const newCity = {
+        id: cityId,
+        name: newCityName,
+        position: { x, y },
+        population: 0,
+        buildings: [],
+        production: {
+          current_item: null,
+          turns_remaining: 0
+        }
+      };
+
+      cities = [...cities, newCity];
+
+      if (gameData && gameData.player) {
+        if (!gameData.player.cities) {
+          gameData.player.cities = [];
+        }
+        gameData.player.cities.push(newCity);
+
+        gameData.player.resources.food -= requiredResources.food;
+        gameData.player.resources.gold -= requiredResources.gold;
+
+        const settlerIndex = units.findIndex(u => u === settlerToFoundCity);
+        if (settlerIndex !== -1) {
+          units.splice(settlerIndex, 1);
+          units = [...units];
+        }
+
+        if (gameData.player.units) {
+          const gameDataSettlerIndex = gameData.player.units.findIndex(u => 
+            u.id === settlerToFoundCity.id || 
+            (u.position[0] === settlerToFoundCity.position[0] && u.position[1] === settlerToFoundCity.position[1])
+          );
+          
+          if (gameDataSettlerIndex !== -1) {
+            gameData.player.units.splice(gameDataSettlerIndex, 1);
+          }
+        }
+
+        updateFogOfWarAroundPosition(x, y, 3);
+
+        showToastNotification(`¡Ciudad ${newCityName} fundada con éxito!`, "success");
+      }
+
+      showCityFoundingModal = false;
+      settlerToFoundCity = null;
+      selectedUnitInfo = null;
+      newCityName = "";
+
+      try {
+        gameAPI.updateGameSession(gameData);
+      } catch (error) {
+        console.error("Error saving game after founding city:", error);
+      }
+    } catch (error) {
+      console.error("Error founding city:", error);
+      showToastNotification("Error al fundar la ciudad: " + error.message, "error");
+    }
+  }
+
+  // Function to get city icon
+  function getCityIcon(city) {
+    const population = city.population || 0;
+    if (population >= 10) return "🏙️";
+    if (population >= 5) return "🏢";
+    return "🏠";
+  }
+
   // Function to get terrain background URL based on type
   function getTerrainImageUrl(terrainType) {
     switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return './ia_assets/ura_tile.jpg'; // Try with ./ prefix
-      case TERRAIN_TYPES.NORMAL: return './ia_assets/belarra_tile.jpg'; // Try with ./ prefix
-      default: return null; // For other types, we'll fall back to color
+      case TERRAIN_TYPES.WATER: return './ia_assets/ura_tile.jpg';
+      case TERRAIN_TYPES.NORMAL: return './ia_assets/belarra_tile.jpg';
+      default: return null;
     }
   }
 
   // Keep original color function as fallback for terrains without images
   function getTerrainColor(terrainType) {
     switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return '#3399ff'; // Azul para agua
-      case TERRAIN_TYPES.MINERAL: return '#cc9900'; // Dorado para minerales
-      case TERRAIN_TYPES.NORMAL: return '#66cc66'; // Verde para tierra normal
-      default: return '#66cc66'; // Verde por defecto
+      case TERRAIN_TYPES.WATER: return '#3399ff';
+      case TERRAIN_TYPES.MINERAL: return '#cc9900';
+      case TERRAIN_TYPES.NORMAL: return '#66cc66';
+      default: return '#66cc66';
     }
   }
 
   // Update unit icon function to use images when available
   function getUnitImageUrl(unitType) {
     switch (unitType) {
-      case "warrior": return './ia_assets/warrior.png'; // Updated to match format
-      case "settler": return './ia_assets/settler.png'; // Updated to match format
-      default: return null; // For other unit types, we'll fall back to emoji
+      case "warrior": return './ia_assets/warrior.png';
+      case "settler": return './ia_assets/settler.png';
+      default: return null;
     }
   }
 
   function getUnitIcon(unitType) {
-    // Return an appropriate icon for each unit type as fallback
     switch (unitType) {
       case "settler":
         return "🏠";
@@ -131,7 +247,7 @@
       case 2: return "🪙"; // Gold
       case 3: return "⚙️"; // Iron
       case 4: return "🌲"; // Wood
-      case 5: return "🪨"; // Stone (new)
+      case 5: return "🪨"; // Stone
       default: return null; // No resource
     }
   }
@@ -149,314 +265,40 @@
     }
   }
 
-  onMount(async () => {
-    try {
-      // Add map-active class to body when map is mounted
-      document.body.classList.add('map-active');
-      document.documentElement.classList.add('map-active');
-
-      // Verificar si el usuario está autenticado
-      if (!$user) {
-        navigate('/');
-        return;
-      }
-
-      // Escuchar eventos de teclado para el menú de pausa
-      window.addEventListener('keydown', handleKeyPress);
-
-      // Obtener el ID del mapa seleccionado del estado del juego o usar uno predeterminado
-      selectedMapId = $gameState?.currentScenario?.mapId;
-      console.log("Selected map ID:", selectedMapId);
-
-      // Inicializar el juego. This function will set gameData, 
-      // and from it, the currentTurn and currentPlayer Svelte stores.
-      await initializeGame();
-
-      return () => {
-        // Remove map-active class when map is unmounted
-        document.body.classList.remove('map-active');
-        document.documentElement.classList.remove('map-active');
-        window.removeEventListener('keydown', handleKeyPress);
-      };
-    } catch (err) {
-      console.error("Error mounting Map component:", err);
-      loadingError = err.message;
-    }
-  });
-  
-  // Add explicit onDestroy to ensure cleanup happens
-  onDestroy(() => {
-    document.body.classList.remove('map-active');
-    document.documentElement.classList.remove('map-active');
-    window.removeEventListener('keydown', handleKeyPress);
-  });
-
-  function handleKeyPress(event) {
-    if (event.key === 'Escape') {
-      togglePauseMenu();
-    }
-  }
-
-  function togglePauseMenu() {
-    showPauseMenu = !showPauseMenu;
-    pauseGame(showPauseMenu);
-  }
-
-  async function initializeGame() {
-    try {
-      isLoading = true;
-      loadingError = null;
-
-      // Intentar obtener el juego de la sesión primero
-      try {
-        // First, try to load game data from the session via an API call
-        gameData = await gameAPI.getCurrentGame();
-        console.log("Game data from session:", gameData);
-
-        if (gameData) {
-          // We have game data from session, use this for map rendering
-          console.log("Using game data from session");
-
-          // Get map data from the game object
-          mapData = gameData.map_data || {};
-          console.log("Map data from session game:", mapData);
-
-          // Configure map properties from the map_data
-          mapWidth = gameData.map_size?.width || mapData.width || 30;
-          mapHeight = gameData.map_size?.height || mapData.height || 15;
-          grid = mapData.grid || [];
-          terrain = mapData.terrain || [];
-          startPoint = mapData.startPoint || [15, 7];
-          difficulty = gameData.difficulty || mapData.difficulty || "medium";
-
-          // Initialize turn and player Svelte stores from loaded gameData
-          currentTurn.set(gameData.turn || 1);
-          currentPlayer.set(gameData.current_player || "player");
-
-          // Load both player and AI units
-          units = [];
-          if (gameData.player && Array.isArray(gameData.player.units)) {
-            // Add player's units with owner property
-            const playerUnits = gameData.player.units.map(unit => ({
-              ...unit,
-              owner: 'player'
-            }));
-            units = [...playerUnits];
-            console.log("Player units loaded:", playerUnits.length);
-          }
-          
-          // Add AI units if they exist
-          if (gameData.ia && Array.isArray(gameData.ia.units)) {
-            const aiUnits = gameData.ia.units.map(unit => ({
-              ...unit,
-              owner: 'ia'
-            }));
-            units = [...units, ...aiUnits];
-            console.log("AI units loaded:", aiUnits.length);
-          }
-          
-          console.log("Total units loaded:", units.length);
-        } else {
-          // If no game in session, try to load a map directly
-          if (selectedMapId) {
-            // Si tenemos un ID específico, intentamos cargarlo
-            mapData = await gameAPI.getMapById(selectedMapId);
-            console.log("Loaded map by ID:", mapData);
-          } else {
-            // De lo contrario, cargamos el primer mapa disponible
-            mapData = await gameAPI.getFirstMap();
-            console.log("Loaded first available map:", mapData);
-          }
-
-          if (mapData) {
-            // Configure map properties
-            mapWidth = mapData.width || 30;
-            mapHeight = mapData.height || 15;
-            grid = mapData.grid || [];
-            terrain = mapData.terrain || [];
-            startPoint = mapData.startPoint || [15, 7];
-            difficulty = mapData.difficulty || "medium";
-            units = []; // No units when just loading a map
-
-            // Initialize gameData structure for a new game
-            gameData = {
-              name: "New Game",
-              difficulty: difficulty,
-              turn: 1, // Source of truth for turn number
-              current_player: "player", // Source of truth for current player
-              map_id: selectedMapId || mapData.map_id || mapData._id,
-              map_size: { width: mapWidth, height: mapHeight },
-              map_data: mapData,
-              player: {
-                units: [],
-                cities: [],
-                resources: { food: 100, gold: 50, wood: 20 } 
-              },
-              ia: { units: [], cities: [] },
-              created_at: new Date().toISOString(),
-              last_saved: new Date().toISOString()
-            };
-
-            // Set Svelte stores from the newly initialized gameData
-            currentTurn.set(gameData.turn);
-            currentPlayer.set(gameData.current_player);
-
-            // If starting units are defined (e.g. settler, warrior at startPoint)
-            const settlerType = { type_id: "settler", movement: 2, name: "Settler" }; // Example
-            const warriorType = { type_id: "warrior", movement: 2, name: "Warrior" }; // Example
-            
-            let initialUnits = [];
-            if (startPoint) {
-                const settler = { ...settlerType, id: `settler-${Date.now()}`, position: [...startPoint], status: 'ready', owner: 'player' };
-                initialUnits.push(settler);
-
-                let warriorPos = [...startPoint];
-                if (startPoint[0] + 1 < mapWidth) warriorPos[0] += 1;
-                else if (startPoint[1] + 1 < mapHeight) warriorPos[1] += 1;
-                else if (startPoint[0] - 1 >= 0) warriorPos[0] -= 1;
-                else warriorPos[1] -=1; // Basic placement
-
-                const warrior = { ...warriorType, id: `warrior-${Date.now()}`, position: warriorPos, status: 'ready', owner: 'player' };
-                initialUnits.push(warrior);
-            }
-            gameData.player.units = initialUnits;
-            units = [...initialUnits]; // Sync local units
-            
-            // EXAMPLE: Add AI units for testing (in a real game, the backend would provide these)
-            if (!gameData.ia) {
-              gameData.ia = { units: [], cities: [] };
-            }
-            // Add an example AI warrior at a distance from the player's start point
-            let aiStartX = startPoint[0] + 5;
-            let aiStartY = startPoint[1] + 5;
-            if (aiStartX >= mapWidth) aiStartX = mapWidth - 2;
-            if (aiStartY >= mapHeight) aiStartY = mapHeight - 2;
-            
-            const aiWarrior = { 
-              ...warriorType, 
-              id: `ai-warrior-${Date.now()}`, 
-              position: [aiStartX, aiStartY], 
-              status: 'ready', 
-              owner: 'ia' 
-            };
-            gameData.ia.units = [aiWarrior];
-            units = [...units, ...gameData.ia.units]; // Add AI units to local units array
-          }
-        }
-
-        // Si no tenemos grid o terrain, los inicializamos
-        if (!grid || !grid.length || grid.length !== mapHeight) {
-          initializeFogOfWar();
-        }
-
-        if (!terrain || !terrain.length || terrain.length !== mapHeight) {
-          initializeTerrain();
-        }
-      } catch (apiError) {
-        console.error("Error loading game/map:", apiError);
-        // En caso de error, inicializar con valores predeterminados
-        mapWidth = 30;
-        mapHeight = 15;
-        initializeFogOfWar();
-        initializeTerrain();
-        units = [];
-      }
-
-      isLoading = false;
-
-      // Centrar el mapa
-      setTimeout(centerMapOnStartPoint, 200);
-    } catch (error) {
-      loadingError = error.message || "Error desconocido al iniciar el juego.";
-      isLoading = false;
-    }
-  }
-
-  // Función para inicializar el fog of war
-  function initializeFogOfWar() {
-    grid = Array(mapHeight).fill().map(() => Array(mapWidth).fill(FOG_OF_WAR.HIDDEN));
-
-    // Si tenemos un punto de inicio, hacemos visible esa zona
-    if (startPoint && startPoint.length === 2) {
-      const [startX, startY] = startPoint;
-      const visibilityRadius = 3;
-
-      for (let y = Math.max(0, startY - visibilityRadius); y <= Math.min(mapHeight - 1, startY + visibilityRadius); y++) {
-        for (let x = Math.max(0, startX - visibilityRadius); x <= Math.min(mapWidth - 1, startX + visibilityRadius); x++) {
-          // Calculamos la distancia al punto de inicio
-          const distance = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-
-          // Si está dentro del radio de visibilidad, lo hacemos visible
-          if (distance <= visibilityRadius) {
-            grid[y][x] = FOG_OF_WAR.VISIBLE;
-          }
-        }
-      }
-    }
-  }
-
-  // Función para inicializar el terreno
-  function initializeTerrain() {
-    terrain = Array(mapHeight).fill().map(() => Array(mapWidth).fill(TERRAIN_TYPES.NORMAL));
-
-    // Generar un terreno aleatorio básico
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        const rnd = Math.random();
-
-        if (rnd < 0.15) {
-          terrain[y][x] = TERRAIN_TYPES.WATER; // 15% agua
-        } else if (rnd < 0.25) {
-          terrain[y][x] = TERRAIN_TYPES.MINERAL; // 10% minerales
-        } else {
-          terrain[y][x] = TERRAIN_TYPES.NORMAL; // 75% tierra normal
-        }
-      }
-    }
-
-    // Asegurar que el punto de inicio sea terreno adecuado
-    if (startPoint && startPoint.length === 2) {
-      const [startX, startY] = startPoint;
-      if (startX >= 0 && startX < mapWidth && startY >= 0 && startY < mapHeight) {
-        terrain[startY][startX] = TERRAIN_TYPES.NORMAL;
-
-        // También hacer el área alrededor adecuada para empezar
-        for (let y = Math.max(0, startY - 1); y <= Math.min(mapHeight - 1, startY + 1); y++) {
-          for (let x = Math.max(0, startX - 1); x <= Math.min(mapWidth - 1, startX + 1); x++) {
-            if (terrain[y][x] === TERRAIN_TYPES.WATER) {
-              terrain[y][x] = TERRAIN_TYPES.NORMAL;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Función para centrar el mapa en el punto de inicio
-  function centerMapOnStartPoint() {
-    if (startPoint && startPoint.length === 2) {
-      const [startX, startY] = startPoint;
-      // Calcula la posición central de la pantalla
-      const containerWidth = window.innerWidth;
-      const containerHeight = window.innerHeight;
-
-      // Ajusta el offset para centrar el punto de inicio
-      offsetX = (containerWidth / 2) - (startX * tileSize * zoomLevel);
-      offsetY = (containerHeight / 2) - (startY * tileSize * zoomLevel);
-    }
-  }
-
-  // Función para alternar el fog of war
   function toggleFogOfWar() {
     showFogOfWar = !showFogOfWar;
   }
 
-  // Select a unit and calculate its possible move targets
+  function zoomIn() {
+    zoomLevel += 0.1;
+    if (zoomLevel > 2) zoomLevel = 2;
+  }
+
+  function zoomOut() {
+    zoomLevel -= 0.1;
+    if (zoomLevel < 0.2) zoomLevel = 0.2;
+  }
+
+  function startDrag(event) {
+    isDragging = true;
+    dragStartX = event.clientX - offsetX;
+    dragStartY = event.clientY - offsetY;
+  }
+
+  function drag(event) {
+    if (!isDragging) return;
+    offsetX = event.clientX - dragStartX;
+    offsetY = event.clientY - dragStartY;
+  }
+
+  function endDrag() {
+    isDragging = false;
+  }
+
   function selectUnit(unit) {
     selectedUnit = unit;
     validMoveTargets = [];
     
-    // Get unit's available movement points, accounting for already used movement
     const totalMovement = unit.movement || 2;
     const remainingMovement = unit.remainingMovement !== undefined ? 
                               unit.remainingMovement : 
@@ -468,46 +310,27 @@
       return;
     }
     
-    // Get current position
     const [unitX, unitY] = unit.position;
-    
-    // Calculate valid targets based on remaining movement
     calculateValidMoveTargets(unitX, unitY, remainingMovement);
   }
   
-  // Calculate valid movement targets based on unit's position and movement points
   function calculateValidMoveTargets(startX, startY, movementPoints) {
     validMoveTargets = [];
-    
-    // Set a consistent movement range of 2 tiles in all directions
     const movementRange = 2;
     
-    // Check all tiles within our fixed movement range
     for (let y = Math.max(0, startY - movementRange); y <= Math.min(mapHeight - 1, startY + movementRange); y++) {
       for (let x = Math.max(0, startX - movementRange); x <= Math.min(mapWidth - 1, startX + movementRange); x++) {
-        // Skip the starting position
         if (x === startX && y === startY) continue;
-        
-        // Calculate Manhattan distance (steps needed) to reach this tile
         const steps = Math.abs(x - startX) + Math.abs(y - startY);
-        
-        // Skip if beyond our movement range
         if (steps > movementRange) continue;
-        
-        // Skip if this is water terrain (units can't move on water)
         if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
-        
-        // Check if another unit occupies this tile
         const occupyingUnit = units.find(u => 
           u !== selectedUnit && 
           u.position && 
           u.position[0] === x && 
           u.position[1] === y
         );
-        
-        if (occupyingUnit) continue; // Tile is occupied by another unit
-        
-        // Add to valid targets if the unit has at least 1 movement point left
+        if (occupyingUnit) continue;
         if (movementPoints >= 1) {
           validMoveTargets.push({ x, y, remainingMovement: movementPoints - 1 });
         }
@@ -515,11 +338,9 @@
     }
   }
   
-  // Move the selected unit to a target position
   async function moveUnitToPosition(unit, targetX, targetY) {
     if (movementInProgress) return;
     
-    // Check if the target tile is occupied by another unit
     const occupyingUnit = units.find(u => u !== unit && u.position[0] === targetX && u.position[1] === targetY);
     if (occupyingUnit) {
       showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`, "error");
@@ -543,45 +364,31 @@
       
       if (localUnitIndex !== -1) {
         const originalUnitPosition = [...units[localUnitIndex].position]; 
-        
-        // CHANGED: Each position change costs 1 movement point regardless of distance
         const movementCost = 1;
-        
-        // Get total movement allowance for this unit
         const totalMovement = units[localUnitIndex].movement || 2;
         
-        // Initialize remainingMovement if not present
         if (units[localUnitIndex].remainingMovement === undefined) {
           units[localUnitIndex].remainingMovement = totalMovement;
         }
         
-        // Ensure we can't move more than we have movement points for
         if (movementCost > units[localUnitIndex].remainingMovement) {
           showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
           movementInProgress = false;
           return;
         }
         
-        // Deduct the cost of this move from remaining movement
         units[localUnitIndex].remainingMovement -= movementCost;
-        
-        // Update position
         units[localUnitIndex].position = [targetX, targetY];
         
-        // Update status based on remaining movement
         if (units[localUnitIndex].remainingMovement <= 0) {
           units[localUnitIndex].status = 'exhausted';
         } else {
           units[localUnitIndex].status = 'moved';
         }
         
-        // Force Svelte to update by creating a new array reference
         units = [...units]; 
-        
-        // NEW: Update the selected unit info to reflect the changes
         updateUnitInfoPanel(localUnitIndex);
         
-        // Also update the game data for session persistence
         if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
           let gameDataUnitIndex = -1;
 
@@ -611,12 +418,10 @@
         
         updateFogOfWarAroundPosition(targetX, targetY, 2);
         
-        // If the unit still has movement points, don't deselect it to allow chains of movement
         if (units[localUnitIndex].remainingMovement <= 0) {
           selectedUnit = null;
           validMoveTargets = [];
         } else {
-          // Reselect the unit to update valid moves from the new position
           selectUnit(units[localUnitIndex]);
         }
       } else {
@@ -630,179 +435,23 @@
     }
   }
 
-  // NEW: Function to update the unit info panel when unit data changes
   function updateUnitInfoPanel(unitIndex) {
     if (selectedUnitInfo && units[unitIndex]) {
-      // Check if the current selectedUnitInfo matches the unit being updated
       if (selectedUnitInfo.id === units[unitIndex].id || 
          (selectedUnitInfo.position && units[unitIndex].position && 
           selectedUnitInfo.position[0] === units[unitIndex].position[0] && 
           selectedUnitInfo.position[1] === units[unitIndex].position[1])) {
-        // Update the selectedUnitInfo reference to point to the updated unit
         selectedUnitInfo = units[unitIndex];
       }
     }
   }
 
-  // Update fog of war around a position
-  function updateFogOfWarAroundPosition(centerX, centerY, radius) {
-    if (!showFogOfWar) return;
-    
-    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapHeight - 1, centerY + radius); y++) {
-      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapWidth - 1, centerX + radius); x++) {
-        // Calculate distance to center
-        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-        
-        // If within radius, mark as visible
-        if (distance <= radius && grid[y] && grid[y][x] !== undefined) {
-          grid[y][x] = FOG_OF_WAR.VISIBLE;
-        }
-      }
-    }
-    
-    // Force update of grid to trigger reactivity
-    grid = [...grid];
-  }
-
-  async function endTurn() {
-    if (!gameData) {
-      console.error("Cannot end turn, game data is not loaded.");
-      return;
-    }
-
-    console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
-
-    // AI's turn (placeholder)
-    gameData.current_player = "ia";
-    currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
-    showToastNotification("IA's Turn (Not Implemented - Placeholder)", "info");
-    
-    // Short delay before continuing to next player turn
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Switch back to player and increment turn
-    gameData.current_player = "player";
-    gameData.turn = (gameData.turn || 0) + 1;
-    currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
-    currentTurn.set(gameData.turn); // Update Svelte store from gameData
-
-    // Save current AI units before updating the units array
-    const aiUnits = units.filter(unit => unit.owner === 'ia');
-
-    // Reset player unit statuses and movement points
-    if (gameData.player && Array.isArray(gameData.player.units)) {
-      gameData.player.units.forEach((unit, index) => {
-        unit.status = "ready"; // Reset status
-        unit.remainingMovement = unit.movement || 2; // Reset movement points to full
-        
-        // Update the info panel if this is the currently selected unit
-        if (selectedUnitInfo && selectedUnitInfo.id === unit.id) {
-          selectedUnitInfo = unit; // Update reference to show refreshed stats
-        }
-      });
-      
-      // Update the local 'units' array with BOTH player AND AI units
-      // First add the player units with refreshed status
-      let updatedUnits = [...gameData.player.units];
-      
-      // Then add the AI units back
-      if (aiUnits.length > 0) {
-        updatedUnits = [...updatedUnits, ...aiUnits];
-      }
-      
-      // Update the units array
-      units = updatedUnits;
-      
-      console.log("Units after turn end:", units.length, "- Player:", 
-        units.filter(u => u.owner === 'player').length, 
-        "AI:", units.filter(u => u.owner === 'ia').length);
-    }
-    
-    // Deselect any selected unit
-    selectedUnit = null;
-    selectedUnitInfo = null;
-    validMoveTargets = [];
-
-    // Save the updated game state to the session
-    try {
-      await gameAPI.updateGameSession(gameData);
-      console.log(`Game session updated for Turn ${gameData.turn}.`);
-      showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
-    } catch (error) {
-      console.error("Failed to update game session after ending turn:", error);
-      showToastNotification("Error saving turn data to server.", "error");
-    }
-  }
-
-  async function saveAndExit() {
-    try {
-      if (gameData) {
-        // Step 1: Ensure the latest gameData (with all local changes) is in the backend session
-        console.log("Updating game session before saving and exiting...");
-        await gameAPI.updateGameSession(gameData);
-        
-        // Step 2: Tell the backend to persist the session's game to the database
-        console.log("Requesting backend to save current game session to DB...");
-        const saveResult = await gameAPI.saveCurrentGameSession();
-        console.log("Save result:", saveResult);
-        
-        if (!saveResult || (saveResult.success === false)) {
-          throw new Error(saveResult?.message || "Unknown error saving game");
-        }
-        
-        console.log("Game saved and session persisted.");
-        
-        // Replace alert with toast notification
-        showToastNotification("Your game has been saved successfully!");
-        
-        // Short delay before navigating to give users a chance to see the notification
-        setTimeout(() => {
-          endGame(); // This should clear local stores (like $gameState)
-          navigate('/home');
-        }, 1500);
-      } else {
-        endGame();
-        navigate('/home');
-      }
-    } catch (error) {
-      console.error("Error saving and exiting game:", error);
-      
-      // Show error toast instead of confirm dialog
-      showToastNotification(`Error saving game: ${error.message}. Trying again...`, "error", 2000);
-      
-      // Automatic retry without requiring user interaction
-      try {
-        // Wait a moment before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        // One more attempt directly
-        await gameAPI.saveCurrentGameSession();
-        showToastNotification("Game saved successfully on retry!", "success");
-        
-        // Short delay before navigating
-        setTimeout(() => {
-          endGame();
-          navigate('/home');
-        }, 1500);
-      } catch (retryError) {
-        showToastNotification(`Unable to save game. Exiting without saving.`, "error", 2000);
-        // Short delay before navigating
-        setTimeout(() => {
-          endGame();
-          navigate('/home');
-        }, 2000);
-      }
-    }
-  }
-
-  // Improved handleTileClick to better handle unit selection
   function handleTileClick(x, y) {
-    // If a unit is already selected and we click on a valid move target
     if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
       moveUnitToPosition(selectedUnit, x, y);
       return;
     }
     
-    // Check if there's a unit at this position to select
     const unitAtPosition = units.find(unit => 
       unit && 
       unit.position && 
@@ -811,13 +460,10 @@
       unit.position[1] === y
     );
     
-    // If we found a unit, store its info and check if it's a player unit
     if (unitAtPosition) {
-      // Set selected unit info for display regardless of owner
       selectedUnitInfo = unitAtPosition;
-      selectedTile = null; // Clear tile selection when unit is selected
+      selectedTile = null;
       
-      // Only allow player units to be selected for movement
       if (unitAtPosition.owner === 'ia') {
         showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
         selectedUnit = null;
@@ -826,23 +472,19 @@
       }
       
       if (unitAtPosition.status === 'exhausted') {
-        // If unit is exhausted, show a message
         showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
         selectedUnit = null;
         validMoveTargets = [];
       } else {
-        // Otherwise select it for movement
         selectUnit(unitAtPosition);
       }
       return;
     } else {
-      // No unit found, clear unit selection and info
       selectedUnit = null;
       selectedUnitInfo = null;
       validMoveTargets = [];
     }
     
-    // Handle regular tile info display (original behavior)
     if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
       selectedTile = {
         x, y,
@@ -861,30 +503,112 @@
     }
   }
 
-  function zoomIn() {
-    zoomLevel += 0.1;
-    if (zoomLevel > 2) zoomLevel = 2;
+  async function endTurn() {
+    if (!gameData) {
+      console.error("Cannot end turn, game data is not loaded.");
+      return;
+    }
+
+    console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
+
+    gameData.current_player = "ia";
+    currentPlayer.set(gameData.current_player);
+    showToastNotification("IA's Turn (Not Implemented - Placeholder)", "info");
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    gameData.current_player = "player";
+    gameData.turn = (gameData.turn || 0) + 1;
+    currentPlayer.set(gameData.current_player);
+    currentTurn.set(gameData.turn);
+
+    const aiUnits = units.filter(unit => unit.owner === 'ia');
+
+    if (gameData.player && Array.isArray(gameData.player.units)) {
+      gameData.player.units.forEach((unit, index) => {
+        unit.status = "ready";
+        unit.remainingMovement = unit.movement || 2;
+        
+        if (selectedUnitInfo && selectedUnitInfo.id === unit.id) {
+          selectedUnitInfo = unit;
+        }
+      });
+      
+      let updatedUnits = [...gameData.player.units];
+      
+      if (aiUnits.length > 0) {
+        updatedUnits = [...updatedUnits, ...aiUnits];
+      }
+      
+      units = updatedUnits;
+      
+      console.log("Units after turn end:", units.length, "- Player:", 
+        units.filter(u => u.owner === 'player').length, 
+        "AI:", units.filter(u => u.owner === 'ia').length);
+    }
+    
+    selectedUnit = null;
+    selectedUnitInfo = null;
+    validMoveTargets = [];
+
+    try {
+      await gameAPI.updateGameSession(gameData);
+      console.log(`Game session updated for Turn ${gameData.turn}.`);
+      showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
+    } catch (error) {
+      console.error("Failed to update game session after ending turn:", error);
+      showToastNotification("Error saving turn data to server.", "error");
+    }
   }
 
-  function zoomOut() {
-    zoomLevel -= 0.1;
-    if (zoomLevel < 0.2) zoomLevel = 0.2;
-  }
-
-  function startDrag(event) {
-    isDragging = true;
-    dragStartX = event.clientX - offsetX;
-    dragStartY = event.clientY - offsetY;
-  }
-
-  function drag(event) {
-    if (!isDragging) return;
-    offsetX = event.clientX - dragStartX;
-    offsetY = event.clientY - dragStartY;
-  }
-
-  function endDrag() {
-    isDragging = false;
+  async function saveAndExit() {
+    try {
+      if (gameData) {
+        console.log("Updating game session before saving and exiting...");
+        await gameAPI.updateGameSession(gameData);
+        
+        console.log("Requesting backend to save current game session to DB...");
+        const saveResult = await gameAPI.saveCurrentGameSession();
+        console.log("Save result:", saveResult);
+        
+        if (!saveResult || (saveResult.success === false)) {
+          throw new Error(saveResult?.message || "Unknown error saving game");
+        }
+        
+        console.log("Game saved and session persisted.");
+        
+        showToastNotification("Your game has been saved successfully!");
+        
+        setTimeout(() => {
+          endGame();
+          navigate('/home');
+        }, 1500);
+      } else {
+        endGame();
+        navigate('/home');
+      }
+    } catch (error) {
+      console.error("Error saving and exiting game:", error);
+      
+      showToastNotification(`Error saving game: ${error.message}. Trying again...`, "error", 2000);
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await gameAPI.saveCurrentGameSession();
+        showToastNotification("Game saved successfully on retry!", "success");
+        
+        setTimeout(() => {
+          endGame();
+          navigate('/home');
+        }, 1500);
+      } catch (retryError) {
+        showToastNotification(`Unable to save game. Exiting without saving.`, "error", 2000);
+        setTimeout(() => {
+          endGame();
+          navigate('/home');
+        }, 2000);
+      }
+    }
   }
 
   function exitWithoutSaving() {
@@ -893,10 +617,201 @@
       navigate('/home');
     }
   }
+
+  onMount(async () => {
+    try {
+      document.body.classList.add('map-active');
+      document.documentElement.classList.add('map-active');
+
+      if (!$user) {
+        navigate('/');
+        return;
+      }
+
+      window.addEventListener('keydown', handleKeyPress);
+
+      selectedMapId = $gameState?.currentScenario?.mapId;
+      console.log("Selected map ID:", selectedMapId);
+
+      await initializeGame();
+
+      return () => {
+        document.body.classList.remove('map-active');
+        document.documentElement.classList.remove('map-active');
+        window.removeEventListener('keydown', handleKeyPress);
+      };
+    } catch (err) {
+      console.error("Error mounting Map component:", err);
+      loadingError = err.message;
+    }
+  });
+
+  onDestroy(() => {
+    document.body.classList.remove('map-active');
+    document.documentElement.classList.remove('map-active');
+    window.removeEventListener('keydown', handleKeyPress);
+  });
+
+  function handleKeyPress(event) {
+    if (event.key === 'Escape') {
+      togglePauseMenu();
+    }
+  }
+
+  function togglePauseMenu() {
+    showPauseMenu = !showPauseMenu;
+    pauseGame(showPauseMenu);
+  }
+
+  async function initializeGame() {
+    try {
+      isLoading = true;
+      loadingError = null;
+
+      try {
+        gameData = await gameAPI.getCurrentGame();
+        console.log("Game data from session:", gameData);
+
+        if (gameData) {
+          console.log("Using game data from session");
+
+          mapData = gameData.map_data || {};
+          console.log("Map data from session game:", mapData);
+
+          mapWidth = gameData.map_size?.width || mapData.width || 30;
+          mapHeight = gameData.map_size?.height || mapData.height || 15;
+          grid = mapData.grid || [];
+          terrain = mapData.terrain || [];
+          startPoint = mapData.startPoint || [15, 7];
+          difficulty = gameData.difficulty || mapData.difficulty || "medium";
+
+          currentTurn.set(gameData.turn || 1);
+          currentPlayer.set(gameData.current_player || "player");
+
+          units = [];
+          if (gameData.player && Array.isArray(gameData.player.units)) {
+            const playerUnits = gameData.player.units.map(unit => ({
+              ...unit,
+              owner: 'player'
+            }));
+            units = [...playerUnits];
+            console.log("Player units loaded:", playerUnits.length);
+          }
+          
+          if (gameData.ia && Array.isArray(gameData.ia.units)) {
+            const aiUnits = gameData.ia.units.map(unit => ({
+              ...unit,
+              owner: 'ia'
+            }));
+            units = [...units, ...aiUnits];
+            console.log("AI units loaded:", aiUnits.length);
+          }
+          
+          console.log("Total units loaded:", units.length);
+
+          if (gameData && gameData.player && Array.isArray(gameData.player.cities)) {
+            cities = [...gameData.player.cities];
+            console.log("Loaded cities:", cities.length);
+          } else {
+            cities = [];
+          }
+        }
+      } catch (apiError) {
+        console.error("Error loading game/map:", apiError);
+        mapWidth = 30;
+        mapHeight = 15;
+        initializeFogOfWar();
+        initializeTerrain();
+        units = [];
+      }
+
+      isLoading = false;
+
+      setTimeout(centerMapOnStartPoint, 200);
+    } catch (error) {
+      loadingError = error.message || "Error desconocido al iniciar el juego.";
+      isLoading = false;
+    }
+  }
+
+  function initializeFogOfWar() {
+    grid = Array(mapHeight).fill().map(() => Array(mapWidth).fill(FOG_OF_WAR.HIDDEN));
+
+    if (startPoint && startPoint.length === 2) {
+      const [startX, startY] = startPoint;
+      const visibilityRadius = 3;
+
+      for (let y = Math.max(0, startY - visibilityRadius); y <= Math.min(mapHeight - 1, startY + visibilityRadius); y++) {
+        for (let x = Math.max(0, startX - visibilityRadius); x <= Math.min(mapWidth - 1, startX + visibilityRadius); x++) {
+          const distance = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+          if (distance <= visibilityRadius) {
+            grid[y][x] = FOG_OF_WAR.VISIBLE;
+          }
+        }
+      }
+    }
+  }
+
+  function initializeTerrain() {
+    terrain = Array(mapHeight).fill().map(() => Array(mapWidth).fill(TERRAIN_TYPES.NORMAL));
+
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const rnd = Math.random();
+
+        if (rnd < 0.15) {
+          terrain[y][x] = TERRAIN_TYPES.WATER;
+        } else if (rnd < 0.25) {
+          terrain[y][x] = TERRAIN_TYPES.MINERAL;
+        } else {
+          terrain[y][x] = TERRAIN_TYPES.NORMAL;
+        }
+      }
+    }
+
+    if (startPoint && startPoint.length === 2) {
+      const [startX, startY] = startPoint;
+      if (startX >= 0 && startX < mapWidth && startY >= 0 && startY < mapHeight) {
+        terrain[startY][startX] = TERRAIN_TYPES.NORMAL;
+
+        for (let y = Math.max(0, startY - 1); y <= Math.min(mapHeight - 1, startY + 1); y++) {
+          for (let x = Math.max(0, startX - 1); x <= Math.min(mapWidth - 1, startX + 1); x++) {
+            if (terrain[y][x] === TERRAIN_TYPES.WATER) {
+              terrain[y][x] = TERRAIN_TYPES.NORMAL;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function centerMapOnStartPoint() {
+    if (startPoint && startPoint.length === 2) {
+      const [startX, startY] = startPoint;
+      const containerWidth = window.innerWidth;
+      const containerHeight = window.innerHeight;
+
+      offsetX = (containerWidth / 2) - (startX * tileSize * zoomLevel);
+      offsetY = (containerHeight / 2) - (startY * tileSize * zoomLevel);
+    }
+  }
+
+  function updateFogOfWarAroundPosition(centerX, centerY, radius) {
+    if (!showFogOfWar) return;
+    
+    for (let y = Math.max(0, centerY - radius); y <= Math.min(mapHeight - 1, centerY + radius); y++) {
+      for (let x = Math.max(0, centerX - radius); x <= Math.min(mapWidth - 1, centerX + radius); x++) {
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        if (distance <= radius && grid[y] && grid[y][x] !== undefined) {
+          grid[y][x] = FOG_OF_WAR.VISIBLE;
+        }
+      }
+    }
+    grid = [...grid];
+  }
 </script>
 
 <svelte:head>
-  <!-- This was empty but needs to contain styles -->
   <title>Map - Civilization Game</title>
 </svelte:head>
 
@@ -993,12 +908,23 @@
                 <div class="coord-marker">{x},{y}</div>
               {/if}
               
-              <!-- Add resource marker if the tile has a resource -->
               {#if hasResource && isVisible}
                 <div class="resource-marker" title="{getTerrainName(terrainType)}">
                   <span class="resource-icon">{getResourceIcon(terrainType)}</span>
                 </div>
               {/if}
+              
+              {#each cities as city}
+                {#if (city.position.x === x && city.position.y === y) || 
+                     (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)}
+                  <div 
+                    class="city-marker" 
+                    title="{city.name} (Población: {city.population || 0})"
+                  >
+                    <span class="city-icon">{getCityIcon(city)}</span>
+                  </div>
+                {/if}
+              {/each}
               
               {#if unitAtPosition && isVisible}
                 <div 
@@ -1099,6 +1025,12 @@
           {#if selectedUnitInfo.owner !== 'ia' && selectedUnitInfo.status !== 'exhausted'}
             <div class="unit-actions">
               <button class="action-button" on:click={() => selectUnit(selectedUnitInfo)}>Mover</button>
+              
+              {#if selectedUnitInfo.type_id === 'settler'}
+                <button class="action-button found-city-button" on:click={() => showFoundCityDialog(selectedUnitInfo)}>
+                  Fundar Ciudad
+                </button>
+              {/if}
             </div>
           {:else if selectedUnitInfo.owner === 'ia'}
             <div class="unit-enemy-message">
@@ -1113,6 +1045,42 @@
       </div>
     {/if}
     
+    {#if showCityFoundingModal}
+      <div class="modal-overlay">
+        <div class="modal-content">
+          <h3>Fundar Nueva Ciudad</h3>
+          <p>Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].</p>
+          
+          <div class="form-group">
+            <label for="city-name">Nombre de la Ciudad:</label>
+            <input 
+              type="text" 
+              id="city-name" 
+              bind:value={newCityName} 
+              placeholder="Introduce un nombre para tu ciudad"
+            />
+          </div>
+          
+          <div class="resource-requirements">
+            <h4>Recursos necesarios:</h4>
+            <div class="resource food">
+              <div class="resource-icon">🌾</div>
+              <div class="resource-value">100</div>
+            </div>
+            <div class="resource gold">
+              <div class="resource-icon">💰</div>
+              <div class="resource-value">50</div>
+            </div>
+          </div>
+          
+          <div class="modal-actions">
+            <button class="cancel-button" on:click={cancelCityFounding}>Cancelar</button>
+            <button class="confirm-button" on:click={foundCity}>Fundar Ciudad</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     {#if showPauseMenu}
       <div class="pause-menu-overlay">
         <div class="pause-menu">
@@ -1181,3 +1149,4 @@
     </div>
   {/if}
 </div>
+

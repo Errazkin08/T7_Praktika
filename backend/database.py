@@ -187,9 +187,10 @@ def generate_terrain(width, height, difficulty):
     Generate terrain with patterns:
     - 0: Normal terrain (most common)
     - 1: Water (forms lakes and rivers)
-    - 2: Gold mineral (rare, 10% of minerals)
-    - 3: Iron mineral (uncommon, 20% of minerals)
-    - 4: Wood resource (common, 70% of minerals)
+    - 2: Gold mineral (rare, 7% of minerals)
+    - 3: Iron mineral (uncommon, 13% of minerals)
+    - 4: Wood resource (common, 60% of minerals)
+    - 5: Stone resource (semi-common, 20% of minerals)
     """
     # Initialize terrain with normal terrain
     terrain = [[0 for _ in range(width)] for _ in range(height)]
@@ -215,18 +216,20 @@ def generate_terrain(width, height, difficulty):
     water_tiles = int(total_tiles * water_percent / 100)
     mineral_tiles = int(total_tiles * mineral_percent / 100)
     
-    # Subdivide minerals by type
-    gold_tiles = int(mineral_tiles * 0.1)  # 10% of minerals are gold
-    iron_tiles = int(mineral_tiles * 0.2)  # 20% of minerals are iron
-    wood_tiles = mineral_tiles - gold_tiles - iron_tiles  # Remaining are wood
+    # Subdivide minerals by type with new percentages
+    gold_tiles = int(mineral_tiles * 0.07)    # 7% of minerals are gold
+    iron_tiles = int(mineral_tiles * 0.13)    # 13% of minerals are iron
+    stone_tiles = int(mineral_tiles * 0.20)   # 20% of minerals are stone
+    wood_tiles = mineral_tiles - gold_tiles - iron_tiles - stone_tiles  # Remaining ~60% are wood
     
     print(f"Map size: {width}x{height} = {total_tiles} tiles")
     print(f"Difficulty: {difficulty}")
     print(f"Water: {water_percent}% = {water_tiles} tiles")
     print(f"Minerals: {mineral_percent}% = {mineral_tiles} tiles")
-    print(f"  - Gold: 10% of minerals = {gold_tiles} tiles")
-    print(f"  - Iron: 20% of minerals = {iron_tiles} tiles")
-    print(f"  - Wood: 70% of minerals = {wood_tiles} tiles")
+    print(f"  - Gold: 7% of minerals = {gold_tiles} tiles")
+    print(f"  - Iron: 13% of minerals = {iron_tiles} tiles")
+    print(f"  - Stone: 20% of minerals = {stone_tiles} tiles")
+    print(f"  - Wood: 60% of minerals = {wood_tiles} tiles")
     
     # First place water features with clustering
     placed_water = 0
@@ -277,6 +280,10 @@ def generate_terrain(width, height, difficulty):
     # Add iron tiles
     for _ in range(iron_tiles):
         mineral_placement_order.append(3)  # Iron
+    
+    # Add stone tiles
+    for _ in range(stone_tiles):
+        mineral_placement_order.append(5)  # Stone (code 5)
     
     # Add wood tiles
     for _ in range(wood_tiles):
@@ -647,7 +654,9 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                 "resources": {
                     "food": 100,
                     "gold": 50,
-                    "wood": 20
+                    "wood": 20,
+                    "stone": 20,
+                    "iron": 10
                 },
             },
             "ia": {
@@ -656,7 +665,9 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                 "resources": {
                     "food": 100,
                     "gold": 50,
-                    "wood": 20
+                    "wood": 20,
+                    "stone": 20,
+                    "iron": 10
                 },
             },
             "created_at": datetime.datetime.now(),

@@ -131,6 +131,7 @@
       case 2: return "🪙"; // Gold
       case 3: return "⚙️"; // Iron
       case 4: return "🌲"; // Wood
+      case 5: return "🪨"; // Stone (new)
       default: return null; // No resource
     }
   }
@@ -142,6 +143,7 @@
       case 2: return 'Oro';
       case 3: return 'Hierro';
       case 4: return 'Madera';
+      case 5: return 'Piedra';
       case TERRAIN_TYPES.NORMAL: return 'Tierra';
       default: return 'Desconocido';
     }
@@ -962,7 +964,7 @@
             )}
             {@const isSelectedUnit = selectedUnit && unitAtPosition === selectedUnit}
             {@const terrainImageUrl = isVisible ? getTerrainImageUrl(terrainType) : null}
-            {@const hasResource = isVisible && (terrainType === 2 || terrainType === 3 || terrainType === 4)}
+            {@const hasResource = isVisible && (terrainType === 2 || terrainType === 3 || terrainType === 4 || terrainType === 5)}
             
             <div 
               class="map-tile"
@@ -1157,6 +1159,16 @@
       <div class="resource wood">
         <div class="resource-icon">🪵</div>
         <div class="resource-value">{gameData.player.resources.wood || 0}</div>
+      </div>
+      <!-- Add iron resource -->
+      <div class="resource iron">
+        <div class="resource-icon">⚙️</div>
+        <div class="resource-value">{gameData.player.resources.iron || 0}</div>
+      </div>
+      <!-- Add stone resource -->
+      <div class="resource stone">
+        <div class="resource-icon">🪨</div>
+        <div class="resource-value">{gameData.player.resources.stone || 0}</div>
       </div>
     </div>
   {/if}

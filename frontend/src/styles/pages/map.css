@@ -712,6 +712,14 @@ html.map-active {
   border-left: 3px solid #795548;
 }
 
+.resource.iron {
+  border-left: 3px solid #A8A9AD;
+}
+
+.resource.stone {
+  border-left: 3px solid #777777;
+}
+
 /* Resource marker styles - similar to unit marker but with modifications */
 .resource-marker {
   position: absolute;
@@ -745,4 +753,9 @@ html.map-active {
 
 .resource-marker[title="Madera"] .resource-icon {
   color: #6E4C1E; /* Wood/brown color */
+}
+
+/* Add resource-specific styling for stone */
+.resource-marker[title="Piedra"] .resource-icon {
+  color: #777777; /* Stone/gray color */
 }

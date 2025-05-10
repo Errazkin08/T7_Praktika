@@ -13,10 +13,11 @@
   }
   
   // Check if we're on a page that should have minimal UI
-  $: isMapPage = $currentRoute === '/map';
+  // Add city page to the game pages that need full screen
+  $: isGamePage = $currentRoute === '/map' || $currentRoute === '/city';
   $: isAuthPage = $currentRoute === '/login' || $currentRoute === '/register' || $currentRoute === '/';
-  $: showHeader = !isMapPage;
-  $: showFooter = !isMapPage && !isAuthPage;
+  $: showHeader = !isGamePage;
+  $: showFooter = !isGamePage && !isAuthPage;
 </script>
 
 <ScrollManager />
@@ -39,7 +40,7 @@
 </header>
 {/if}
 
-<main class:full-height={isAuthPage || isMapPage} class:map-view={isMapPage}>
+<main class:full-height={isAuthPage || isGamePage} class:game-view={isGamePage}>
   <svelte:component this={component} />
 </main>
 
@@ -101,6 +102,15 @@
   }
   
   main.map-view {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  
+  main.game-view {
     max-width: none;
     padding: 0;
     margin: 0;

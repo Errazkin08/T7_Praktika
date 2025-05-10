@@ -32,6 +32,7 @@
   // Información de selección
   let selectedTile = null;
   let selectedUnitInfo = null; // New state variable for unit info display
+  let selectedCityInfo = null; // New state variable for city info display
 
   // Fog of War
   let showFogOfWar = true; // Estado para mostrar/ocultar el fog of war
@@ -191,9 +192,9 @@
   // Function to get city icon
   function getCityIcon(city) {
     const population = city.population || 0;
-    if (population >= 10) return "🏙️";
-    if (population >= 5) return "🏢";
-    return "🏠";
+    if (population >= 10) return { type: "emoji", value: "🏙️" };
+    if (population >= 5) return { type: "emoji", value: "🏢" };
+    return { type: "image", value: './ia_assets/city.jpg' };
   }
 
   // Function to get terrain background URL based on type
@@ -452,6 +453,21 @@
       return;
     }
     
+    // Check if there's a city at the clicked position
+    const cityAtPosition = cities.find(city => 
+      (city.position.x === x && city.position.y === y) || 
+      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+    );
+    
+    if (cityAtPosition) {
+      selectedCityInfo = cityAtPosition;
+      selectedTile = null;
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      validMoveTargets = [];
+      return;
+    }
+    
     const unitAtPosition = units.find(unit => 
       unit && 
       unit.position && 
@@ -461,6 +477,7 @@
     );
     
     if (unitAtPosition) {
+      selectedCityInfo = null; // Clear selected city
       selectedUnitInfo = unitAtPosition;
       selectedTile = null;
       
@@ -482,6 +499,7 @@
     } else {
       selectedUnit = null;
       selectedUnitInfo = null;
+      selectedCityInfo = null; // Clear selected city
       validMoveTargets = [];
     }
     
@@ -500,6 +518,15 @@
         terrainName: getTerrainName(terrainType),
         isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
       };
+    }
+  }
+
+  // Add function to enter city management screen
+  function enterCity(city) {
+    // Store the selected city ID in the game state or use a URL parameter
+    if (gameData && city) {
+      gameAPI.storeTemporaryData('selectedCityId', city.id);
+      navigate('/city');
     }
   }
 
@@ -921,7 +948,13 @@
                     class="city-marker" 
                     title="{city.name} (Población: {city.population || 0})"
                   >
-                    <span class="city-icon">{getCityIcon(city)}</span>
+                    <span class="city-icon">
+                      {#if getCityIcon(city).type === "emoji"}
+                        {getCityIcon(city).value}
+                      {:else}
+                        <img src={getCityIcon(city).value} alt="City" class="city-image" />
+                      {/if}
+                    </span>
                   </div>
                 {/if}
               {/each}
@@ -951,7 +984,7 @@
       </div>
     </div>
     
-    {#if selectedTile && !showPauseMenu && !selectedUnitInfo}
+    {#if selectedTile && !showPauseMenu && !selectedUnitInfo && !selectedCityInfo}
       <div class="tile-info-overlay">
         <div class="tile-info-card">
           <div class="tile-info-header">
@@ -1041,6 +1074,53 @@
               <p>Esta unidad ya ha agotado sus movimientos este turno.</p>
             </div>
           {/if}
+        </div>
+      </div>
+    {/if}
+    
+    {#if selectedCityInfo && !showPauseMenu}
+      <div class="city-info-overlay">
+        <div class="city-info-card">
+          <div class="city-info-header">
+            <h4>{selectedCityInfo.name || 'Ciudad'}</h4>
+            <button class="close-button" on:click={() => { selectedCityInfo = null; }}>×</button>
+          </div>
+          
+          <div class="city-details">
+            <div class="city-image-container">
+              <div class="city-icon-large">
+                {#if getCityIcon(selectedCityInfo).type === "emoji"}
+                  {getCityIcon(selectedCityInfo).value}
+                {:else}
+                  <img src={getCityIcon(selectedCityInfo).value} alt="City" class="city-portrait" />
+                {/if}
+              </div>
+            </div>
+            
+            <div class="city-stats">
+              <p><strong>Población:</strong> {selectedCityInfo.population || 0}</p>
+              {#if selectedCityInfo.position}
+                <p><strong>Posición:</strong> {Array.isArray(selectedCityInfo.position) ? 
+                  `[${selectedCityInfo.position[0]}, ${selectedCityInfo.position[1]}]` : 
+                  `[${selectedCityInfo.position.x}, ${selectedCityInfo.position.y}]`}</p>
+              {/if}
+              
+              {#if selectedCityInfo.buildings && selectedCityInfo.buildings.length > 0}
+                <p><strong>Edificios:</strong> {selectedCityInfo.buildings.length}</p>
+              {/if}
+              
+              {#if selectedCityInfo.production && selectedCityInfo.production.current_item}
+                <p><strong>Producción actual:</strong> {selectedCityInfo.production.current_item}</p>
+                <p><strong>Turnos restantes:</strong> {selectedCityInfo.production.turns_remaining}</p>
+              {/if}
+            </div>
+          </div>
+          
+          <div class="city-actions">
+            <button class="action-button enter-city-button" on:click={() => enterCity(selectedCityInfo)}>
+              Entrar a la Ciudad
+            </button>
+          </div>
         </div>
       </div>
     {/if}
@@ -1149,4 +1229,14 @@
     </div>
   {/if}
 </div>
+
+<style>
+  /* ...existing styles... */
+  
+  .city-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+</style>
 

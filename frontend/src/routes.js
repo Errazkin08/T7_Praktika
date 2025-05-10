@@ -8,6 +8,7 @@ import Map from './pages/Map.svelte';
 import NewGame from './pages/NewGame.svelte';
 import LoadGame from './pages/LoadGame.svelte';
 import Maps from './pages/Maps.svelte';
+import City from './pages/City.svelte';
 
 // Define routes
 const routes = {
@@ -20,6 +21,7 @@ const routes = {
   '/new-game': NewGame,
   '/load-game': LoadGame,
   '/maps': Maps,
+  '/city': City,
   '*': NotFound
 };
 

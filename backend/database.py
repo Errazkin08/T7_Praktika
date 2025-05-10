@@ -361,6 +361,108 @@ def delete_map(map_id):
         print(f"Error deleting map: {e}")
         return False
 
+def find_distant_valid_position(map_data):
+    """
+    Find the furthest position from the player's start point where we can place 2 units without water
+    """
+    width = map_data.get("width", 30)
+    height = map_data.get("height", 15)
+    terrain = map_data.get("terrain", [])
+    player_x, player_y = map_data.get("startPoint", [15, 7])
+    
+    # Create a list to store all valid positions with their distances
+    valid_positions = []
+    
+    # Check all positions on the map
+    for y in range(height):
+        for x in range(width):
+            # Skip water tiles
+            if terrain and len(terrain) > y and len(terrain[y]) > x and terrain[y][x] != 1:
+                # Calculate squared distance from player start (no need for square root yet)
+                squared_distance = (x - player_x)**2 + (y - player_y)**2
+                
+                # Check if this position has at least one adjacent non-water position
+                has_valid_adjacent = False
+                directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+                
+                for dx, dy in directions:
+                    nx, ny = x + dx, y + dy
+                    if (0 <= nx < width and 0 <= ny < height and 
+                        terrain and len(terrain) > ny and len(terrain[ny]) > nx and terrain[ny][nx] != 1):
+                        has_valid_adjacent = True
+                        break
+                
+                if has_valid_adjacent:
+                    # Store position and its squared distance
+                    valid_positions.append(([x, y], squared_distance))
+    
+    # Sort positions by distance (furthest first)
+    valid_positions.sort(key=lambda item: item[1], reverse=True)
+    
+    # Return the furthest valid position if we found any
+    if valid_positions:
+        return valid_positions[0][0]  # Return just the position coordinates
+    
+    # Fallback to a position that's at least not close to the player
+    attempts = 100
+    while attempts > 0:
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        # Ensure position is somewhat far from player start
+        min_distance = (width**2 + height**2)**0.5 / 4
+        distance = ((x - player_x)**2 + (y - player_y)**2)**0.5
+        
+        # Check if the position is valid and has a valid adjacent position
+        if distance >= min_distance and terrain and terrain[y][x] != 1:
+            # Check for adjacent valid positions
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+                nx, ny = x + dx, y + dy
+                if (0 <= nx < width and 0 <= ny < height and terrain[ny][nx] != 1):
+                    return [x, y]  # Found a position with a valid adjacent space
+        
+        attempts -= 1
+    
+    # Last resort: Return a position in the first quadrant of the map
+    # We'll still check for adjacency to ensure two units can be placed
+    for y in range(height // 2):
+        for x in range(width // 2):
+            if terrain and terrain[y][x] != 1:
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    nx, ny = x + dx, y + dy
+                    if (0 <= nx < width and 0 <= ny < height and terrain[ny][nx] != 1):
+                        return [x, y]
+    
+    # Ultimate fallback: Just return corner position and hope for the best
+    return [1, 1]
+
+def find_adjacent_valid_position(map_data, position):
+    """
+    Find a valid (non-water) position adjacent to the given position
+    """
+    width = map_data.get("width", 30)
+    height = map_data.get("height", 15)
+    terrain = map_data.get("terrain", [])
+    x, y = position
+    
+    # Check all adjacent positions (including diagonals)
+    directions = [
+        (1, 0), (-1, 0), (0, 1), (0, -1),  # Cardinal directions first
+        (1, 1), (1, -1), (-1, 1), (-1, -1)  # Then diagonals
+    ]
+    
+    for dx, dy in directions:
+        new_x = x + dx
+        new_y = y + dy
+        
+        # Check if position is within map bounds
+        if 0 <= new_x < width and 0 <= new_y < height:
+            # Check if position is not water
+            if terrain and len(terrain) > new_y and len(terrain[new_y]) > new_x and terrain[new_y][new_x] != 1:
+                return [new_x, new_y]
+    
+    # If no valid adjacent position found, return original position
+    return position
+
 def add_game(username, map_id, difficulty, game_name="New Game"):
     """Add a new game for a user"""
     try:
@@ -429,6 +531,18 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
         elif map_data["startPoint"][1] - 1 >= 0:
             warrior["position"][1] -= 1
             
+        # Find a distant valid position for AI settler
+        ai_start_position = find_distant_valid_position(map_data)
+        
+        # Create AI settler
+        ai_settler = get_troop_type("settler", ai_start_position[:])  # Create a copy of the position list
+        
+        # Find adjacent valid position for AI warrior
+        ai_warrior_position = find_adjacent_valid_position(map_data, ai_start_position)
+        
+        # Create AI warrior
+        ai_warrior = get_troop_type("warrior", ai_warrior_position[:])  # Create a copy of the position list
+            
         # Create a timestamp-based game ID
         game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
         
@@ -455,8 +569,13 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                 },
             },
             "ia": {
-                "units": [],
-                "cities": []
+                "units": [ai_settler, ai_warrior],
+                "cities": [],
+                "resources": {
+                    "food": 100,
+                    "gold": 50,
+                    "wood": 20
+                },
             },
             "created_at": datetime.datetime.now(),
             "last_saved": datetime.datetime.now()

@@ -209,14 +209,29 @@
           currentTurn.set(gameData.turn || 1);
           currentPlayer.set(gameData.current_player || "player");
 
-          // Load units from player.units
+          // Load both player and AI units
+          units = [];
           if (gameData.player && Array.isArray(gameData.player.units)) {
-            units = gameData.player.units;
-            console.log("Units loaded from session game:", units);
-          } else {
-            units = [];
-            console.log("No units found in session game data");
+            // Add player's units with owner property
+            const playerUnits = gameData.player.units.map(unit => ({
+              ...unit,
+              owner: 'player'
+            }));
+            units = [...playerUnits];
+            console.log("Player units loaded:", playerUnits.length);
           }
+          
+          // Add AI units if they exist
+          if (gameData.ia && Array.isArray(gameData.ia.units)) {
+            const aiUnits = gameData.ia.units.map(unit => ({
+              ...unit,
+              owner: 'ia'
+            }));
+            units = [...units, ...aiUnits];
+            console.log("AI units loaded:", aiUnits.length);
+          }
+          
+          console.log("Total units loaded:", units.length);
         } else {
           // If no game in session, try to load a map directly
           if (selectedMapId) {
@@ -268,7 +283,7 @@
             
             let initialUnits = [];
             if (startPoint) {
-                const settler = { ...settlerType, id: `settler-${Date.now()}`, position: [...startPoint], status: 'ready' };
+                const settler = { ...settlerType, id: `settler-${Date.now()}`, position: [...startPoint], status: 'ready', owner: 'player' };
                 initialUnits.push(settler);
 
                 let warriorPos = [...startPoint];
@@ -277,12 +292,31 @@
                 else if (startPoint[0] - 1 >= 0) warriorPos[0] -= 1;
                 else warriorPos[1] -=1; // Basic placement
 
-                const warrior = { ...warriorType, id: `warrior-${Date.now()}`, position: warriorPos, status: 'ready' };
+                const warrior = { ...warriorType, id: `warrior-${Date.now()}`, position: warriorPos, status: 'ready', owner: 'player' };
                 initialUnits.push(warrior);
             }
             gameData.player.units = initialUnits;
-            units = [...gameData.player.units]; // Sync local units
-            console.log("Initialized gameData for a new game scenario:", gameData);
+            units = [...initialUnits]; // Sync local units
+            
+            // EXAMPLE: Add AI units for testing (in a real game, the backend would provide these)
+            if (!gameData.ia) {
+              gameData.ia = { units: [], cities: [] };
+            }
+            // Add an example AI warrior at a distance from the player's start point
+            let aiStartX = startPoint[0] + 5;
+            let aiStartY = startPoint[1] + 5;
+            if (aiStartX >= mapWidth) aiStartX = mapWidth - 2;
+            if (aiStartY >= mapHeight) aiStartY = mapHeight - 2;
+            
+            const aiWarrior = { 
+              ...warriorType, 
+              id: `ai-warrior-${Date.now()}`, 
+              position: [aiStartX, aiStartY], 
+              status: 'ready', 
+              owner: 'ia' 
+            };
+            gameData.ia.units = [aiWarrior];
+            units = [...units, ...gameData.ia.units]; // Add AI units to local units array
           }
         }
 
@@ -746,11 +780,19 @@
       unit.position[1] === y
     );
     
-    // If we found a unit, store its info and check if it can move
+    // If we found a unit, store its info and check if it's a player unit
     if (unitAtPosition) {
-      // Set selected unit info for display
+      // Set selected unit info for display regardless of owner
       selectedUnitInfo = unitAtPosition;
       selectedTile = null; // Clear tile selection when unit is selected
+      
+      // Only allow player units to be selected for movement
+      if (unitAtPosition.owner === 'ia') {
+        showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+        return;
+      }
       
       if (unitAtPosition.status === 'exhausted') {
         // If unit is exhausted, show a message
@@ -920,7 +962,8 @@
                   class="unit-marker" 
                   class:selected={isSelectedUnit}
                   class:exhausted={unitAtPosition.status === 'exhausted'}
-                  title="{unitAtPosition.name || unitAtPosition.type_id} {unitAtPosition.status ? '(' + unitAtPosition.status + ')' : ''}"
+                  class:enemy={unitAtPosition.owner === 'ia'}
+                  title="{unitAtPosition.name || unitAtPosition.type_id} {unitAtPosition.owner === 'ia' ? '(Enemy)' : ''} {unitAtPosition.status ? '(' + unitAtPosition.status + ')' : ''}"
                 >
                   {#if getUnitImageUrl(unitAtPosition.type_id)}
                     <img 
@@ -972,7 +1015,7 @@
     
     {#if selectedUnitInfo && !showPauseMenu}
       <div class="unit-info-overlay">
-        <div class="unit-info-card">
+        <div class="unit-info-card" class:enemy-unit={selectedUnitInfo.owner === 'ia'}>
           <div class="unit-info-header">
             <h4>{selectedUnitInfo.name || selectedUnitInfo.type_id || 'Unidad'}</h4>
             <button class="close-button" on:click={() => { selectedUnitInfo = null; }}>×</button>
@@ -989,7 +1032,7 @@
             
             <div class="unit-stats">
               <p><strong>Tipo:</strong> {selectedUnitInfo.type_id || 'Desconocido'}</p>
-              <p><strong>Facción:</strong> {selectedUnitInfo.owner || 'player'}</p>
+              <p><strong>Facción:</strong> {selectedUnitInfo.owner === 'ia' ? 'Enemigo' : 'Jugador'}</p>
               <p><strong>Estado:</strong> {selectedUnitInfo.status || 'ready'}</p>
               <p><strong>Movimientos:</strong> {selectedUnitInfo.remainingMovement !== undefined ? selectedUnitInfo.remainingMovement : (selectedUnitInfo.movement || 2)}/{selectedUnitInfo.movement || 2}</p>
               {#if selectedUnitInfo.position && Array.isArray(selectedUnitInfo.position) && selectedUnitInfo.position.length >= 2}
@@ -1010,9 +1053,13 @@
             </div>
           </div>
           
-          {#if selectedUnitInfo.status !== 'exhausted'}
+          {#if selectedUnitInfo.owner !== 'ia' && selectedUnitInfo.status !== 'exhausted'}
             <div class="unit-actions">
               <button class="action-button" on:click={() => selectUnit(selectedUnitInfo)}>Mover</button>
+            </div>
+          {:else if selectedUnitInfo.owner === 'ia'}
+            <div class="unit-enemy-message">
+              <p>Esta es una unidad enemiga. No puedes controlarla.</p>
             </div>
           {:else}
             <div class="unit-exhausted-message">
@@ -1053,6 +1100,24 @@
         </div>
       </div>
     {/if}
+  {/if}
+
+  <!-- Add resources bar at the bottom of the screen -->
+  {#if !isLoading && !loadingError && gameData && gameData.player && gameData.player.resources}
+    <div class="resources-bar">
+      <div class="resource food">
+        <div class="resource-icon">🌾</div>
+        <div class="resource-value">{gameData.player.resources.food || 0}</div>
+      </div>
+      <div class="resource gold">
+        <div class="resource-icon">💰</div>
+        <div class="resource-value">{gameData.player.resources.gold || 0}</div>
+      </div>
+      <div class="resource wood">
+        <div class="resource-icon">🪵</div>
+        <div class="resource-value">{gameData.player.resources.wood || 0}</div>
+      </div>
+    </div>
   {/if}
 
   {#if showToast}

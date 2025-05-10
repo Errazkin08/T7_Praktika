@@ -487,15 +487,44 @@ export const gameAPI = {
    */
   async saveCurrentGameSession() {
     try {
+      console.log("Requesting to save current game session to database...");
       const response = await fetchWithAuth(`${API_BASE_URL}/current-game/save`, { // Endpoint
         method: 'POST',
       });
-      console.log("Response from saveCurrentGameSession:", response);
+      
+      console.log("Response status from saveCurrentGameSession:", response.status);
+      
+      // Try to get the response text for better error reporting
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+      
+      // If not OK, try to parse the error or use the text
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `Failed to save current game session: ${response.status}` }));
-        throw new Error(errorData.error || `Failed to save current game session: ${response.status}`);
+        let errorMessage = `Failed to save current game session: ${response.status}`;
+        
+        try {
+          // Try to parse as JSON if possible
+          const errorData = JSON.parse(responseText);
+          if (errorData.error || errorData.message) {
+            errorMessage = errorData.error || errorData.message;
+          }
+        } catch (parseError) {
+          // If can't parse as JSON, use the raw text if available
+          if (responseText) {
+            errorMessage = responseText;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
-      return await response.json();
+      
+      // Try to parse the response JSON
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        console.warn("Could not parse response as JSON:", parseError);
+        return { success: true, message: "Game saved successfully" };
+      }
     } catch (error) {
       console.error("Error saving current game session:", error);
       throw error;

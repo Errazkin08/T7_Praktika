@@ -55,6 +55,28 @@
   let validMoveTargets = [];
   let movementInProgress = false;
 
+  // Add these variables for toast notifications
+  let showToast = false;
+  let toastMessage = "";
+  let toastType = "success"; // Can be "success", "error", "warning"
+  let toastTimeout;
+
+  // Function to show a toast notification
+  function showToastNotification(message, type = "success", duration = 3000) {
+    // Clear any existing timeout to prevent multiple toasts
+    if (toastTimeout) clearTimeout(toastTimeout);
+    
+    // Set toast properties
+    toastMessage = message;
+    toastType = type;
+    showToast = true;
+    
+    // Hide toast after duration
+    toastTimeout = setTimeout(() => {
+      showToast = false;
+    }, duration);
+  }
+
   // Function to get terrain background URL based on type
   function getTerrainImageUrl(terrainType) {
     switch (terrainType) {
@@ -629,6 +651,66 @@
     }
   }
 
+  async function saveAndExit() {
+    try {
+      if (gameData) {
+        // Step 1: Ensure the latest gameData (with all local changes) is in the backend session
+        console.log("Updating game session before saving and exiting...");
+        await gameAPI.updateGameSession(gameData);
+        
+        // Step 2: Tell the backend to persist the session's game to the database
+        console.log("Requesting backend to save current game session to DB...");
+        const saveResult = await gameAPI.saveCurrentGameSession();
+        console.log("Save result:", saveResult);
+        
+        if (!saveResult || (saveResult.success === false)) {
+          throw new Error(saveResult?.message || "Unknown error saving game");
+        }
+        
+        console.log("Game saved and session persisted.");
+        
+        // Replace alert with toast notification
+        showToastNotification("Your game has been saved successfully!");
+        
+        // Short delay before navigating to give users a chance to see the notification
+        setTimeout(() => {
+          endGame(); // This should clear local stores (like $gameState)
+          navigate('/home');
+        }, 1500);
+      } else {
+        endGame();
+        navigate('/home');
+      }
+    } catch (error) {
+      console.error("Error saving and exiting game:", error);
+      
+      // Show error toast instead of confirm dialog
+      showToastNotification(`Error saving game: ${error.message}. Trying again...`, "error", 2000);
+      
+      // Automatic retry without requiring user interaction
+      try {
+        // Wait a moment before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // One more attempt directly
+        await gameAPI.saveCurrentGameSession();
+        showToastNotification("Game saved successfully on retry!", "success");
+        
+        // Short delay before navigating
+        setTimeout(() => {
+          endGame();
+          navigate('/home');
+        }, 1500);
+      } catch (retryError) {
+        showToastNotification(`Unable to save game. Exiting without saving.`, "error", 2000);
+        // Short delay before navigating
+        setTimeout(() => {
+          endGame();
+          navigate('/home');
+        }, 2000);
+      }
+    }
+  }
+
   function zoomIn() {
     zoomLevel += 0.1;
     if (zoomLevel > 2) zoomLevel = 2;
@@ -653,27 +735,6 @@
 
   function endDrag() {
     isDragging = false;
-  }
-
-  async function saveAndExit() {
-    try {
-      if (gameData) {
-        // Step 1: Ensure the latest gameData (with all local changes) is in the backend session
-        console.log("Updating game session before saving and exiting...", gameData);
-        await gameAPI.updateGameSession(gameData);
-        
-        // Step 2: Tell the backend to persist the session's game to the database
-        console.log("Requesting backend to save current game session to DB...");
-        await gameAPI.saveCurrentGameSession();
-        console.log("Game saved and session persisted.");
-      }
-      endGame(); // This should clear local stores (like $gameState)
-      navigate('/home');
-    } catch (error) {
-      console.error("Error saving and exiting game:", error);
-      // Provide more specific feedback if possible
-      alert(`Error saving game: ${error.message}. Please try again or exit without saving.`);
-    }
   }
 
   function exitWithoutSaving() {
@@ -870,6 +931,14 @@
         </div>
       </div>
     {/if}
+  {/if}
+
+  {#if showToast}
+    <div class="toast-container">
+      <div class="toast-notification {toastType}">
+        <span class="toast-message">{toastMessage}</span>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -1304,5 +1373,52 @@
     0% { transform: scale(1); }
     50% { transform: scale(1.2); }
     100% { transform: scale(1); }
+  }
+
+  /* Toast notification styles */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  
+  .toast-notification {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    color: white;
+    display: flex;
+    align-items: center;
+    animation: slide-in 0.3s ease-out, fade-out 0.5s ease-out 2.5s forwards;
+    max-width: 300px;
+  }
+  
+  .toast-message {
+    flex: 1;
+  }
+  
+  .success {
+    background-color: #4CAF50;
+  }
+  
+  .error {
+    background-color: #f44336;
+  }
+  
+  .warning {
+    background-color: #ff9800;
+  }
+  
+  @keyframes slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
 </style>

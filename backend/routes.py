@@ -312,6 +312,24 @@ def get_game():
         return jsonify({"error": "No game found"}), 404
     return jsonify(game), 200
 
+@routes_blueprint.route('/api/current-game', methods=['GET'])
+def get_current_game():
+    """
+    Get the current game from the session.
+    """
+    try:
+        if 'username' not in session or not session['username']:
+            return jsonify({"error": "User not logged in"}), 401
+            
+        if 'game' not in session or not session['game']:
+            return jsonify({"error": "No active game in session"}), 404
+            
+        # Return the game from the session directly
+        return jsonify(session['game'])
+    except Exception as e:
+        print(f"Error in get_current_game: {e}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
 @routes_blueprint.route('/api/game/save', methods=['POST'])
 def save_game_endpoint():
     if save_game():
@@ -320,14 +338,30 @@ def save_game_endpoint():
 
 @routes_blueprint.route('/api/current-game/save', methods=['POST'])
 def save_current_game_session():
-    """Endpoint to save the current game session state without full game saving"""
-    if 'game' in session:
+    """Endpoint to save the current game session state to the database"""
+    try:
+        if 'username' not in session:
+            return jsonify({"success": False, "message": "User not logged in"}), 401
+            
+        if 'game' not in session:
+            return jsonify({"success": False, "message": "No active game in session"}), 400
+        
+        # Save the game from session to database
         from database import save_game
         result = save_game()
+        
         if result:
-            return jsonify({"success": True, "message": "Game state saved"})
-        return jsonify({"success": False, "message": "Failed to save game state"}), 500
-    return jsonify({"success": False, "message": "No active game"}), 404
+            # Confirm the save was successful
+            return jsonify({
+                "success": True, 
+                "message": "Game saved successfully", 
+                "game_id": session['game'].get('game_id')
+            })
+        else:
+            return jsonify({"success": False, "message": "Failed to save game"}), 500
+    except Exception as e:
+        print(f"Exception in save_current_game_session: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 @routes_blueprint.route('/api/update-game-session', methods=['POST'])
 def update_game_session():

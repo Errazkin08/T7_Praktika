@@ -478,29 +478,34 @@ def save_game():
     db = get_db()
     game = session.get('game')
     
-    if game:
-        try:
-            # Update the last_saved timestamp
-            game['last_saved'] = datetime.datetime.now().isoformat()
-            
-            # We need to convert any string dates back to datetime for MongoDB
-            if 'created_at' in game and isinstance(game['created_at'], str):
-                try:
-                    game['created_at'] = datetime.datetime.fromisoformat(game['created_at'])
-                except:
-                    game['created_at'] = datetime.datetime.now()
-            
-            # Replace the game in the database
-            db.games.delete_one({"game_id": game['game_id']})
-            db.games.insert_one(game)
-            
-            # Update session with the sanitized version
-            session['game'] = sanitize_for_json(game)
-            return True
-        except Exception as e:
-            print(f"Error saving game: {e}")
-            return False
-    return False
+    if not game:
+        print("No game found in session to save")
+        return False
+        
+    try:
+        # Make sure game_id exists
+        if 'game_id' not in game or not game['game_id']:
+            game_id = str(int(datetime.datetime.now().timestamp() * 1000))
+            game['game_id'] = game_id
+        
+        # Update the last_saved timestamp
+        game['last_saved'] = datetime.datetime.now().isoformat()
+        
+        # Create a direct copy of the game data to save
+        # This avoids any accidental references to the session object
+        game_to_save = dict(game)
+        
+        # Find and remove the existing game first
+        db.games.delete_one({"game_id": game_to_save['game_id']})
+        
+        # Insert as a new document
+        result = db.games.insert_one(game_to_save)
+        
+        print(f"Game saved successfully with ID: {game_to_save['game_id']}")
+        return True
+    except Exception as e:
+        print(f"Error saving game: {e}")
+        return False
 
 def delete_game(game_id):
     """
@@ -528,13 +533,12 @@ def delete_game(game_id):
                 pass
         
         # Try by _id if it could be an ObjectId
-        if not deleted and isinstance(game_id, str):
+        if not deleted and isinstance(game_id, str) and len(game_id) == 24:
             try:
-                if len(game_id) == 24:  # ObjectId is 24 chars
-                    obj_id = ObjectId(game_id)
-                    result = db.games.delete_one({"_id": obj_id})
-                    if result.deleted_count > 0:
-                        deleted = True
+                obj_id = ObjectId(game_id)
+                result = db.games.delete_one({"_id": obj_id})
+                if result.deleted_count > 0:
+                    deleted = True
             except Exception:
                 pass
         
@@ -574,32 +578,43 @@ def get_game_by_id_from_db(game_id, username=None):
     """
     db = get_db()
     try:
-        # Try different ways to find the game
-        
         # First try by game_id as is
         game = db.games.find_one({"game_id": game_id})
         
-        # If not found, try as integer if it's a string
         if not game and isinstance(game_id, str):
             try:
+                # Try as integer
                 numeric_id = int(game_id)
                 game = db.games.find_one({"game_id": numeric_id})
             except ValueError:
                 pass
             
-        # If still not found, try by ObjectId if it's a valid one
-        if not game and isinstance(game_id, str) and len(game_id) == 24:
-            try:
-                obj_id = ObjectId(game_id)
-                game = db.games.find_one({"_id": obj_id})
-            except Exception:
-                pass
-                
-        # If game is found and username is provided, check ownership
+            # Try as ObjectId
+            if not game and len(game_id) == 24:
+                try:
+                    obj_id = ObjectId(game_id)
+                    game = db.games.find_one({"_id": obj_id})
+                except Exception:
+                    pass
+        
+        # If game found and username provided, check ownership
         if game and username and game.get('username') != username:
             print(f"Game {game_id} belongs to {game.get('username')}, not to {username}")
             return None
+        
+        # Ensure the game is properly cleaned for session storage
+        if game:
+            # Make sure ObjectIds are converted to strings
+            if '_id' in game:
+                game['_id'] = str(game['_id'])
             
+            # Make sure the game_id is a string
+            if 'game_id' in game and not isinstance(game['game_id'], str):
+                game['game_id'] = str(game['game_id'])
+                
+            # Store the exact game document in the session
+            session['game'] = game
+        
         return game
     except Exception as e:
         print(f"Error getting game by ID: {e}")
@@ -715,7 +730,7 @@ def add_troop_to_player(username, type_id, position):
     db = get_db()
     
     # Get the troop type
-    troop_type = get_troop_type(type_id)
+    troop_type = get_troop_type(type_id, position)
     if not troop_type:
         return False, "Invalid troop type"
     

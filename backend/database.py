@@ -559,7 +559,7 @@ def get_user_games(username):
     games = []
     try:
         # Get all games for the user
-        games_cursor = db.games.find({"username": username})
+        games_cursor = db.games.find({"username": username}).sort("last_saved", -1)
         
         # Process each game to ensure JSON serialization works
         for game in games_cursor:

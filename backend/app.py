@@ -1,6 +1,10 @@
 from flask import Flask, jsonify, request, session
 from flask_cors import CORS
-from routes import routes_blueprint
+from routes.userRoute import user_blueprint
+from routes.gameRoute import game_blueprint
+from routes.mapRoute import map_blueprint
+from routes.iaRoute import ia_blueprint
+from routes.troopRoute import troop_blueprint
 from database import init_db, close_db
 import os
 from bson import ObjectId
@@ -58,8 +62,12 @@ def teardown_db(exception):
 with app.app_context():
     init_db()
 
-# Register blueprints
-app.register_blueprint(routes_blueprint)
+# Register all blueprints
+app.register_blueprint(user_blueprint)
+app.register_blueprint(game_blueprint)
+app.register_blueprint(map_blueprint)
+app.register_blueprint(ia_blueprint)
+app.register_blueprint(troop_blueprint)
 
 # Error handling
 @app.errorhandler(500)

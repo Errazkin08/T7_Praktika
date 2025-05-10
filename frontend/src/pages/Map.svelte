@@ -385,70 +385,28 @@
     }
   }
 
-  // Enhanced tile click handler to support unit selection and movement
-  function handleTileClick(x, y) {
-    // If a unit is already selected and we click on a valid move target
-    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
-      moveUnitToPosition(selectedUnit, x, y);
-      return;
-    }
-    
-    // Check if there's a unit at this position to select
-    const unitAtPosition = units.find(unit => 
-      unit && 
-      unit.position && 
-      Array.isArray(unit.position) && 
-      unit.position[0] === x && 
-      unit.position[1] === y
-    );
-    
-    // If we found a unit and it's not exhausted, select it
-    if (unitAtPosition && (!unitAtPosition.status || unitAtPosition.status !== 'exhausted')) {
-      selectUnit(unitAtPosition);
-      return;
-    } else if (unitAtPosition) {
-      // If unit is exhausted, just show a message
-      alert("Esta unidad ya ha agotado sus movimientos este turno.");
-      selectedUnit = null;
-      validMoveTargets = [];
-    } else {
-      // No unit found, clear selection
-      selectedUnit = null;
-      validMoveTargets = [];
-    }
-    
-    // Handle regular tile info (original behavior)
-    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
-      selectedTile = {
-        x, y,
-        terrainName: 'Desconocido (no explorado)',
-        isExplored: false
-      };
-    } else {
-      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
-
-      selectedTile = {
-        x, y,
-        terrain: terrainType,
-        terrainName: getTerrainName(terrainType),
-        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
-      };
-    }
-  }
-
   // Select a unit and calculate its possible move targets
   function selectUnit(unit) {
     selectedUnit = unit;
     validMoveTargets = [];
     
-    // Get unit's available movement points
-    const movementPoints = unit.movement || 2;
+    // Get unit's available movement points, accounting for already used movement
+    const totalMovement = unit.movement || 2;
+    const remainingMovement = unit.remainingMovement !== undefined ? 
+                              unit.remainingMovement : 
+                              totalMovement;
+    
+    if (remainingMovement <= 0) {
+      showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+      selectedUnit = null;
+      return;
+    }
     
     // Get current position
     const [unitX, unitY] = unit.position;
     
-    // For each movement point, calculate valid adjacent tiles
-    calculateValidMoveTargets(unitX, unitY, movementPoints);
+    // Calculate valid targets based on remaining movement
+    calculateValidMoveTargets(unitX, unitY, remainingMovement);
   }
   
   // Calculate valid movement targets based on unit's position and movement points
@@ -511,12 +469,12 @@
     // Check if the target tile is occupied by another unit
     const occupyingUnit = units.find(u => u !== unit && u.position[0] === targetX && u.position[1] === targetY);
     if (occupyingUnit) {
-      alert(`Cannot move to tile (${targetX}, ${targetY}). It is occupied by another unit (${occupyingUnit.name || occupyingUnit.type_id}).`);
-      movementInProgress = false; // Ensure this is reset if we return early
+      showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`, "error");
+      movementInProgress = false;
       return;
     }
 
-    movementInProgress = true; // Set true only after passing the occupation check
+    movementInProgress = true;
     
     try {
       const targetInfo = validMoveTargets.find(target => 
@@ -525,7 +483,6 @@
       
       if (!targetInfo) {
         console.error("Target position not in valid moves");
-        // movementInProgress = false; // Already handled in finally
         return;
       }
       
@@ -533,20 +490,43 @@
       
       if (localUnitIndex !== -1) {
         const originalUnitPosition = [...units[localUnitIndex].position]; 
-
+        
+        // Calculate movement cost (distance between positions)
+        const movementCost = Math.abs(targetX - originalUnitPosition[0]) + 
+                             Math.abs(targetY - originalUnitPosition[1]);
+        
+        // Get total movement allowance for this unit
+        const totalMovement = units[localUnitIndex].movement || 2;
+        
+        // Initialize remainingMovement if not present
+        if (units[localUnitIndex].remainingMovement === undefined) {
+          units[localUnitIndex].remainingMovement = totalMovement;
+        }
+        
+        // Ensure we can't move more than we have movement points for
+        if (movementCost > units[localUnitIndex].remainingMovement) {
+          showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
+          movementInProgress = false;
+          return;
+        }
+        
+        // Deduct the cost of this move from remaining movement
+        units[localUnitIndex].remainingMovement -= movementCost;
+        
+        // Update position
         units[localUnitIndex].position = [targetX, targetY];
         
-        // const totalMovement = units[localUnitIndex].movement || 2; // This is the unit's max movement
-        const movementRemainingAfterThisMove = targetInfo.remainingMovement;
-        
-        if (movementRemainingAfterThisMove <= 0) {
+        // Update status based on remaining movement
+        if (units[localUnitIndex].remainingMovement <= 0) {
           units[localUnitIndex].status = 'exhausted';
         } else {
           units[localUnitIndex].status = 'moved';
         }
         
+        // Force Svelte to update by creating a new array reference
         units = [...units]; 
         
+        // Also update the game data for session persistence
         if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
           let gameDataUnitIndex = -1;
 
@@ -566,8 +546,9 @@
           if (gameDataUnitIndex !== -1) {
             gameData.player.units[gameDataUnitIndex].position = [targetX, targetY];
             gameData.player.units[gameDataUnitIndex].status = units[localUnitIndex].status;
+            gameData.player.units[gameDataUnitIndex].remainingMovement = units[localUnitIndex].remainingMovement;
             
-            console.log(`Unit updated in gameData: ID ${unit.id || 'N/A'}, New Pos [${targetX},${targetY}], Status ${units[localUnitIndex].status}`);
+            console.log(`Unit updated in gameData: ID ${unit.id || 'N/A'}, New Pos [${targetX},${targetY}], Status ${units[localUnitIndex].status}, Remaining Movement: ${units[localUnitIndex].remainingMovement}`);
           } else {
             console.warn("Moved unit not found in gameData.player.units. Session not updated for this unit.");
           }
@@ -575,8 +556,15 @@
         
         updateFogOfWarAroundPosition(targetX, targetY, 2);
         
-        selectedUnit = null;
-        validMoveTargets = [];
+        // If the unit still has movement points, don't deselect it to allow chains of movement
+        if (units[localUnitIndex].remainingMovement <= 0) {
+          showToastNotification(`Unidad ${unit.name || unit.type_id} ha agotado su movimiento.`, "info");
+          selectedUnit = null;
+          validMoveTargets = [];
+        } else {
+          // Reselect the unit to update valid moves from the new position
+          selectUnit(units[localUnitIndex]);
+        }
       } else {
          console.error("Selected unit not found in local 'units' array.");
       }
@@ -587,7 +575,7 @@
       movementInProgress = false;
     }
   }
-  
+
   // Update fog of war around a position
   function updateFogOfWarAroundPosition(centerX, centerY, radius) {
     if (!showFogOfWar) return;
@@ -619,7 +607,10 @@
     // AI's turn (placeholder)
     gameData.current_player = "ia";
     currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
-    alert("IA's Turn (Not Implemented - Placeholder). Click OK to continue to next player turn.");
+    showToastNotification("IA's Turn (Not Implemented - Placeholder)", "info");
+    
+    // Short delay before continuing to next player turn
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Switch back to player and increment turn
     gameData.current_player = "player";
@@ -627,14 +618,15 @@
     currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
     currentTurn.set(gameData.turn); // Update Svelte store from gameData
 
-    // Reset player unit statuses
+    // Reset player unit statuses and movement points
     if (gameData.player && Array.isArray(gameData.player.units)) {
       gameData.player.units.forEach(unit => {
-        unit.status = "ready"; // Or your default ready status
+        unit.status = "ready"; // Reset status
+        unit.remainingMovement = unit.movement || 2; // Reset movement points to full
       });
       // Update the local 'units' array for Svelte reactivity
       units = [...gameData.player.units];
-      console.log("Player units status reset for new turn.");
+      console.log("Player units status and movement points reset for new turn.");
     }
     
     // Deselect any selected unit
@@ -645,9 +637,10 @@
     try {
       await gameAPI.updateGameSession(gameData);
       console.log(`Game session updated for Turn ${gameData.turn}.`);
+      showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
     } catch (error) {
       console.error("Failed to update game session after ending turn:", error);
-      alert("Error saving turn data to server. Please check console.");
+      showToastNotification("Error saving turn data to server.", "error");
     }
   }
 
@@ -708,6 +701,60 @@
           navigate('/home');
         }, 2000);
       }
+    }
+  }
+
+  // Improved handleTileClick to better handle unit selection
+  function handleTileClick(x, y) {
+    // If a unit is already selected and we click on a valid move target
+    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
+      moveUnitToPosition(selectedUnit, x, y);
+      return;
+    }
+    
+    // Check if there's a unit at this position to select
+    const unitAtPosition = units.find(unit => 
+      unit && 
+      unit.position && 
+      Array.isArray(unit.position) && 
+      unit.position[0] === x && 
+      unit.position[1] === y
+    );
+    
+    // If we found a unit, check if it can move
+    if (unitAtPosition) {
+      if (unitAtPosition.status === 'exhausted') {
+        // If unit is exhausted, show a message
+        showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+      } else {
+        // Otherwise select it
+        selectUnit(unitAtPosition);
+      }
+      return;
+    } else {
+      // No unit found, clear selection
+      selectedUnit = null;
+      validMoveTargets = [];
+    }
+    
+    // Handle regular tile info display (original behavior)
+    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
+      selectedTile = {
+        x, y,
+        terrainName: 'Desconocido (no explorado)',
+        isExplored: false
+      };
+    } else {
+      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
+
+      selectedTile = {
+        x, y,
+        terrain: terrainType,
+        terrainName: getTerrainName(terrainType),
+        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
+      };
     }
   }
 

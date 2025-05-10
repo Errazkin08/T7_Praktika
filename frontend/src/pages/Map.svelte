@@ -125,6 +125,28 @@
     }
   }
 
+  // Add this new function to get resource icons based on terrain type
+  function getResourceIcon(terrainType) {
+    switch (terrainType) {
+      case 2: return "🪙"; // Gold
+      case 3: return "⚙️"; // Iron
+      case 4: return "🌲"; // Wood
+      default: return null; // No resource
+    }
+  }
+
+  // Get the terrain name with updated resource types
+  function getTerrainName(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.WATER: return 'Agua';
+      case 2: return 'Oro';
+      case 3: return 'Hierro';
+      case 4: return 'Madera';
+      case TERRAIN_TYPES.NORMAL: return 'Tierra';
+      default: return 'Desconocido';
+    }
+  }
+
   onMount(async () => {
     try {
       // Add map-active class to body when map is mounted
@@ -427,15 +449,6 @@
     showFogOfWar = !showFogOfWar;
   }
 
-  function getTerrainName(terrainType) {
-    switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return 'Agua';
-      case TERRAIN_TYPES.MINERAL: return 'Terreno mineralizado';
-      case TERRAIN_TYPES.NORMAL: return 'Tierra';
-      default: return 'Desconocido';
-    }
-  }
-
   // Select a unit and calculate its possible move targets
   function selectUnit(unit) {
     selectedUnit = unit;
@@ -671,6 +684,9 @@
     currentPlayer.set(gameData.current_player); // Update Svelte store from gameData
     currentTurn.set(gameData.turn); // Update Svelte store from gameData
 
+    // Save current AI units before updating the units array
+    const aiUnits = units.filter(unit => unit.owner === 'ia');
+
     // Reset player unit statuses and movement points
     if (gameData.player && Array.isArray(gameData.player.units)) {
       gameData.player.units.forEach((unit, index) => {
@@ -682,9 +698,22 @@
           selectedUnitInfo = unit; // Update reference to show refreshed stats
         }
       });
-      // Update the local 'units' array for Svelte reactivity
-      units = [...gameData.player.units];
-      console.log("Player units status and movement points reset for new turn.");
+      
+      // Update the local 'units' array with BOTH player AND AI units
+      // First add the player units with refreshed status
+      let updatedUnits = [...gameData.player.units];
+      
+      // Then add the AI units back
+      if (aiUnits.length > 0) {
+        updatedUnits = [...updatedUnits, ...aiUnits];
+      }
+      
+      // Update the units array
+      units = updatedUnits;
+      
+      console.log("Units after turn end:", units.length, "- Player:", 
+        units.filter(u => u.owner === 'player').length, 
+        "AI:", units.filter(u => u.owner === 'ia').length);
     }
     
     // Deselect any selected unit
@@ -933,6 +962,7 @@
             )}
             {@const isSelectedUnit = selectedUnit && unitAtPosition === selectedUnit}
             {@const terrainImageUrl = isVisible ? getTerrainImageUrl(terrainType) : null}
+            {@const hasResource = isVisible && (terrainType === 2 || terrainType === 3 || terrainType === 4)}
             
             <div 
               class="map-tile"
@@ -946,8 +976,12 @@
                 top: {y * tileSize}px;
                 width: {tileSize}px;
                 height: {tileSize}px;
-                background-color: {isVisible && !terrainImageUrl ? getTerrainColor(terrainType) : '#000'};
-                background-image: {terrainImageUrl ? `url('${terrainImageUrl}')` : 'none'};
+                background-color: {isVisible && !terrainImageUrl ? 
+                                 (hasResource ? getTerrainColor(TERRAIN_TYPES.NORMAL) : getTerrainColor(terrainType)) : 
+                                 '#000'};
+                background-image: {terrainImageUrl && !hasResource ? 
+                                 `url('${terrainImageUrl}')` : 
+                                 (hasResource ? `url('./ia_assets/belarra_tile.jpg')` : 'none')};
                 background-size: cover;
               "
               on:click={() => handleTileClick(x, y)}
@@ -955,6 +989,13 @@
             >
               {#if x % 10 === 0 && y % 10 === 0 && isVisible}
                 <div class="coord-marker">{x},{y}</div>
+              {/if}
+              
+              <!-- Add resource marker if the tile has a resource -->
+              {#if hasResource && isVisible}
+                <div class="resource-marker" title="{getTerrainName(terrainType)}">
+                  <span class="resource-icon">{getResourceIcon(terrainType)}</span>
+                </div>
               {/if}
               
               {#if unitAtPosition && isVisible}

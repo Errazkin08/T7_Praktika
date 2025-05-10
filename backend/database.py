@@ -187,93 +187,175 @@ def generate_terrain(width, height, difficulty):
     Generate terrain with patterns:
     - 0: Normal terrain (most common)
     - 1: Water (forms lakes and rivers)
-    - 2: Mineralized terrain (rare, forms in small clusters)
+    - 2: Gold mineral (rare, 10% of minerals)
+    - 3: Iron mineral (uncommon, 20% of minerals)
+    - 4: Wood resource (common, 70% of minerals)
     """
     # Initialize terrain with normal terrain
     terrain = [[0 for _ in range(width)] for _ in range(height)]
     
-    # Water generation parameters
-    water_percent = 15  # 15% of map is water
-    water_seeds = int((width * height * water_percent) / 100 / 10)
-    water_seeds = max(3, min(15, water_seeds))  # Minimum 3, maximum 15 seeds
+    # Calculate total tiles
+    total_tiles = width * height
     
-    # Mineralized terrain parameters
-    mineral_percent = 5  # 5% of map is mineralized (rare resource)
-    mineral_seeds = int((width * height * mineral_percent) / 100 / 4)
-    mineral_seeds = max(2, min(8, mineral_seeds))  # Minimum 2, maximum 8 seeds
+    # Fixed water percentage regardless of difficulty
+    water_percent = 15  # Always 15% of map is water
     
-    # Adjust difficulty
-    if difficulty == "medium":
-        water_percent += 5
-        mineral_percent -= 1
+    # Set mineral percentage based on difficulty
+    if difficulty == "easy":
+        mineral_percent = 20  # 20% minerals on easy difficulty
+    elif difficulty == "medium":
+        mineral_percent = 15  # 15% minerals on medium difficulty
     elif difficulty == "hard":
-        water_percent += 10
-        mineral_percent -= 2
+        mineral_percent = 10  # 10% minerals on hard difficulty
+    else:
+        # Default to easy if unknown difficulty
+        mineral_percent = 20
     
-    # Generate water bodies (lakes/rivers)
+    # Calculate exact number of tiles for each type
+    water_tiles = int(total_tiles * water_percent / 100)
+    mineral_tiles = int(total_tiles * mineral_percent / 100)
+    
+    # Subdivide minerals by type
+    gold_tiles = int(mineral_tiles * 0.1)  # 10% of minerals are gold
+    iron_tiles = int(mineral_tiles * 0.2)  # 20% of minerals are iron
+    wood_tiles = mineral_tiles - gold_tiles - iron_tiles  # Remaining are wood
+    
+    print(f"Map size: {width}x{height} = {total_tiles} tiles")
+    print(f"Difficulty: {difficulty}")
+    print(f"Water: {water_percent}% = {water_tiles} tiles")
+    print(f"Minerals: {mineral_percent}% = {mineral_tiles} tiles")
+    print(f"  - Gold: 10% of minerals = {gold_tiles} tiles")
+    print(f"  - Iron: 20% of minerals = {iron_tiles} tiles")
+    print(f"  - Wood: 70% of minerals = {wood_tiles} tiles")
+    
+    # First place water features with clustering
+    placed_water = 0
+    water_seeds = min(water_tiles // 10, 15)  # Use at most 15 seed points
+    water_seeds = max(water_seeds, 3)  # At least 3 seed points
+    
+    water_per_seed = water_tiles // water_seeds
+    
     for _ in range(water_seeds):
-        # Random starting point
+        if placed_water >= water_tiles:
+            break
+            
+        # Place a water seed
         x = random.randint(2, width - 3)
         y = random.randint(2, height - 3)
         
-        # Size of the water body
-        size = random.randint(5, 15)
+        # Skip if already water
+        if terrain[y][x] != 0:
+            continue
+            
+        # Define size of this water body (avoid one large body consuming everything)
+        size = min(random.randint(5, 15), water_per_seed)
         
-        # Generate water in a natural-looking pattern
-        generate_water_pattern(terrain, x, y, size, width, height)
+        # Generate water cluster
+        placed_water += generate_water_pattern(terrain, x, y, size, width, height)
     
-    # Generate mineralized terrain (small clusters)
-    for _ in range(mineral_seeds):
-        # Random starting point
-        x = random.randint(1, width - 2)
-        y = random.randint(1, height - 2)
+    # If we still have water to place, add random individual water tiles
+    remaining_water = water_tiles - placed_water
+    attempts = 0
+    
+    while remaining_water > 0 and attempts < remaining_water * 3:
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
         
-        # Size of the mineral deposit
-        size = random.randint(1, 3)
+        if terrain[y][x] == 0:  # Only place on normal terrain
+            terrain[y][x] = 1  # Water
+            remaining_water -= 1
         
-        # Generate minerals in small clusters
-        generate_mineral_pattern(terrain, x, y, size, width, height)
+        attempts += 1
+    
+    # Now place minerals - first distribute them individually
+    mineral_placement_order = []
+    
+    # Add gold tiles
+    for _ in range(gold_tiles):
+        mineral_placement_order.append(2)  # Gold
+    
+    # Add iron tiles
+    for _ in range(iron_tiles):
+        mineral_placement_order.append(3)  # Iron
+    
+    # Add wood tiles
+    for _ in range(wood_tiles):
+        mineral_placement_order.append(4)  # Wood
+    
+    # Shuffle the placement order
+    random.shuffle(mineral_placement_order)
+    
+    # Attempt to place each mineral (with some clustering)
+    to_place = len(mineral_placement_order)
+    placed = 0
+    cluster_chance = 0.3  # 30% chance to try to form a small cluster
+    
+    for mineral_type in mineral_placement_order:
+        # Try to place the mineral
+        attempts = 0
+        max_attempts = 10  # Try up to 10 times to find a suitable spot
+        
+        while attempts < max_attempts:
+            x = random.randint(0, width - 1)
+            y = random.randint(0, height - 1)
+            
+            if terrain[y][x] == 0:  # Only place on normal terrain
+                terrain[y][x] = mineral_type
+                placed += 1
+                
+                # Try to form a small cluster (occasionally)
+                if random.random() < cluster_chance:
+                    # Try to add one adjacent mineral of the same type
+                    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                    random.shuffle(directions)
+                    
+                    for dx, dy in directions:
+                        nx, ny = x + dx, y + dy
+                        if (0 <= nx < width and 0 <= ny < height and 
+                            terrain[ny][nx] == 0):
+                            terrain[ny][nx] = mineral_type
+                            placed += 1
+                            break  # Only add one adjacent tile
+                
+                break  # Successfully placed
+            
+            attempts += 1
+    
+    print(f"Placed {placed} out of {to_place} minerals")
     
     return terrain
 
 def generate_water_pattern(terrain, x, y, size, width, height):
-    """Generate a natural-looking water body"""
+    """Generate a natural-looking water body. Returns the number of water tiles placed."""
     # Mark the center as water
+    if terrain[y][x] != 0:  # Already something else
+        return 0
+        
     terrain[y][x] = 1
+    placed = 1
     
     # Generate water in a randomized pattern around the center
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
     queue = [(x, y, size)]
     
-    while queue:
+    while queue and placed < size:
         cx, cy, remaining_size = queue.pop(0)
         if remaining_size <= 0:
             continue
         
         # Choose random directions to expand
         random.shuffle(directions)
-        for dx, dy in directions[:random.randint(1, 4)]:  # Expand in 1-4 directions
+        for dx, dy in directions[:random.randint(1, min(4, remaining_size))]:
             nx, ny = cx + dx, cy + dy
-            if 0 <= nx < width and 0 <= ny < height and terrain[ny][nx] == 0:
+            if (0 <= nx < width and 0 <= ny < height and 
+                terrain[ny][nx] == 0 and placed < size):
                 terrain[ny][nx] = 1
+                placed += 1
                 # Continue expanding with reduced size
                 if random.random() < 0.7:  # 70% chance to continue
                     queue.append((nx, ny, remaining_size - 1))
-
-def generate_mineral_pattern(terrain, x, y, size, width, height):
-    """Generate a small cluster of mineralized terrain"""
-    # Mark the center as mineralized
-    if terrain[y][x] == 0:  # Only place minerals on normal terrain
-        terrain[y][x] = 2
     
-    # Generate minerals in a small cluster
-    if size > 1:
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for _ in range(size):
-            dx, dy = random.choice(directions)
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < width and 0 <= ny < height and terrain[ny][nx] == 0:
-                terrain[ny][nx] = 2
+    return placed
 
 def get_first_map():
     """

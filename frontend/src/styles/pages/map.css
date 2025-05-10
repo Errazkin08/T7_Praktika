@@ -208,7 +208,7 @@ html.map-active {
 
 .map-tile {
     position: absolute;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    border: none; /* Remove borders completely */
     box-sizing: border-box;
     transition: all 0.1s;
     background-position: center;
@@ -217,46 +217,40 @@ html.map-active {
 
 .map-tile.fog {
     background-color: #000 !important;
-    border: 1px solid #222;
+    /* No border for fog tiles */
 }
 
 .map-tile.water {
     background-color: #3399ff;
-    border: 1px solid rgba(0, 0, 150, 0.3);
+    /* No border for water tiles */
     animation: waterWave 2s infinite alternate;
 }
 
 @keyframes waterWave {
     from {
-        border-color: rgba(0, 0, 150, 0.3);
+        filter: brightness(0.95);
     }
-
     to {
-        border-color: rgba(100, 200, 255, 0.7);
+        filter: brightness(1.05);
     }
 }
 
+/* Simplificar completamente el tile mineral a solo un color de fondo, igual que los otros tipos */
 .map-tile.mineral {
-    background-color: #cc9900;
-    border: 1px solid rgba(150, 100, 0, 0.5);
-    position: relative;
-    overflow: hidden;
+    background-color: #cc9900; /* Solo un color sólido, sin patrones ni efectos */
 }
 
+/* Eliminar cualquier otro estilo específico para los tiles minerales */
+.map-tile.mineral::before,
 .map-tile.mineral::after {
-    content: "💎";
-    position: absolute;
-    font-size: 0.7rem;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0.7;
+    content: none;
 }
 
+/* Keep this border visible since it's important for gameplay */
 .map-tile.valid-move {
     box-shadow: inset 0 0 10px rgba(255, 255, 0, 0.7);
     cursor: pointer;
-    border: 1px dashed #ffcc00;
+    border: 1px dashed rgba(255, 204, 0, 0.7); /* Keep this visible but slightly more transparent */
 }
 
 .map-tile.selected-unit-tile {
@@ -716,4 +710,39 @@ html.map-active {
 
 .resource.wood {
   border-left: 3px solid #795548;
+}
+
+/* Resource marker styles - similar to unit marker but with modifications */
+.resource-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10; /* Between terrain (5) and units (15) */
+  pointer-events: none; /* Allow clicks to pass through to the tile */
+}
+
+.resource-icon {
+  font-size: 1.2rem;
+  filter: drop-shadow(0px 0px 2px black);
+  opacity: 0.9;
+  text-align: center;
+}
+
+/* Add resource-specific styling (optional) */
+.resource-marker[title="Oro"] .resource-icon {
+  color: #FFD700; /* Gold color */
+  font-size: 1.3rem;
+}
+
+.resource-marker[title="Hierro"] .resource-icon {
+  color: #A8A9AD; /* Iron/steel color */
+}
+
+.resource-marker[title="Madera"] .resource-icon {
+  color: #6E4C1E; /* Wood/brown color */
 }

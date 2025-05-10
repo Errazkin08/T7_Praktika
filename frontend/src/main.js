@@ -1,4 +1,5 @@
 import App from './App.svelte';
+import './styles/global.css'; // Import global CSS
 import './app.css';
 import { initRouter } from './router.js';
 

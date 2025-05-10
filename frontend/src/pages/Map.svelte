@@ -4,6 +4,7 @@
   import { gameAPI } from '../services/gameAPI.js';
   import { gameState, pauseGame, endGame, currentTurn, currentPlayer } from '../stores/gameState.js';
   import { user } from '../stores/auth.js';
+  import '../styles/pages/map.css'; 
 
   let showPauseMenu = false;
   let isLoading = true;
@@ -30,6 +31,7 @@
 
   // Información de selección
   let selectedTile = null;
+  let selectedUnitInfo = null; // New state variable for unit info display
 
   // Fog of War
   let showFogOfWar = true; // Estado para mostrar/ocultar el fog of war
@@ -100,6 +102,7 @@
   function getUnitImageUrl(unitType) {
     switch (unitType) {
       case "warrior": return './ia_assets/warrior.png'; // Updated to match format
+      case "settler": return './ia_assets/settler.png'; // Updated to match format
       default: return null; // For other unit types, we'll fall back to emoji
     }
   }
@@ -124,6 +127,10 @@
 
   onMount(async () => {
     try {
+      // Add map-active class to body when map is mounted
+      document.body.classList.add('map-active');
+      document.documentElement.classList.add('map-active');
+
       // Verificar si el usuario está autenticado
       if (!$user) {
         navigate('/');
@@ -142,6 +149,9 @@
       await initializeGame();
 
       return () => {
+        // Remove map-active class when map is unmounted
+        document.body.classList.remove('map-active');
+        document.documentElement.classList.remove('map-active');
         window.removeEventListener('keydown', handleKeyPress);
       };
     } catch (err) {
@@ -412,51 +422,38 @@
   // Calculate valid movement targets based on unit's position and movement points
   function calculateValidMoveTargets(startX, startY, movementPoints) {
     validMoveTargets = [];
-    const queue = [[startX, startY, movementPoints]];
-    const visited = {}; // Stores { "x,y": remainingMovement }
-  
-    while (queue.length > 0) {
-      const [x, y, remainingMovement] = queue.shift();
-  
-      // Skip if out of bounds
-      if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) continue;
-  
-      // Skip if this is water terrain (units can't move on water)
-      if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
-  
-      // Check if another unit (not the selected one) occupies this tile
-      // This check is primarily for the tiles being considered as potential next steps.
-      // The starting tile (startX, startY) is implicitly allowed.
-      if (x !== startX || y !== startY) { // Don't check the unit's current tile for occupation by others
-        const occupyingUnit = units.find(u => u !== selectedUnit && u.position[0] === x && u.position[1] === y);
-        if (occupyingUnit) {
-          continue; // Tile is occupied by another unit
-        }
-      }
-  
-      const key = `${x},${y}`;
-      // Skip if already visited with more or equal remaining movement
-      if (visited[key] !== undefined && visited[key] >= remainingMovement) continue;
-  
-      visited[key] = remainingMovement;
-  
-      // Add to valid targets if not the starting position
-      if (x !== startX || y !== startY) {
-        validMoveTargets.push({ x, y, remainingMovement });
-      }
-  
-      // If we still have movement points, explore adjacent tiles
-      if (remainingMovement > 0) {
-        const neighbors = [
-          [x + 1, y], [x - 1, y], // Right, Left
-          [x, y + 1], [x, y - 1]  // Down, Up
-        ];
-  
-        for (const [nx, ny] of neighbors) {
-          // Check bounds before adding to queue
-          if (nx >= 0 && nx < mapWidth && ny >= 0 && ny < mapHeight) {
-            queue.push([nx, ny, remainingMovement - 1]);
-          }
+    
+    // Set a consistent movement range of 2 tiles in all directions
+    const movementRange = 2;
+    
+    // Check all tiles within our fixed movement range
+    for (let y = Math.max(0, startY - movementRange); y <= Math.min(mapHeight - 1, startY + movementRange); y++) {
+      for (let x = Math.max(0, startX - movementRange); x <= Math.min(mapWidth - 1, startX + movementRange); x++) {
+        // Skip the starting position
+        if (x === startX && y === startY) continue;
+        
+        // Calculate Manhattan distance (steps needed) to reach this tile
+        const steps = Math.abs(x - startX) + Math.abs(y - startY);
+        
+        // Skip if beyond our movement range
+        if (steps > movementRange) continue;
+        
+        // Skip if this is water terrain (units can't move on water)
+        if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
+        
+        // Check if another unit occupies this tile
+        const occupyingUnit = units.find(u => 
+          u !== selectedUnit && 
+          u.position && 
+          u.position[0] === x && 
+          u.position[1] === y
+        );
+        
+        if (occupyingUnit) continue; // Tile is occupied by another unit
+        
+        // Add to valid targets if the unit has at least 1 movement point left
+        if (movementPoints >= 1) {
+          validMoveTargets.push({ x, y, remainingMovement: movementPoints - 1 });
         }
       }
     }
@@ -491,9 +488,8 @@
       if (localUnitIndex !== -1) {
         const originalUnitPosition = [...units[localUnitIndex].position]; 
         
-        // Calculate movement cost (distance between positions)
-        const movementCost = Math.abs(targetX - originalUnitPosition[0]) + 
-                             Math.abs(targetY - originalUnitPosition[1]);
+        // CHANGED: Each position change costs 1 movement point regardless of distance
+        const movementCost = 1;
         
         // Get total movement allowance for this unit
         const totalMovement = units[localUnitIndex].movement || 2;
@@ -525,6 +521,9 @@
         
         // Force Svelte to update by creating a new array reference
         units = [...units]; 
+        
+        // NEW: Update the selected unit info to reflect the changes
+        updateUnitInfoPanel(localUnitIndex);
         
         // Also update the game data for session persistence
         if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
@@ -558,7 +557,6 @@
         
         // If the unit still has movement points, don't deselect it to allow chains of movement
         if (units[localUnitIndex].remainingMovement <= 0) {
-          showToastNotification(`Unidad ${unit.name || unit.type_id} ha agotado su movimiento.`, "info");
           selectedUnit = null;
           validMoveTargets = [];
         } else {
@@ -573,6 +571,20 @@
     } 
     finally {
       movementInProgress = false;
+    }
+  }
+
+  // NEW: Function to update the unit info panel when unit data changes
+  function updateUnitInfoPanel(unitIndex) {
+    if (selectedUnitInfo && units[unitIndex]) {
+      // Check if the current selectedUnitInfo matches the unit being updated
+      if (selectedUnitInfo.id === units[unitIndex].id || 
+         (selectedUnitInfo.position && units[unitIndex].position && 
+          selectedUnitInfo.position[0] === units[unitIndex].position[0] && 
+          selectedUnitInfo.position[1] === units[unitIndex].position[1])) {
+        // Update the selectedUnitInfo reference to point to the updated unit
+        selectedUnitInfo = units[unitIndex];
+      }
     }
   }
 
@@ -620,9 +632,14 @@
 
     // Reset player unit statuses and movement points
     if (gameData.player && Array.isArray(gameData.player.units)) {
-      gameData.player.units.forEach(unit => {
+      gameData.player.units.forEach((unit, index) => {
         unit.status = "ready"; // Reset status
         unit.remainingMovement = unit.movement || 2; // Reset movement points to full
+        
+        // Update the info panel if this is the currently selected unit
+        if (selectedUnitInfo && selectedUnitInfo.id === unit.id) {
+          selectedUnitInfo = unit; // Update reference to show refreshed stats
+        }
       });
       // Update the local 'units' array for Svelte reactivity
       units = [...gameData.player.units];
@@ -631,6 +648,7 @@
     
     // Deselect any selected unit
     selectedUnit = null;
+    selectedUnitInfo = null;
     validMoveTargets = [];
 
     // Save the updated game state to the session
@@ -721,21 +739,26 @@
       unit.position[1] === y
     );
     
-    // If we found a unit, check if it can move
+    // If we found a unit, store its info and check if it can move
     if (unitAtPosition) {
+      // Set selected unit info for display
+      selectedUnitInfo = unitAtPosition;
+      selectedTile = null; // Clear tile selection when unit is selected
+      
       if (unitAtPosition.status === 'exhausted') {
         // If unit is exhausted, show a message
         showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
         selectedUnit = null;
         validMoveTargets = [];
       } else {
-        // Otherwise select it
+        // Otherwise select it for movement
         selectUnit(unitAtPosition);
       }
       return;
     } else {
-      // No unit found, clear selection
+      // No unit found, clear unit selection and info
       selectedUnit = null;
+      selectedUnitInfo = null;
       validMoveTargets = [];
     }
     
@@ -793,15 +816,8 @@
 </script>
 
 <svelte:head>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      height: 100%;
-      width: 100%;
-    }
-  </style>
+  <!-- This was empty but needs to contain styles -->
+  <title>Map - Civilization Game</title>
 </svelte:head>
 
 <div class="map-page">
@@ -893,16 +909,15 @@
               {/if}
               
               {#if unitAtPosition && isVisible}
-                {@const unitImageUrl = getUnitImageUrl(unitAtPosition.type_id)}
                 <div 
                   class="unit-marker" 
                   class:selected={isSelectedUnit}
                   class:exhausted={unitAtPosition.status === 'exhausted'}
                   title="{unitAtPosition.name || unitAtPosition.type_id} {unitAtPosition.status ? '(' + unitAtPosition.status + ')' : ''}"
                 >
-                  {#if unitImageUrl}
+                  {#if getUnitImageUrl(unitAtPosition.type_id)}
                     <img 
-                      src={unitImageUrl} 
+                      src={getUnitImageUrl(unitAtPosition.type_id)} 
                       alt={unitAtPosition.type_id} 
                       class="unit-image"
                     />
@@ -917,7 +932,7 @@
       </div>
     </div>
     
-    {#if selectedTile && !showPauseMenu}
+    {#if selectedTile && !showPauseMenu && !selectedUnitInfo}
       <div class="tile-info-overlay">
         <div class="tile-info-card">
           <div class="tile-info-header">
@@ -942,6 +957,59 @@
           {#if selectedTile.isExplored === false}
             <div class="fog-info">
               <p>Esta zona no ha sido explorada todavía.</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+    
+    {#if selectedUnitInfo && !showPauseMenu}
+      <div class="unit-info-overlay">
+        <div class="unit-info-card">
+          <div class="unit-info-header">
+            <h4>{selectedUnitInfo.name || selectedUnitInfo.type_id || 'Unidad'}</h4>
+            <button class="close-button" on:click={() => { selectedUnitInfo = null; }}>×</button>
+          </div>
+          
+          <div class="unit-details">
+            <div class="unit-image-container">
+              {#if selectedUnitInfo.type_id && getUnitImageUrl(selectedUnitInfo.type_id)}
+                <img src={getUnitImageUrl(selectedUnitInfo.type_id)} alt={selectedUnitInfo.type_id} class="unit-portrait" />
+              {:else}
+                <div class="unit-icon-large">{selectedUnitInfo.type_id ? getUnitIcon(selectedUnitInfo.type_id) : '❓'}</div>
+              {/if}
+            </div>
+            
+            <div class="unit-stats">
+              <p><strong>Tipo:</strong> {selectedUnitInfo.type_id || 'Desconocido'}</p>
+              <p><strong>Facción:</strong> {selectedUnitInfo.owner || 'player'}</p>
+              <p><strong>Estado:</strong> {selectedUnitInfo.status || 'ready'}</p>
+              <p><strong>Movimientos:</strong> {selectedUnitInfo.remainingMovement !== undefined ? selectedUnitInfo.remainingMovement : (selectedUnitInfo.movement || 2)}/{selectedUnitInfo.movement || 2}</p>
+              {#if selectedUnitInfo.position && Array.isArray(selectedUnitInfo.position) && selectedUnitInfo.position.length >= 2}
+                <p><strong>Posición:</strong> [{selectedUnitInfo.position[0]}, {selectedUnitInfo.position[1]}]</p>
+              {/if}
+              
+              {#if selectedUnitInfo.health !== undefined}
+                <p><strong>Salud:</strong> {selectedUnitInfo.health}</p>
+              {/if}
+              
+              {#if selectedUnitInfo.attack !== undefined}
+                <p><strong>Ataque:</strong> {selectedUnitInfo.attack}</p>
+              {/if}
+              
+              {#if selectedUnitInfo.defense !== undefined}
+                <p><strong>Defensa:</strong> {selectedUnitInfo.defense}</p>
+              {/if}
+            </div>
+          </div>
+          
+          {#if selectedUnitInfo.status !== 'exhausted'}
+            <div class="unit-actions">
+              <button class="action-button" on:click={() => selectUnit(selectedUnitInfo)}>Mover</button>
+            </div>
+          {:else}
+            <div class="unit-exhausted-message">
+              <p>Esta unidad ya ha agotado sus movimientos este turno.</p>
             </div>
           {/if}
         </div>
@@ -988,484 +1056,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .map-page {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: #000;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .blurred {
-    filter: blur(2px);
-  }
-
-  .loading {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    color: white;
-    background-color: rgba(0, 0, 0, 0.8);
-    gap: 20px;
-  }
-
-  .loading-spinner {
-    border: 6px solid rgba(255, 255, 255, 0.3);
-    border-top: 6px solid #4CAF50;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .error-message {
-    color: #ff5252;
-    background-color: rgba(255, 82, 82, 0.1);
-    padding: 10px;
-    border-radius: 5px;
-    max-width: 80%;
-    text-align: center;
-  }
-
-  .retry-button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    background-color: #4CAF50;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
-    margin: 10px;
-  }
-  
-  .map-controls {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 1rem;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    z-index: 10;
-    align-items: center;
-  }
-  
-  .left-controls, .right-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .menu-button, .right-controls button {
-    padding: 0.3rem 0.6rem;
-    background-color: #444;
-    color: white;
-    border: 1px solid #666;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .menu-button:hover, .right-controls button:hover {
-    background-color: #555;
-  }
-  
-  .game-info {
-    margin-left: 1rem;
-    font-size: 0.9rem;
-    white-space: nowrap;
-  }
-  
-  .end-turn-button {
-    padding: 0.3rem 0.6rem;
-    background-color: #ffc107;
-    color: #212529;
-    border: 1px solid #dda700;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-
-  .end-turn-button:hover {
-    background-color: #e0a800;
-  }
-  
-  .map-container {
-    flex: 1;
-    position: relative;
-    cursor: grab;
-    background-color: #0066cc;
-    overflow: hidden;
-  }
-  
-  .map-grid {
-    position: relative;
-    transform-origin: 0 0;
-  }
-  
-  .map-tile {
-    position: absolute;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    transition: all 0.1s;
-    background-position: center;
-    background-repeat: no-repeat;
-  }
-  
-  .map-tile.fog {
-    background-color: #000 !important;
-    border: 1px solid #222;
-  }
-  
-  .map-tile.water {
-    background-color: #3399ff;
-    border: 1px solid rgba(0, 0, 150, 0.3);
-    animation: waterWave 2s infinite alternate;
-  }
-  
-  @keyframes waterWave {
-    from { border-color: rgba(0, 0, 150, 0.3); }
-    to { border-color: rgba(100, 200, 255, 0.7); }
-  }
-  
-  .map-tile.mineral {
-    background-color: #cc9900;
-    border: 1px solid rgba(150, 100, 0, 0.5);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .map-tile.mineral::after {
-    content: "💎";
-    position: absolute;
-    font-size: 0.7rem;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0.7;
-  }
-  
-  .map-tile.valid-move {
-    box-shadow: inset 0 0 10px rgba(255, 255, 0, 0.7);
-    cursor: pointer;
-    border: 1px dashed #ffcc00;
-  }
-  
-  .map-tile.selected-unit-tile {
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.9);
-  }
-  
-  .right-controls button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 5px;
-    font-size: 0.9rem;
-  }
-  
-  .right-controls button.active {
-    background-color: #4CAF50;
-    border-color: #2E7D32;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
-  }
-  
-  .coord-marker {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    font-size: 0.6rem;
-    color: rgba(0, 0, 0, 0.7);
-    background-color: rgba(255, 255, 255, 0.7);
-    padding: 1px 3px;
-    border-radius: 2px;
-    z-index: 10;
-  }
-  
-  .start-marker {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 5;
-  }
-  
-  .start-icon {
-    font-size: 1.2rem;
-    filter: drop-shadow(0px 0px 2px black);
-  }
-  
-  .tile-info-overlay {
-    position: fixed;
-    top: 60px;
-    right: 10px;
-    z-index: 200;
-    max-width: 300px;
-    width: 100%;
-    pointer-events: none;
-  }
-  
-  .tile-info-card {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    border-radius: 8px;
-    padding: 1rem;
-    pointer-events: auto;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  
-  .tile-info-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    width: 100%;
-  }
-  
-  .close-button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    height: 24px;
-    width: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .close-button:hover {
-    color: #ff9999;
-  }
-  
-  .terrain-info {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 1rem;
-  }
-  
-  .terrain-sample {
-    width: 100%;
-    height: 20px;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-  }
-  
-  .start-info {
-    background-color: rgba(76, 175, 80, 0.2);
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-  }
-  
-  .start-info h5 {
-    margin: 0 0 0.5rem 0;
-    color: #4CAF50;
-  }
-  
-  .start-info p {
-    margin: 0;
-    font-size: 0.9rem;
-  }
-  
-  .fog-info {
-    background-color: rgba(0, 0, 0, 0.2);
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-  }
-  
-  .fog-info p {
-    margin: 0;
-    font-size: 0.9rem;
-    color: #aaa;
-  }
-  
-  .pause-menu-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 300;
-  }
-  
-  .pause-menu {
-    background-color: #1a1a1a;
-    border: 2px solid #4CAF50;
-    border-radius: 10px;
-    padding: 2rem;
-    width: 400px;
-    color: white;
-  }
-  
-  .pause-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid #333;
-    padding-bottom: 0.5rem;
-  }
-  
-  .menu-options {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .menu-option {
-    padding: 0.8rem;
-    border: none;
-    border-radius: 4px;
-    background-color: #333;
-    color: white;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.2s;
-  }
-  
-  .menu-option:hover {
-    transform: translateY(-2px);
-  }
-  
-  .menu-option.primary {
-    background-color: #4CAF50;
-    font-weight: bold;
-  }
-  
-  .menu-option.danger {
-    background-color: #f44336;
-  }
-  
-  .game-details {
-    font-size: 0.9rem;
-    color: #aaa;
-    border-top: 1px solid #333;
-    padding-top: 1rem;
-  }
-  
-  .game-details p {
-    margin: 0.3rem 0;
-  }
-  
-  .error {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: white;
-    text-align: center;
-  }
-  
-  .error button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  .unit-marker {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 15; /* Ensure units appear above terrain */
-    transition: transform 0.2s ease; /* Smooth hover effect */
-  }
-  
-  .unit-image {
-    max-width: 90%;
-    max-height: 90%;
-    object-fit: contain;
-    filter: drop-shadow(0 0 2px rgba(0,0,0,0.7));
-  }
-  
-  .unit-marker.exhausted .unit-image {
-    opacity: 0.6;
-    filter: grayscale(70%) drop-shadow(0 0 2px rgba(0,0,0,0.7));
-  }
-  
-  @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-  }
-
-  /* Toast notification styles */
-  .toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-    pointer-events: none;
-  }
-  
-  .toast-notification {
-    padding: 12px 20px;
-    margin-bottom: 10px;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    color: white;
-    display: flex;
-    align-items: center;
-    animation: slide-in 0.3s ease-out, fade-out 0.5s ease-out 2.5s forwards;
-    max-width: 300px;
-  }
-  
-  .toast-message {
-    flex: 1;
-  }
-  
-  .success {
-    background-color: #4CAF50;
-  }
-  
-  .error {
-    background-color: #f44336;
-  }
-  
-  .warning {
-    background-color: #ff9800;
-  }
-  
-  @keyframes slide-in {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-  
-  @keyframes fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-</style>

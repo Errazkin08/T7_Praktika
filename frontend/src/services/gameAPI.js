@@ -33,6 +33,28 @@ async function fetchWithAuth(url, options = {}) {
   }
 }
 
+// Temporary storage for sharing data between components
+const tempStorage = new Map();
+
+// Store temporary data
+export function storeTemporaryData(key, value) {
+  tempStorage.set(key, value);
+}
+
+// Retrieve temporary data
+export function getTemporaryData(key) {
+  return tempStorage.get(key);
+}
+
+// Clear temporary data
+export function clearTemporaryData(key) {
+  if (key) {
+    tempStorage.delete(key);
+  } else {
+    tempStorage.clear();
+  }
+}
+
 export const gameAPI = {
   /**
    * Get all available scenarios
@@ -571,5 +593,9 @@ export const gameAPI = {
       console.error("Error getting AI action:", error);
       throw error;
     }
-  }
+  },
+
+  storeTemporaryData,
+  getTemporaryData,
+  clearTemporaryData
 };

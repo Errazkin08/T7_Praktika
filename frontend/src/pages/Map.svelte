@@ -27,7 +27,7 @@
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let zoomLevel = 1.0;
+  let zoomLevel = 1.8; // Increased from 1.0 to make map appear larger initially
 
   // Información de selección
   let selectedTile = null;

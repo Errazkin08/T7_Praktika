@@ -70,6 +70,7 @@ export const gameAPI = {
    * Save a game state
    */
   async saveGame(gameData) {
+    console.log("Saving game data:", gameData);
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/games`, {
         method: 'POST',
@@ -486,9 +487,10 @@ export const gameAPI = {
    */
   async saveCurrentGameSession() {
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/current-game/save`, { // Endpoint from app.py
+      const response = await fetchWithAuth(`${API_BASE_URL}/current-game/save`, { // Endpoint
         method: 'POST',
       });
+      console.log("Response from saveCurrentGameSession:", response);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `Failed to save current game session: ${response.status}` }));
         throw new Error(errorData.error || `Failed to save current game session: ${response.status}`);

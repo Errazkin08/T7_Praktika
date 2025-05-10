@@ -513,8 +513,22 @@
 
     gameData.current_player = "ia";
     currentPlayer.set(gameData.current_player);
-    showToastNotification("IA's Turn (Not Implemented - Placeholder)", "info");
+    showToastNotification("IA's Turn - Processing...", "info");
     
+    // Call the AI endpoint with current game state
+    try {
+      console.log("Requesting AI action...");
+      const aiResponse = await gameAPI.getAIAction(gameData);
+      console.log("AI Response:", aiResponse);
+      
+      // Display a toast notification that AI turn is complete
+      showToastNotification("IA has completed its turn", "success");
+    } catch (error) {
+      console.error("Error getting AI action:", error);
+      showToastNotification("Error processing AI turn", "error");
+    }
+    
+    // Continue with the normal turn sequence after AI's turn
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     gameData.current_player = "player";

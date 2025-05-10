@@ -11,7 +11,7 @@ class GroqAPIClient:
     
     # Lista de modelos disponibles en Groq (agrega o quita según necesidad)
     MODELS = [
-        "llama3-70b-8192",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
         "llama3-8b-8192",
         "meta-llama/llama-4-maverick-17b-128e-instruct",
         "deepseek-r1-distill-llama-70b",
@@ -140,7 +140,7 @@ class GroqAPIClient:
             print(f"Error en la llamada #{str(e)}") 
             return ""
 
-def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
+def iaDeitu(prompt: str, game_state: dict = None) -> str:
     """
     Función para interactuar con la IA de juego.
     
@@ -158,17 +158,15 @@ def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
         
         # Siempre incluimos las instrucciones del sistema en cada llamada
         system_instructions = f"""
-        Eres una IA que controla un jugador en un juego de estrategia por turnos. 
+        Eres una IA que controla un jugador en un juego de estrategia por turnos tipo Civilization. 
         Tu objetivo es tomar decisiones estratégicas según el estado del juego que recibirás.
-        Debes responder EXCLUSIVAMENTE en formato JSON según el esquema proporcionado.
-        
+        Debes responder EXCLUSIVAMENTE en formato JSON según el esquema proporcionado, aparte del JSON no añadas nada más.
+        No debes incluir comentarios, explicaciones o cualquier otro texto fuera del JSON.
         Estas son las reglas del juego:
-        {rules if rules else 'Reglas no especificadas.'}
-        
-        No añadas explicaciones adicionales, solo devuelve el JSON válido con tus acciones y razonamiento.
+        -Cada unidad puede movrse dos veces por turno.
+        -Cada unidad puede atacar una vez por turno.
+        -Cada unidad puede construir una vez por turno.
         """
-        
-        # Construimos el prompt completo con las instrucciones del sistema y el estado del juego
         game_prompt = f"""
         {system_instructions}
         
@@ -181,6 +179,10 @@ def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
         - 0: Tierra (terreno normal)
         - 1: Agua (no transitable)
         - 2: Terreno con minerales (recursos)
+        - 3: Terreno con hierro (recursos)
+        - 4: Terreno con madera (bosque)
+        - 5: Terreno con piedra (recursos)
+        - 6: Terreno con oro (recursos)
         
         Estado actual del juego:
         {json.dumps(game_state) if game_state else 'No hay estado de juego disponible.'}
@@ -195,7 +197,11 @@ def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
           "actions": [
             {{
               "action_id": [número secuencial de acción],
-              "type": "[tipo de acción]",
+              "type": "[tipo de acción/ movimiento/ataque/construcción]",
+                "unit_id": "[ID de la unidad que realiza la acción]",
+                "position":[
+                  [coordenada_x, coordenada_y]
+                ],
               // otros campos según el tipo de acción
               "state_before": {{ /* estado resumido antes de la acción */ }},
               "state_after": {{ /* estado resumido después de la acción */ }}
@@ -204,6 +210,9 @@ def iaDeitu(prompt: str, game_state: dict = None, rules: str = None) -> str:
           ],
           "reasoning": "[Explicación breve de tu estrategia en este turno]"
         }}
+
+        Recuerda que el JSON debe ser válido y no debe contener comillas al principio o al final.
+        Si no puedes realizar ninguna acción, responde con un JSON vacío.
         """
         
         # Ejecutar la llamada a la API y devolver directamente el resultado

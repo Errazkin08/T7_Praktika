@@ -765,76 +765,113 @@
         movementInProgress = false;
         return;
       }
+            // Find the unit by ID first, and by position as fallback to make sure
+      // we're modifying the correct unit
+      let unitIndex = -1;
       
-      const unitIndex = units.findIndex(u => u === unit);
+      if (unit.id) {
+        // Find by ID (most reliable)
+        unitIndex = units.findIndex(u => u.id === unit.id);
+      }
       
+      // If unit was not found by ID, find it by original position
+      if (unitIndex === -1 && Array.isArray(unit.position)) {
+        const [unitX, unitY] = unit.position;
+        unitIndex = units.findIndex(u => 
+          u === unit || 
+          (u.position && 
+           Array.isArray(u.position) && 
+           u.position[0] === unitX && 
+           u.position[1] === unitY && 
+           u.owner === unit.owner &&
+           u.type_id === unit.type_id)
+        );
+      }
+      
+      // Make absolutely sure we have the right unit before moving it
       if (unitIndex !== -1) {
-        const originalPosition = [...units[unitIndex].position];
+        const unitToMove = units[unitIndex];
+        const originalPosition = [...unitToMove.position];
+        
+        console.log(`Moving unit ${unitToMove.type_id} (${unitToMove.id}) from [${originalPosition}] to [${targetX},${targetY}]`);
         
         // Calculate the movement cost
         const movementCost = Math.abs(targetX - originalPosition[0]) + Math.abs(targetY - originalPosition[1]);
         
-        if (units[unitIndex].remainingMovement === undefined) {
-          units[unitIndex].remainingMovement = units[unitIndex].movement || 2;
+        if (unitToMove.remainingMovement === undefined) {
+          unitToMove.remainingMovement = unitToMove.movement || 2;
         }
         
-        if (units[unitIndex].remainingMovement < movementCost) {
+        if (unitToMove.remainingMovement < movementCost) {
           showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
           movementInProgress = false;
           return;
         }
         
+        // Create a copy of the unit object to avoid reference issues
+        const updatedUnit = { ...unitToMove };
+        
         // Update unit position and movement points
-        units[unitIndex].position = [targetX, targetY];
-        units[unitIndex].remainingMovement -= movementCost;
+        updatedUnit.position = [targetX, targetY];
+        updatedUnit.remainingMovement -= movementCost;
         
         // Update unit status based on remaining movement
-        if (units[unitIndex].remainingMovement <= 0) {
-          units[unitIndex].status = 'exhausted';
+        if (updatedUnit.remainingMovement <= 0) {
+          updatedUnit.status = 'exhausted';
         } else {
-          units[unitIndex].status = 'moved';
+          updatedUnit.status = 'moved';
         }
         
-        // Ensure reactivity
+        // Update the unit in the array with our updated copy
+        units[unitIndex] = updatedUnit;
+        
+        // Ensure reactivity by creating a new array
         units = [...units];
         
         // Update unit info panel if it's showing this unit
-        if (selectedUnitInfo && selectedUnitInfo === units[unitIndex]) {
-          selectedUnitInfo = units[unitIndex];
+        if (selectedUnitInfo && (selectedUnitInfo.id === updatedUnit.id || selectedUnitInfo === unit)) {
+          selectedUnitInfo = updatedUnit;
         }
         
         // Update game data 
         if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
           const gameDataUnitIndex = gameData.player.units.findIndex(u => 
-            u.id === unit.id || (
-              u.position && 
-              Array.isArray(u.position) && 
-              u.position[0] === originalPosition[0] && 
-              u.position[1] === originalPosition[1]
-            )
+            (u.id && u.id === updatedUnit.id) || 
+            (u.position && 
+             Array.isArray(u.position) && 
+             u.position[0] === originalPosition[0] && 
+             u.position[1] === originalPosition[1] &&
+             u.type_id === updatedUnit.type_id)
           );
           
           if (gameDataUnitIndex !== -1) {
             gameData.player.units[gameDataUnitIndex].position = [targetX, targetY];
-            gameData.player.units[gameDataUnitIndex].status = units[unitIndex].status;
-            gameData.player.units[gameDataUnitIndex].remainingMovement = units[unitIndex].remainingMovement;
+            gameData.player.units[gameDataUnitIndex].status = updatedUnit.status;
+            gameData.player.units[gameDataUnitIndex].remainingMovement = updatedUnit.remainingMovement;
           }
         }
         
         // Update fog of war around new position
         updateFogOfWarAroundPosition(targetX, targetY, 2);
         
+        // Update selected unit reference to the updated unit
+        selectedUnit = updatedUnit;
+        
         // If unit has remaining movement, show updated valid moves
-        if (units[unitIndex].remainingMovement > 0) {
-          selectUnit(units[unitIndex]);
+        if (updatedUnit.remainingMovement > 0) {
+          selectUnit(updatedUnit);
         } else {
           // Clear selection if no more movement
           selectedUnit = null;
           validMoveTargets = [];
         }
+      } else {
+        console.error("Could not find unit to move in the units array");
+        showToastNotification("Error al mover la unidad: unidad no encontrada", "error");
       }
     } catch (error) {
       console.error("Error moving unit:", error);
+      showToastNotification("Error al mover la unidad", "error");
     } finally {
       movementInProgress = false;
     }

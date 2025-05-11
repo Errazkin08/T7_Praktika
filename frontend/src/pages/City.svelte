@@ -9,18 +9,145 @@
   let isLoading = true;
   let error = null;
   let gameData = null;
+  let troopTypes = [];
+  let loadingTroopTypes = false;
+  let activeTab = 'summary';
+  let selectedTroopType = null;
 
-  // Add state variable to track the active tab
-  let activeTab = 'summary'; // Options: 'summary', 'production', 'buildings', 'citizens'
-  
-  // Function to change the active tab
   function setActiveTab(tab) {
     activeTab = tab;
   }
-  
+
+  async function fetchTroopTypes() {
+    loadingTroopTypes = true;
+    try {
+      const types = await gameAPI.getTroopTypes();
+      troopTypes = types;
+      console.log("Troop types loaded:", troopTypes);
+    } catch (err) {
+      console.error("Error loading troop types:", err);
+    } finally {
+      loadingTroopTypes = false;
+    }
+  }
+
+  function toggleTroopSelection(troopType, index) {
+    const troopId = troopType.id || `troop-${index}`;
+    
+    if (selectedTroopType && selectedTroopType._uniqueId === troopId) {
+      selectedTroopType = null;
+    } else {
+      selectedTroopType = {
+        ...troopType,
+        _uniqueId: troopId
+      };
+      console.log("Selected troop:", selectedTroopType);
+    }
+  }
+
+  async function startTrainingTroop(troopType) {
+    try {
+      if (!city) {
+        showToastNotification("Error: No hay ciudad seleccionada", "error");
+        return;
+      }
+      
+      // Check if there's already production in progress
+      if (city.production && city.production.current_item) {
+        showToastNotification("Ya hay una unidad en producción", "error");
+        return;
+      }
+      
+      // Get the number of turns required for this troop type
+      const turnsToComplete = troopType.turns_to_build || troopType.turns || 3;
+      
+      // Get the proper type/id for production
+      // Fix: Use type_id instead of type
+      const troopTypeId = troopType.id || troopType.type_id;
+      
+      if (!troopTypeId) {
+        showToastNotification("Error: No se puede identificar el tipo de tropa", "error");
+        return;
+      }
+      
+      console.log("Setting troop for production:", troopTypeId);
+      
+      // Create the production object with the proper current_item
+      city.production = {
+        current_item: troopTypeId,
+        turns_remaining: turnsToComplete
+      };
+      
+      console.log("Setting production:", city.production);
+      
+      // Update the game data with the new production
+      if (gameData && gameData.player && gameData.player.cities) {
+        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
+        if (cityIndex !== -1) {
+          gameData.player.cities[cityIndex].production = city.production;
+          
+          // Save changes to game session
+          await gameAPI.updateGameSession(gameData);
+          
+          // Clear selected troop to hide the expanded panel
+          selectedTroopType = null;
+          
+          // Show feedback messages - now this will create a visual toast
+          showToastNotification(`¡Iniciada producción de ${troopType.name}!`, "success");
+          
+          // Switch to the summary tab to show the production info
+          setActiveTab('summary');
+        }
+      }
+    } catch (err) {
+      console.error("Error starting troop production:", err);
+      showToastNotification("Error al iniciar la producción", "error");
+    }
+  }
+
+  function showToastNotification(message, type = "info") {
+    console.log(`[${type}] ${message}`);
+    
+    // Create a toast element
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${type}`;
+    toast.innerHTML = `<span class="toast-message">${message}</span>`;
+    
+    // Create container if it doesn't exist
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    
+    // Add toast to container
+    container.appendChild(toast);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  function returnToMap() {
+    navigate('/map');
+  }
+
+  function getDefaultTroopIcon(type) {
+    switch (type && type.toLowerCase()) {
+      case 'warrior': return { type: 'image', url: './ia_assets/warrior.png' };
+      case 'settler': return { type: 'image', url: './ia_assets/settler.png' };
+      case 'archer': return { type: 'emoji', value: '🏹' };
+      case 'cavalry': return { type: 'emoji', value: '🐎' };
+      case 'builder': return { type: 'emoji', value: '🔨' };
+      default: return { type: 'emoji', value: '👤' };
+    }
+  }
+
   onMount(async () => {
     try {
-      // Add full-screen classes similar to Map component
       document.body.classList.add('city-active');
       document.documentElement.classList.add('city-active');
 
@@ -29,19 +156,16 @@
         return;
       }
       
-      // Get the current game session data
       gameData = await gameAPI.getCurrentGame();
       if (!gameData) {
         throw new Error("No hay datos de juego disponibles.");
       }
       
-      // Get the selected city ID
       const selectedCityId = await gameAPI.getTemporaryData('selectedCityId');
       if (!selectedCityId) {
         throw new Error("No se ha seleccionado ninguna ciudad.");
       }
       
-      // Find the city in the game data
       if (gameData.player && gameData.player.cities) {
         city = gameData.player.cities.find(c => c.id === selectedCityId);
       }
@@ -50,6 +174,8 @@
         throw new Error("No se encontró la ciudad seleccionada.");
       }
       
+      await fetchTroopTypes();
+      
       isLoading = false;
     } catch (err) {
       console.error("Error loading city:", err);
@@ -57,16 +183,11 @@
       isLoading = false;
     }
   });
-  
+
   onDestroy(() => {
-    // Clean up classes when component is destroyed
     document.body.classList.remove('city-active');
     document.documentElement.classList.remove('city-active');
   });
-  
-  function returnToMap() {
-    navigate('/map');
-  }
 </script>
 
 <svelte:head>
@@ -132,7 +253,6 @@
         </div>
         
         <div class="city-content">
-          <!-- Summary Tab -->
           <div class="tab-content" class:active={activeTab === 'summary'}>
             <h3>Resumen de la Ciudad</h3>
             <p>Panel de gestión de la ciudad. Aquí se mostrarán más opciones en futuras implementaciones.</p>
@@ -161,13 +281,27 @@
             {/if}
             
             {#if city.production && city.production.current_item}
-              <div class="info-section">
+              {@const productionType = troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)}
+              <div class="info-section production-status-section">
                 <h4>Producción Actual</h4>
                 <div class="production-item">
-                  <span class="production-name">{city.production.current_item}</span>
-                  <div class="production-progress">
-                    <div class="progress-bar" style="width: 30%;"></div>
-                    <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                  <div class="production-icon">
+                    {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
+                      <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                    {:else}
+                      <span class="production-emoji">
+                        {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                      </span>
+                    {/if}
+                  </div>
+                  <div class="production-details">
+                    <span class="production-name">
+                      {productionType ? productionType.name : city.production.current_item}
+                    </span>
+                    <div class="production-progress">
+                      <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
+                      <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -180,7 +314,6 @@
             {/if}
           </div>
           
-          <!-- Production Tab -->
           <div class="tab-content" class:active={activeTab === 'production'}>
             <h3>Producción</h3>
             <p>En este panel podrás gestionar qué construye tu ciudad.</p>
@@ -188,16 +321,30 @@
             <div class="info-section">
               <h4>Producción Actual</h4>
               {#if city.production && city.production.current_item}
+                {@const productionType = troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)}
                 <div class="production-item">
-                  <span class="production-name">{city.production.current_item}</span>
-                  <div class="production-progress">
-                    <div class="progress-bar" style="width: 30%;"></div>
-                    <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                  <div class="production-icon">
+                    {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
+                      <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                    {:else}
+                      <span class="production-emoji">
+                        {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                      </span>
+                    {/if}
                   </div>
-                  <button class="cancel-production-button">Cancelar Producción</button>
+                  <div class="production-details">
+                    <span class="production-name">
+                      {productionType ? productionType.name : city.production.current_item}
+                    </span>
+                    <div class="production-progress">
+                      <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
+                      <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                    </div>
+                    <button class="cancel-production-button">Cancelar Producción</button>
+                  </div>
                 </div>
               {:else}
-                <p>No hay producción en curso.</p>
+                <p>No hay producción en curso. Selecciona una unidad para comenzar la producción.</p>
               {/if}
             </div>
             
@@ -206,8 +353,101 @@
               <div class="production-options">
                 <div class="production-option">
                   <h5>Unidades</h5>
-                  <button class="production-button">Colono (10 turnos)</button>
-                  <button class="production-button">Guerrero (5 turnos)</button>
+                  {#if loadingTroopTypes}
+                    <p>Cargando tipos de tropas...</p>
+                  {:else if troopTypes.length === 0}
+                    <p>No hay tipos de tropas disponibles.</p>
+                  {:else}
+                    {#each troopTypes as troopType, index}
+                      {@const uniqueKey = troopType.id || `troop-type-${index}`}
+                      {@const iconData = getDefaultTroopIcon(troopType.name)}
+                      <div class="troop-container">
+                        <button 
+                          class="production-button troop-button" 
+                          class:expanded={selectedTroopType && (selectedTroopType._uniqueId === (troopType.id || `troop-${index}`))}
+                          on:click={() => toggleTroopSelection(troopType, index)}
+                        >
+                          <div class="troop-info">
+                            {#if iconData.type === 'image'}
+                              <div class="troop-image-container">
+                                <img src={iconData.url} alt={troopType.name} class="troop-image" />
+                              </div>
+                            {:else}
+                              <span class="troop-icon">{iconData.value}</span>
+                            {/if}
+                            
+                            <div class="troop-details">
+                              <span class="troop-name">{troopType.name}</span>
+                              <span class="troop-cost">{troopType.cost ? `${troopType.cost.food || 0}🌾 ${troopType.cost.gold || 0}💰` : 'Costo no disponible'}</span>
+                            </div>
+                            <span class="production-turns">
+                              <span class="turns-icon">🕒</span>
+                              <span class="turns-count">{troopType.turns_to_build || troopType.turns || '?'}</span>
+                              <span class="turns-label">turnos</span>
+                            </span>
+                          </div>
+                        </button>
+                        
+                        {#if selectedTroopType && (selectedTroopType._uniqueId === (troopType.id || `troop-${index}`))}
+                          <div class="troop-details-expanded">
+                            <div class="troop-attributes">
+                              {#if troopType.description}
+                                <p class="troop-description">{troopType.description}</p>
+                              {/if}
+                              
+                              <div class="attributes-grid">
+                                {#if troopType.attack !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">⚔️</span>
+                                    <span class="attribute-label">Ataque:</span>
+                                    <span class="attribute-value">{troopType.attack}</span>
+                                  </div>
+                                {/if}
+                                
+                                {#if troopType.defense !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">🛡️</span>
+                                    <span class="attribute-label">Defensa:</span>
+                                    <span class="attribute-value">{troopType.defense}</span>
+                                  </div>
+                                {/if}
+                                
+                                {#if troopType.health !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">❤️</span>
+                                    <span class="attribute-label">Salud:</span>
+                                    <span class="attribute-value">{troopType.health}</span>
+                                  </div>
+                                {/if}
+                                
+                                {#if troopType.movement !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">👣</span>
+                                    <span class="attribute-label">Movimiento:</span>
+                                    <span class="attribute-value">{troopType.movement}</span>
+                                  </div>
+                                {/if}
+                                
+                                {#if troopType.range !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">🎯</span>
+                                    <span class="attribute-label">Alcance:</span>
+                                    <span class="attribute-value">{troopType.range}</span>
+                                  </div>
+                                {/if}
+                              </div>
+                              
+                              <div class="troop-action">
+                                <button class="train-button" on:click={() => startTrainingTroop(troopType)}>
+                                  Entrenar {troopType.name}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        {/if}
+                      </div>
+                    {/each}
+                  {/if}
                 </div>
                 <div class="production-option">
                   <h5>Edificios</h5>
@@ -218,7 +458,6 @@
             </div>
           </div>
           
-          <!-- Buildings Tab -->
           <div class="tab-content" class:active={activeTab === 'buildings'}>
             <h3>Edificios</h3>
             <p>Gestiona los edificios de tu ciudad.</p>
@@ -241,7 +480,6 @@
             {/if}
           </div>
           
-          <!-- Citizens Tab -->
           <div class="tab-content" class:active={activeTab === 'citizens'}>
             <h3>Ciudadanos</h3>
             <p>Administra a los ciudadanos de tu ciudad.</p>
@@ -309,7 +547,6 @@
 </div>
 
 <style>
-  /* Full-screen styles similar to Map component */
   :global(body.city-active),
   :global(html.city-active) {
     overflow: hidden !important;
@@ -329,7 +566,7 @@
     display: flex;
     flex-direction: column;
     color: white;
-    z-index: 1000; /* Ensure it's above other app elements */
+    z-index: 1000;
   }
   
   .city-background {
@@ -529,7 +766,6 @@
     background-color: #45a049;
   }
   
-  /* New styles for the new tab content */
   .production-options {
     display: flex;
     gap: 15px;
@@ -567,6 +803,118 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+  }
+  
+  .troop-container {
+    margin-bottom: 8px;
+  }
+  
+  .troop-button {
+    transition: background-color 0.2s, border-radius 0.2s;
+  }
+  
+  .troop-button.expanded {
+    background-color: rgba(76, 175, 80, 0.2);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+  }
+  
+  .troop-details-expanded {
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: none;
+    padding: 12px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    animation: slide-down 0.2s ease-out;
+  }
+  
+  @keyframes slide-down {
+    from {
+      max-height: 0;
+      opacity: 0;
+    }
+    to {
+      max-height: 500px;
+      opacity: 1;
+    }
+  }
+  
+  .troop-description {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-style: italic;
+    opacity: 0.9;
+    font-size: 0.9rem;
+  }
+  
+  .attributes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  
+  .attribute {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 6px 8px;
+    border-radius: 4px;
+  }
+  
+  .attribute-icon {
+    font-size: 1.1rem;
+  }
+  
+  .attribute-label {
+    font-size: 0.8rem;
+    opacity: 0.8;
+  }
+  
+  .attribute-value {
+    font-weight: bold;
+    margin-left: auto;
+  }
+  
+  .troop-action {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .train-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  
+  .train-button:hover {
+    background-color: #45a049;
+  }
+  
+  .troop-image-container {
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  
+  .troop-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
   
   .buildings-grid {
@@ -618,7 +966,6 @@
     text-align: right;
   }
   
-  /* Loading and error styles */
   .loading-container, .error-container {
     position: absolute;
     top: 0;
@@ -666,7 +1013,6 @@
     margin: 10px;
   }
   
-  /* Resources bar (copied from Map component for consistency) */
   .resources-bar {
     position: fixed;
     bottom: 0;
@@ -726,5 +1072,108 @@
   
   .resource.stone {
     border-left: 3px solid #777777;
+  }
+
+  /* Toast notification styles */
+  .toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 350px;
+  }
+
+  .toast-notification {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: white;
+    opacity: 0.95;
+    animation: toast-in 0.3s ease-out;
+    transition: opacity 0.3s;
+  }
+
+  .toast-notification.success {
+    background-color: #28a745;
+    border-left: 5px solid #1e7e34;
+  }
+
+  .toast-notification.error {
+    background-color: #dc3545;
+    border-left: 5px solid #bd2130;
+  }
+
+  .toast-notification.warning {
+    background-color: #ffc107;
+    border-left: 5px solid #d39e00;
+    color: #212529;
+  }
+
+  .toast-notification.info {
+    background-color: #17a2b8;
+    border-left: 5px solid #138496;
+  }
+
+  .toast-message {
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+  }
+
+  @keyframes toast-in {
+    from {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 0.95;
+    }
+  }
+
+  .production-status-section {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-left: 4px solid #4CAF50;
+  }
+
+  .production-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .production-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  .production-emoji {
+    font-size: 32px;
+  }
+
+  .production-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .production-details {
+    flex: 1;
+  }
+
+  .production-name {
+    font-size: 18px;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 8px;
   }
 </style>

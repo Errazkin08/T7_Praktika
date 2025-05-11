@@ -846,6 +846,7 @@ def get_troop_types():
             "health": 100,
             "attack": 10,
             "defense": 10,
+            "turns": 3,
             "position": [0, 0],
             "movement": 2,
             "cost": {
@@ -862,6 +863,7 @@ def get_troop_types():
             "health": 80,
             "attack": 15,
             "defense": 5,
+            "turns": 5,
             "position": [0, 0],
             "movement": 2,
             "range": 2,
@@ -880,6 +882,7 @@ def get_troop_types():
             "health": 120,
             "attack": 15,
             "defense": 8,
+            "turns": 8,
             "position": [0, 0],
             "movement": 4,
             "cost": {
@@ -896,6 +899,7 @@ def get_troop_types():
             "health": 50,
             "attack": 0,
             "defense": 1,
+            "turns": 6,
             "position": [0, 0],
             "movement": 2,
             "cost": {
@@ -912,6 +916,7 @@ def get_troop_types():
             "health": 40,
             "attack": 0,
             "defense": 1,
+            "turns": 7,
             "position": [0, 0],
             "movement": 2,
             "cost": {
@@ -919,7 +924,7 @@ def get_troop_types():
                 "gold": 20
             },
             "abilities": ["build_improvement"],
-            "description": "Constructs improvements on the map"
+            "description": "Constructs improvements on the city"
         }
     ]
     return troop_types

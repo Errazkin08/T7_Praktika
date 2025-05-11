@@ -83,6 +83,11 @@
   let activeMovementPath = null;
   let debugAIMovement = true; // Enable debugging
 
+  // Add this new state variables for unit placement
+  let newlyProducedUnit = null;
+  let awaitingUnitPlacement = false;
+  let producingCity = null;
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -576,6 +581,9 @@
 
     console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
 
+    // Handle city production before switching to AI turn
+    await processCityProduction();
+
     gameData.current_player = "ia";
     currentPlayer.set(gameData.current_player);
     showToastNotification("IA's Turn - Processing...", "info");
@@ -640,6 +648,73 @@
     } catch (error) {
       console.error("Failed to update game session after ending turn:", error);
       showToastNotification("Error saving turn data to server.", "error");
+    }
+  }
+
+  async function processCityProduction() {
+    if (!gameData || !gameData.player || !gameData.player.cities) {
+      return;
+    }
+    
+    // Process each city's production
+    for (const city of gameData.player.cities) {
+      if (city.production && city.production.current_item && city.production.turns_remaining > 0) {
+        // Decrease turns remaining
+        city.production.turns_remaining--;
+        
+        // If production is complete, create the unit
+        if (city.production.turns_remaining <= 0) {
+          try {
+            // Get the troop type details
+            const troopTypeId = city.production.current_item;
+            const troopDetails = await gameAPI.getTroopType(troopTypeId);
+            
+            // Get placement coordinates for the unit
+            const cityPosition = Array.isArray(city.position) ? 
+              [...city.position] : 
+              [city.position.x, city.position.y];
+            
+            // Create a new unit object
+            const newUnit = {
+              id: `${troopTypeId}_${Date.now()}`,
+              type_id: troopTypeId,
+              position: [...cityPosition], // Initially at the city's position
+              status: 'ready',
+              movement: troopDetails.movement || 2,
+              remainingMovement: troopDetails.movement || 2,
+              health: troopDetails.health || 100,
+              attack: troopDetails.attack,
+              defense: troopDetails.defense,
+              owner: 'player',
+              name: troopDetails.name || troopTypeId
+            };
+            
+            // Store the newly created unit and city for placement
+            newlyProducedUnit = newUnit;
+            producingCity = city;
+            awaitingUnitPlacement = true;
+            
+            // Show a notification to the player
+            showToastNotification(`${city.name} ha completado la producción de ${troopDetails.name || troopTypeId}. Elige dónde colocar la unidad.`, "success", 5000);
+            
+            // Clear the city's production
+            city.production.current_item = null;
+            city.production.turns_remaining = 0;
+            
+            // Center the map on the city position
+            centerMapOnPosition(cityPosition[0], cityPosition[1]);
+            
+            // Exit the loop after handling one completed production
+            // This way we handle one unit placement at a time
+            break;
+          } catch (error) {
+            console.error(`Error completing production in city ${city.name}:`, error);
+            // In case of error, still clear the production
+            city.production.current_item = null;
+            city.production.turns_remaining = 0;
+          }
+        }
+      }
     }
   }
 
@@ -882,6 +957,155 @@
     } finally {
       movementInProgress = false;
     }
+  }
+
+  function handleTileClick(x, y) {
+    // First check if we're in unit placement mode
+    if (awaitingUnitPlacement && newlyProducedUnit) {
+      placeNewUnit(x, y);
+      return;
+    }
+    
+    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
+      moveUnitToPosition(selectedUnit, x, y);
+      return;
+    }
+    
+    // Check if there's a city at the clicked position
+    const cityAtPosition = cities.find(city => 
+      (city.position.x === x && city.position.y === y) || 
+      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+    );
+    
+    if (cityAtPosition) {
+      selectedCityInfo = cityAtPosition;
+      selectedTile = null;
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      validMoveTargets = [];
+      return;
+    }
+    
+    const unitAtPosition = units.find(unit => 
+      unit && 
+      unit.position && 
+      Array.isArray(unit.position) && 
+      unit.position[0] === x && 
+      unit.position[1] === y
+    );
+    
+    if (unitAtPosition) {
+      selectedCityInfo = null; // Clear selected city
+      selectedUnitInfo = unitAtPosition;
+      selectedTile = null;
+      
+      if (unitAtPosition.owner === 'ia') {
+        showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+        return;
+      }
+      
+      if (unitAtPosition.status === 'exhausted') {
+        showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+      } else {
+        selectUnit(unitAtPosition);
+      }
+      return;
+    } else {
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      selectedCityInfo = null; // Clear selected city
+      validMoveTargets = [];
+    }
+    
+    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
+      selectedTile = {
+        x, y,
+        terrainName: 'Desconocido (no explorado)',
+        isExplored: false
+      };
+    } else {
+      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
+
+      selectedTile = {
+        x, y,
+        terrain: terrainType,
+        terrainName: getTerrainName(terrainType),
+        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
+      };
+    }
+  }
+
+  async function placeNewUnit(x, y) {
+    try {
+      // Check if the target position is valid
+      if (!isValidPlacementPosition(x, y)) {
+        showToastNotification("No puedes colocar la unidad en esa posición. Elige otra casilla cercana a la ciudad.", "error");
+        return;
+      }
+      
+      // Update the unit position
+      newlyProducedUnit.position = [x, y];
+      
+      // Add the unit to the player's units
+      units = [...units, newlyProducedUnit];
+      
+      if (!gameData.player.units) {
+        gameData.player.units = [];
+      }
+      
+      gameData.player.units.push(newlyProducedUnit);
+      
+      // Update the game state
+      await gameAPI.updateGameSession(gameData);
+      
+      // Show a success notification
+      showToastNotification(`¡${newlyProducedUnit.name} colocado con éxito!`, "success");
+      
+      // Clear the placement mode
+      awaitingUnitPlacement = false;
+      newlyProducedUnit = null;
+      producingCity = null;
+    } catch (error) {
+      console.error("Error placing new unit:", error);
+      showToastNotification("Error al colocar la unidad", "error");
+    }
+  }
+
+  function isValidPlacementPosition(x, y) {
+    if (!producingCity) return false;
+    
+    // Get city position
+    const cityPos = Array.isArray(producingCity.position) ? 
+      producingCity.position : 
+      [producingCity.position.x, producingCity.position.y];
+    
+    // Calculate distance from city (Manhattan distance)
+    const distance = Math.abs(x - cityPos[0]) + Math.abs(y - cityPos[1]);
+    const maxDistance = 1; // Only allow placement in adjacent tiles including the city tile
+    
+    // Check if position is too far from city
+    if (distance > maxDistance) {
+      return false;
+    }
+    
+    // Check if position is water
+    if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) {
+      return false;
+    }
+    
+    // Check if position is occupied by another unit
+    const isOccupied = units.some(unit => 
+      unit.position && 
+      Array.isArray(unit.position) && 
+      unit.position[0] === x && 
+      unit.position[1] === y
+    );
+    
+    return !isOccupied;
   }
 
   onMount(async () => {
@@ -1182,80 +1406,6 @@
     if (gameData && city) {
       gameAPI.storeTemporaryData('selectedCityId', city.id);
       navigate('/city');
-    }
-  }
-
-  function handleTileClick(x, y) {
-    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
-      moveUnitToPosition(selectedUnit, x, y);
-      return;
-    }
-    
-    // Check if there's a city at the clicked position
-    const cityAtPosition = cities.find(city => 
-      (city.position.x === x && city.position.y === y) || 
-      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
-    );
-    
-    if (cityAtPosition) {
-      selectedCityInfo = cityAtPosition;
-      selectedTile = null;
-      selectedUnit = null;
-      selectedUnitInfo = null;
-      validMoveTargets = [];
-      return;
-    }
-    
-    const unitAtPosition = units.find(unit => 
-      unit && 
-      unit.position && 
-      Array.isArray(unit.position) && 
-      unit.position[0] === x && 
-      unit.position[1] === y
-    );
-    
-    if (unitAtPosition) {
-      selectedCityInfo = null; // Clear selected city
-      selectedUnitInfo = unitAtPosition;
-      selectedTile = null;
-      
-      if (unitAtPosition.owner === 'ia') {
-        showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
-        selectedUnit = null;
-        validMoveTargets = [];
-        return;
-      }
-      
-      if (unitAtPosition.status === 'exhausted') {
-        showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
-        selectedUnit = null;
-        validMoveTargets = [];
-      } else {
-        selectUnit(unitAtPosition);
-      }
-      return;
-    } else {
-      selectedUnit = null;
-      selectedUnitInfo = null;
-      selectedCityInfo = null; // Clear selected city
-      validMoveTargets = [];
-    }
-    
-    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
-      selectedTile = {
-        x, y,
-        terrainName: 'Desconocido (no explorado)',
-        isExplored: false
-      };
-    } else {
-      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
-
-      selectedTile = {
-        x, y,
-        terrain: terrainType,
-        terrainName: getTerrainName(terrainType),
-        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
-      };
     }
   }
 
@@ -1756,6 +1906,24 @@
         height: {Math.abs(activeMovementPath.toY - activeMovementPath.fromY) * tileSize}px;
       "
     ></div>
+  {/if}
+
+  <!-- Add a UI indicator for unit placement mode -->
+  {#if awaitingUnitPlacement && newlyProducedUnit}
+    <div class="unit-placement-overlay">
+      <div class="unit-placement-card">
+        <h3>Colocar Unidad</h3>
+        <p>Selecciona una casilla para colocar tu nueva unidad: {newlyProducedUnit.name}</p>
+        <div class="unit-preview">
+          {#if getUnitImageUrl(newlyProducedUnit.type_id)}
+            <img src={getUnitImageUrl(newlyProducedUnit.type_id)} alt={newlyProducedUnit.name} class="unit-placement-image" />
+          {:else}
+            <span class="unit-placement-icon">{getUnitIcon(newlyProducedUnit.type_id)}</span>
+          {/if}
+        </div>
+        <p class="placement-instruction">Haz clic en una casilla adyacente a la ciudad para colocar la unidad.</p>
+      </div>
+    </div>
   {/if}
 </div>
 

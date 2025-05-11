@@ -55,6 +55,27 @@ export function clearTemporaryData(key) {
   }
 }
 
+// Add method to fetch troop types
+async function getTroopTypes() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/troops/types`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch troop types');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching troop types:', error);
+    throw error;
+  }
+}
+
 export const gameAPI = {
   /**
    * Get all available scenarios
@@ -594,6 +615,33 @@ export const gameAPI = {
       throw error;
     }
   },
+
+  /**
+   * Get a specific troop type by ID
+   */
+  async getTroopType(typeId) {
+    try {
+      const response = await fetch(`${this.apiUrl}/troops/types/${typeId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.getToken()}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching troop type: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error in getTroopType:', error);
+      throw error;
+    }
+  },
+
+  getTroopTypes,
 
   storeTemporaryData,
   getTemporaryData,

@@ -88,6 +88,9 @@
   let awaitingUnitPlacement = false;
   let producingCity = null;
 
+  // Add this new state variable to track city area tiles
+  let cityAreaTiles = [];
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -151,6 +154,7 @@
         name: newCityName,
         position: { x, y },
         population: 0,
+        area: 5,
         buildings: [],
         production: {
           current_item: null,
@@ -983,8 +987,14 @@
       selectedUnit = null;
       selectedUnitInfo = null;
       validMoveTargets = [];
+      
+      // Calculate and display the city area
+      calculateCityArea(cityAtPosition);
       return;
     }
+    
+    // When clicking somewhere else, clear the city area
+    cityAreaTiles = [];
     
     const unitAtPosition = units.find(unit => 
       unit && 
@@ -1037,6 +1047,48 @@
         isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
       };
     }
+  }
+
+  function calculateCityArea(city) {
+    cityAreaTiles = [];
+    
+    if (!city || !city.area) {
+      return;
+    }
+    
+    // Get city position
+    const cityPosX = Array.isArray(city.position) ? city.position[0] : city.position.x;
+    const cityPosY = Array.isArray(city.position) ? city.position[1] : city.position.y;
+    
+    // Calculate area radius (half the side length)
+    const radius = Math.floor(city.area / 2);
+    
+    // Calculate the starting positions (top-left corner of the square)
+    const startX = cityPosX - radius;
+    const startY = cityPosY - radius;
+    
+    // Generate all tiles in the city area
+    for (let y = 0; y < city.area; y++) {
+      for (let x = 0; x < city.area; x++) {
+        const tileX = startX + x;
+        const tileY = startY + y;
+        
+        // Check if the tile is within map bounds
+        if (tileX >= 0 && tileX < mapWidth && tileY >= 0 && tileY < mapHeight) {
+          // Add the tile to city area tiles
+          cityAreaTiles.push({ x: tileX, y: tileY });
+        }
+      }
+    }
+  }
+
+  function clearSelections() {
+    selectedUnit = null;
+    selectedUnitInfo = null;
+    selectedCityInfo = null;
+    selectedTile = null;
+    validMoveTargets = [];
+    cityAreaTiles = [];
   }
 
   async function placeNewUnit(x, y) {
@@ -1432,6 +1484,8 @@
     switch (unitType) {
       case "warrior": return './ia_assets/warrior.png';
       case "settler": return './ia_assets/settler.png';
+      case "cavalry": return './ia_assets/cavalry.png';
+      case "archer": return './ia_assets/archer.png'; // Add this case for archer image
       default: return null;
     }
   }
@@ -1516,6 +1570,10 @@
               class:mineral={isVisible && terrainType === TERRAIN_TYPES.MINERAL}
               class:valid-move={isVisible && isValidMoveTarget}
               class:selected-unit-tile={isVisible && isSelectedUnit}
+              class:city-area-tile={cityAreaTiles.some(tile => tile.x === x && tile.y === y)}
+              class:city-center-tile={selectedCityInfo && 
+                ((Array.isArray(selectedCityInfo.position) && selectedCityInfo.position[0] === x && selectedCityInfo.position[1] === y) ||
+                (selectedCityInfo.position.x === x && selectedCityInfo.position.y === y))}
               style="
                 left: {x * tileSize}px;
                 top: {y * tileSize}px;
@@ -1628,6 +1686,11 @@
       <div class="unit-info-overlay">
         <div class="unit-info-card" class:enemy-unit={selectedUnitInfo.owner === 'ia'}>
           <div class="unit-info-header">
+            <h4>{selectedUnitInfo.name || selectedUnitInfo.type_id || 'Unidad'}</h4>
+            <button class="close-button" on:click={() => { selectedUnitInfo = null; }}>×</button>
+          </div>
+          
+          <div class="unit-details">
             <h4>{selectedUnitInfo.name || selectedUnitInfo.type_id || 'Unidad'}</h4>
             <button class="close-button" on:click={() => { selectedUnitInfo = null; }}>×</button>
           </div>
@@ -1937,25 +2000,4 @@
   {/if}
 </div>
 
-<style>
-  /* ...existing styles... */
-  
-  .city-image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-  
-  .resource-image {
-    max-width: 80%;
-    max-height: 80%;
-    object-fit: contain;
-  }
-  
-  .resource-bar-icon {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-  }
-</style>
 

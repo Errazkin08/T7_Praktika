@@ -108,7 +108,7 @@
     }
   }
 
-  async function startTrainingTroop(troopType) {
+  async function startProduction(item, itemType) {
     try {
       if (!city) {
         showToastNotification("Error: No hay ciudad seleccionada", "error");
@@ -117,28 +117,28 @@
       
       // Check if there's already production in progress
       if (city.production && city.production.current_item) {
-        showToastNotification("Ya hay una unidad en producción", "error");
+        showToastNotification("Ya hay una producción en curso", "error");
         return;
       }
       
-      // Get the number of turns required for this troop type
-      const turnsToComplete = troopType.turns_to_build || troopType.turns || 3;
+      // Get the number of turns required for this item
+      const turnsToComplete = item.turns_to_build || item.turns || 3;
       
       // Get the proper type/id for production
-      // Fix: Use type_id instead of type
-      const troopTypeId = troopType.id || troopType.type_id;
+      const itemId = item.id || item.type_id;
       
-      if (!troopTypeId) {
-        showToastNotification("Error: No se puede identificar el tipo de tropa", "error");
+      if (!itemId) {
+        showToastNotification(`Error: No se puede identificar el tipo de ${itemType === 'troop' ? 'tropa' : 'edificio'}`, "error");
         return;
       }
       
-      console.log("Setting troop for production:", troopTypeId);
+      console.log(`Setting ${itemType} for production:`, itemId);
       
-      // Create the production object with the proper current_item
+      // Create the production object with the proper values including itemType
       city.production = {
-        current_item: troopTypeId,
-        turns_remaining: turnsToComplete
+        current_item: itemId,
+        turns_remaining: turnsToComplete,
+        itemType: itemType // Add new itemType attribute
       };
       
       console.log("Setting production:", city.production);
@@ -152,18 +152,22 @@
           // Save changes to game session
           await gameAPI.updateGameSession(gameData);
           
-          // Clear selected troop to hide the expanded panel
-          selectedTroopType = null;
+          // Clear selected item to hide the expanded panel
+          if (itemType === 'troop') {
+            selectedTroopType = null;
+          } else if (itemType === 'building') {
+            selectedBuildingType = null;
+          }
           
-          // Show feedback messages - now this will create a visual toast
-          showToastNotification(`¡Iniciada producción de ${troopType.name}!`, "success");
+          // Show feedback messages
+          showToastNotification(`¡Iniciada producción de ${item.name}!`, "success");
           
           // Switch to the summary tab to show the production info
           setActiveTab('summary');
         }
       }
     } catch (err) {
-      console.error("Error starting troop production:", err);
+      console.error(`Error starting ${itemType} production:`, err);
       showToastNotification("Error al iniciar la producción", "error");
     }
   }
@@ -365,16 +369,25 @@
             {/if}
             
             {#if city.production && city.production.current_item}
-              {@const productionType = troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)}
+              {@const isProducingTroop = !city.production.itemType || city.production.itemType === 'troop'}
+              {@const productionType = isProducingTroop 
+                ? troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)
+                : buildingTypes.find(b => b.id === city.production.current_item || b.type_id === city.production.current_item)}
               <div class="info-section production-status-section">
                 <h4>Producción Actual</h4>
                 <div class="production-item">
                   <div class="production-icon">
-                    {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
-                      <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                    {#if isProducingTroop}
+                      {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
+                        <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                      {:else}
+                        <span class="production-emoji">
+                          {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                        </span>
+                      {/if}
                     {:else}
                       <span class="production-emoji">
-                        {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                        {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
                       </span>
                     {/if}
                   </div>
@@ -405,14 +418,23 @@
             <div class="info-section">
               <h4>Producción Actual</h4>
               {#if city.production && city.production.current_item}
-                {@const productionType = troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)}
+                {@const isProducingTroop = !city.production.itemType || city.production.itemType === 'troop'}
+                {@const productionType = isProducingTroop 
+                  ? troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)
+                  : buildingTypes.find(b => b.id === city.production.current_item || b.type_id === city.production.current_item)}
                 <div class="production-item">
                   <div class="production-icon">
-                    {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
-                      <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                    {#if isProducingTroop}
+                      {#if productionType && getDefaultTroopIcon(productionType.name).type === 'image'}
+                        <img src={getDefaultTroopIcon(productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                      {:else}
+                        <span class="production-emoji">
+                          {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                        </span>
+                      {/if}
                     {:else}
                       <span class="production-emoji">
-                        {productionType ? getDefaultTroopIcon(productionType.name).value : '🛠️'}
+                        {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
                       </span>
                     {/if}
                   </div>
@@ -522,7 +544,7 @@
                               </div>
                               
                               <div class="troop-action">
-                                <button class="train-button" on:click={() => startTrainingTroop(troopType)}>
+                                <button class="train-button" on:click={() => startProduction(troopType, 'troop')}>
                                   Entrenar {troopType.name}
                                 </button>
                               </div>
@@ -604,7 +626,7 @@
                               </div>
                               
                               <div class="building-action">
-                                <button class="construct-button">
+                                <button class="construct-button" on:click={() => startProduction(buildingType, 'building')}>
                                   Construir {buildingType.name}
                                 </button>
                               </div>

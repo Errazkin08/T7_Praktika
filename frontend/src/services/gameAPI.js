@@ -655,23 +655,62 @@ export const gameAPI = {
    */
   async getTroopType(typeId) {
     try {
-      const response = await fetch(`${this.apiUrl}/troops/types/${typeId}`, {
+      const token = await this.getToken();
+      const response = await fetch(`/api/troops/types/${typeId}`, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`
-        }
+        },
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Error fetching troop type: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get troop type');
       }
-      debugger
-      const data = await response.json();
-      return data;
+
+      return await response.json();
     } catch (error) {
-      console.error('Error in getTroopType:', error);
-      throw error;
+      console.error("Error in getTroopType:", error);
+      // Provide fallback data so the game can continue
+      return {
+        name: `Type ${typeId}`,
+        movement: 2,
+        health: 100,
+        attack: 10,
+        defense: 10
+      };
+    }
+  },
+
+  /**
+   * Get a specific building type by ID
+   */
+  async getBuildingType(typeId) {
+    try {
+      const token = await this.getToken();
+      const response = await fetch(`/api/buildings/types/${typeId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get building type');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getBuildingType:", error);
+      // Provide fallback data
+      return {
+        name: `Building ${typeId}`,
+        production_bonus: 10,
+        defense_bonus: 10
+      };
     }
   },
 

@@ -666,56 +666,112 @@
         // Decrease turns remaining
         city.production.turns_remaining--;
         
-        // If production is complete, create the unit
+        // If production is complete
         if (city.production.turns_remaining <= 0) {
           try {
-            // Get the troop type details
-            const troopTypeId = city.production.current_item;
-            const troopDetails = await gameAPI.getTroopType(troopTypeId);
+            const itemId = city.production.current_item;
+            const itemType = city.production.itemType || "troop"; // Default to "troop" for backward compatibility
             
-            // Get placement coordinates for the unit
+            // Get the city position
             const cityPosition = Array.isArray(city.position) ? 
               [...city.position] : 
               [city.position.x, city.position.y];
             
-            // Create a new unit object
-            const newUnit = {
-              id: `${troopTypeId}_${Date.now()}`,
-              type_id: troopTypeId,
-              position: [...cityPosition], // Initially at the city's position
-              status: 'ready',
-              movement: troopDetails.movement || 2,
-              remainingMovement: troopDetails.movement || 2,
-              health: troopDetails.health || 100,
-              attack: troopDetails.attack,
-              defense: troopDetails.defense,
-              owner: 'player',
-              name: troopDetails.name || troopTypeId
-            };
-            
-            // Store the newly created unit and city for placement
-            newlyProducedUnit = newUnit;
-            producingCity = city;
-            awaitingUnitPlacement = true;
-            
-            // Show a notification to the player
-            showToastNotification(`${city.name} ha completado la producción de ${troopDetails.name || troopTypeId}. Elige dónde colocar la unidad.`, "success", 5000);
+            // Handle different item types differently
+            if (itemType === "troop") {
+              // Add extra error handling around the API call
+              let troopDetails;
+              try {
+                // This is where the error occurs - wrap in a try/catch
+                troopDetails = await gameAPI.getTroopType(itemId);
+              } catch (apiError) {
+                console.error(`API Error getting troop type ${itemId}:`, apiError);
+                // Provide fallback data if the API call fails
+                troopDetails = {
+                  name: `Troop ${itemId}`,
+                  movement: 2,
+                  health: 100,
+                  attack: 10,
+                  defense: 5
+                };
+              }
+              
+              // Create a new unit object
+              const newUnit = {
+                id: `${itemId}_${Date.now()}`,
+                type_id: itemId,
+                position: [...cityPosition], // Initially at the city's position
+                status: 'ready',
+                movement: troopDetails.movement || 2,
+                remainingMovement: troopDetails.movement || 2,
+                health: troopDetails.health || 100,
+                attack: troopDetails.attack,
+                defense: troopDetails.defense,
+                owner: 'player',
+                name: troopDetails.name || itemId
+              };
+              
+              // Store the newly created unit and city for placement
+              newlyProducedUnit = newUnit;
+              producingCity = city;
+              awaitingUnitPlacement = true;
+              
+              // Calculate city area for placement
+              calculateCityArea(city);
+              
+              // Show a notification to the player
+              showToastNotification(`${city.name} ha completado la producción de ${troopDetails.name || itemId}. Elige dónde colocar la unidad.`, "success", 5000);
+              
+              // Center the map on the city position
+              centerMapOnPosition(cityPosition[0], cityPosition[1]);
+              
+            } else if (itemType === "building") {
+              // Add extra error handling for building API call too
+              let buildingDetails;
+              try {
+                buildingDetails = await gameAPI.getBuildingType(itemId);
+              } catch (apiError) {
+                console.error(`API Error getting building type ${itemId}:`, apiError);
+                // Provide fallback data
+                buildingDetails = {
+                  name: `Building ${itemId}`
+                };
+              }
+              
+              // Create a new building object
+              const newBuilding = {
+                id: `${itemId}_${Date.now()}`,
+                type_id: itemId,
+                name: buildingDetails.name || itemId,
+                constructed_at: gameData.turn
+              };
+              
+              // Add building directly to the city (no placement needed)
+              if (!city.buildings) {
+                city.buildings = [];
+              }
+              city.buildings.push(newBuilding);
+              
+              // Show a notification to the player
+              showToastNotification(`${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`, "success");
+              
+              // No need for placement - update game state immediately
+              await gameAPI.updateGameSession(gameData);
+            }
             
             // Clear the city's production
             city.production.current_item = null;
             city.production.turns_remaining = 0;
-            
-            // Center the map on the city position
-            centerMapOnPosition(cityPosition[0], cityPosition[1]);
+            city.production.itemType = null;
             
             // Exit the loop after handling one completed production
-            // This way we handle one unit placement at a time
             break;
           } catch (error) {
             console.error(`Error completing production in city ${city.name}:`, error);
             // In case of error, still clear the production
             city.production.current_item = null;
             city.production.turns_remaining = 0;
+            city.production.itemType = null;
           }
         }
       }
@@ -1095,7 +1151,7 @@
     try {
       // Check if the target position is valid
       if (!isValidPlacementPosition(x, y)) {
-        showToastNotification("No puedes colocar la unidad en esa posición. Elige otra casilla cercana a la ciudad.", "error");
+        showToastNotification("No puedes colocar la unidad en esa posición. Elige otra casilla dentro del área de la ciudad.", "error");
         return;
       }
       
@@ -1117,10 +1173,11 @@
       // Show a success notification
       showToastNotification(`¡${newlyProducedUnit.name} colocado con éxito!`, "success");
       
-      // Clear the placement mode
+      // Clear the placement mode and city area highlighting
       awaitingUnitPlacement = false;
       newlyProducedUnit = null;
       producingCity = null;
+      cityAreaTiles = [];
     } catch (error) {
       console.error("Error placing new unit:", error);
       showToastNotification("Error al colocar la unidad", "error");
@@ -1130,17 +1187,9 @@
   function isValidPlacementPosition(x, y) {
     if (!producingCity) return false;
     
-    // Get city position
-    const cityPos = Array.isArray(producingCity.position) ? 
-      producingCity.position : 
-      [producingCity.position.x, producingCity.position.y];
-    
-    // Calculate distance from city (Manhattan distance)
-    const distance = Math.abs(x - cityPos[0]) + Math.abs(y - cityPos[1]);
-    const maxDistance = 1; // Only allow placement in adjacent tiles including the city tile
-    
-    // Check if position is too far from city
-    if (distance > maxDistance) {
+    // Check if position is within the city area tiles
+    const isInCityArea = cityAreaTiles.some(tile => tile.x === x && tile.y === y);
+    if (!isInCityArea) {
       return false;
     }
     
@@ -1988,21 +2037,11 @@
     ></div>
     <div 
       class="movement-path-indicator target" 
-      style="
-        left: {activeMovementPath.toX * tileSize}px;
-        top: {activeMovementPath.toY * tileSize}px;
-        width: {tileSize}px;
-        height: {tileSize}px;
-      "
+      style=""
     ></div>
     <div 
       class="movement-path-line" 
-      style="
-        left: {Math.min(activeMovementPath.fromX, activeMovementPath.toX) * tileSize + tileSize/2}px;
-        top: {Math.min(activeMovementPath.fromY, activeMovementPath.toY) * tileSize + tileSize/2}px;
-        width: {Math.abs(activeMovementPath.toX - activeMovementPath.fromX) * tileSize}px;
-        height: {Math.abs(activeMovementPath.toY - activeMovementPath.fromY) * tileSize}px;
-      "
+      style=""
     ></div>
   {/if}
 

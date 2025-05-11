@@ -1077,9 +1077,10 @@ def get_building_types():
     #Define different building types like sawmill, quarry, farm, etc.
     building_types = [
         {
-            "type_id": "sawmill",
+            "type_id": "Sawmill",
             "name": "Sawmill",
             "category": "production",
+            "turns": 3,
             "cost": {
                 "wood": 20,
                 "stone": 20
@@ -1087,9 +1088,10 @@ def get_building_types():
             "description": "Produces wood over time"
         },
         { 
-            "type_id": "quarry",
+            "type_id": "Quarry",
             "name": "Quarry",
             "category": "production",
+            "turns": 5,
             "cost": {
                 "wood": 30, 
                 "stone": 20
@@ -1097,23 +1099,36 @@ def get_building_types():
             "description": "Produces stone over time"
         },
         {
-            "type_id": "farm",
+            "type_id": "Farm",
             "name": "Farm",
             "category": "production",
+            "turns": 3,
             "cost": {
                 "wood": 40
             },
             "description": "Produces food over time"
         },
         {
-            "type_id": "mine",
-            "name": "Mine",
+            "type_id": "Iron mine",
+            "name": "Iron mine",
             "category": "production",
+            "turns": 5,
             "cost": {
                 "wood": 50,
                 "stone": 50
             },
-            "description": "Produces minerals over time"
+            "description": "Produces iron over time"
+        }, 
+        {
+            "type_id": "Gold mine",
+            "name": "Gold mine",
+            "category": "production",
+            "turns": 7,
+            "cost": {
+                "wood": 50,
+                "stone": 70
+            },
+            "description": "Produces gold over time"
         }
 
     ]

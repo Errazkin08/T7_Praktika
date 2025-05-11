@@ -1382,7 +1382,7 @@
   // Function to get resource icons based on terrain type
   function getResourceIcon(terrainType) {
     switch (terrainType) {
-      case 2: return { type: "emoji", value: "🪙" }; // Gold
+      case 2: return { type: "image", value: "./ia_assets/oro.png" }; // Gold - changed to image
       case 3: return { type: "image", value: "./ia_assets/metala.png" }; // Iron/Metal
       case 4: return { type: "image", value: "./ia_assets/zuhaitza.png" }; // Wood/Tree
       case 5: return { type: "image", value: "./ia_assets/harria.png" }; // Stone
@@ -1452,12 +1452,33 @@
     calculateValidMoveTargets(unitX, unitY, remainingMovement);
   }
 
-  // Add function to enter city management screen
+  // Update the enterCity function to be more reliable
   function enterCity(city) {
-    // Store the selected city ID in the game state or use a URL parameter
-    if (gameData && city) {
-      gameAPI.storeTemporaryData('selectedCityId', city.id);
+    if (!gameData || !city) {
+      showToastNotification("Error al acceder a la ciudad", "error");
+      return;
+    }
+    
+    try {
+      // Store the city ID in both in-memory storage and localStorage
+      const cityId = city.id;
+      
+      // Make sure cityId is valid
+      if (!cityId) {
+        showToastNotification("ID de ciudad no válido", "error");
+        return;
+      }
+      
+      console.log("Entering city with ID:", cityId);
+      
+      // Store the ID before navigating
+      gameAPI.storeTemporaryData('selectedCityId', cityId);
+      
+      // Navigate to city page
       navigate('/city');
+    } catch (error) {
+      console.error("Error entering city:", error);
+      showToastNotification("Error al acceder a la ciudad", "error");
     }
   }
 
@@ -1869,11 +1890,15 @@
   {#if !isLoading && !loadingError && gameData && gameData.player && gameData.player.resources}
     <div class="resources-bar">
       <div class="resource food">
-        <div class="resource-icon">🌾</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/janaria.png" alt="Food" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.food || 0}</div>
       </div>
       <div class="resource gold">
-        <div class="resource-icon">🪙</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/lingotes_oro.png" alt="Gold" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.gold || 0}</div>
       </div>
       <div class="resource wood">
@@ -1885,7 +1910,7 @@
       <!-- Add iron resource -->
       <div class="resource iron">
         <div class="resource-icon">
-          <img src="./ia_assets/metala.png" alt="Iron" class="resource-bar-icon" />
+          <img src="./ia_assets/lingote_hierro.png" alt="Iron" class="resource-bar-icon" />
         </div>
         <div class="resource-value">{gameData.player.resources.iron || 0}</div>
       </div>

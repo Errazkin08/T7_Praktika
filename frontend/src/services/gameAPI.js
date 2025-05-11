@@ -34,24 +34,58 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 // Temporary storage for sharing data between components
-const tempStorage = new Map();
+let temporaryDataStore = {};
 
 // Store temporary data
 export function storeTemporaryData(key, value) {
-  tempStorage.set(key, value);
+  temporaryDataStore[key] = value;
+  // Also save in localStorage as backup
+  try {
+    localStorage.setItem(`temp_${key}`, JSON.stringify(value));
+  } catch (e) {
+    console.warn("Could not store temporary data in localStorage", e);
+  }
+  return value;
 }
 
 // Retrieve temporary data
 export function getTemporaryData(key) {
-  return tempStorage.get(key);
+  // First try in-memory storage
+  if (temporaryDataStore[key] !== undefined) {
+    return temporaryDataStore[key];
+  }
+  
+  // Then try localStorage as backup
+  try {
+    const value = localStorage.getItem(`temp_${key}`);
+    if (value) {
+      const parsed = JSON.parse(value);
+      temporaryDataStore[key] = parsed; // Update in-memory storage
+      return parsed;
+    }
+  } catch (e) {
+    console.warn("Could not retrieve temporary data from localStorage", e);
+  }
+  
+  return null;
 }
 
 // Clear temporary data
 export function clearTemporaryData(key) {
   if (key) {
-    tempStorage.delete(key);
+    delete temporaryDataStore[key];
+    try {
+      localStorage.removeItem(`temp_${key}`);
+    } catch (e) {
+      console.warn("Could not remove temporary data from localStorage", e);
+    }
   } else {
-    tempStorage.clear();
+    temporaryDataStore = {};
+    try {
+      localStorage.clear();
+    } catch (e) {
+      console.warn("Could not clear localStorage", e);
+    }
   }
 }
 
@@ -632,12 +666,37 @@ export const gameAPI = {
       if (!response.ok) {
         throw new Error(`Error fetching troop type: ${response.statusText}`);
       }
-      
+      debugger
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Error in getTroopType:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Get building types
+   */
+  async getBuildingTypes() {
+    try {
+      // Fix URL path - use API_BASE_URL directly instead of this.apiUrl
+      const response = await fetch(`${API_BASE_URL}/buildings/types`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        console.error(`Error fetching building types: ${response.status} ${response.statusText}`);
+        return [];
+      }
+      
+      const data = await response.json();
+      console.log("Building types loaded:", data);
+      return data;
+    } catch (error) {
+      console.error("Error in getBuildingTypes:", error);
+      return [];
     }
   },
 

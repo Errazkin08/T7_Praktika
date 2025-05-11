@@ -5,6 +5,7 @@ from routes.gameRoute import game_blueprint
 from routes.mapRoute import map_blueprint
 from routes.iaRoute import ia_blueprint
 from routes.troopRoute import troop_blueprint
+from routes.buildingRoute import building_blueprint
 from database import init_db, close_db
 import os
 from bson import ObjectId
@@ -68,6 +69,7 @@ app.register_blueprint(game_blueprint)
 app.register_blueprint(map_blueprint)
 app.register_blueprint(ia_blueprint)
 app.register_blueprint(troop_blueprint)
+app.register_blueprint(building_blueprint)
 
 # Error handling
 @app.errorhandler(500)

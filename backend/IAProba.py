@@ -176,6 +176,11 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
         -Cada unidad puede movrse dos veces por turno.
         -Cada unidad puede atacar una vez por turno.
         -Cada unidad puede construir una vez por turno.
+        -No puede haber dos unidades en la misma posición. (IMPORTANTE)
+        -Las unidades no se pueden salir del mapa, es decir en un mapa 20x20 no pueden ir a las posiciones [20,0] o [0,20], ya que las coordenadas empiezan por el 0, para saber el tamaño del mapa fijate en el valor map_size del json del game que te paso.
+        -Las unidades no pueden moverse a través de otras unidades.
+        -Las unidades no pueden moverse a través de agua ni tampoco pueden estar en agua. (IMPORTANTE)
+
         """
         game_prompt = f"""
         {system_instructions}
@@ -193,6 +198,8 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
         - 4: Terreno con madera (bosque)
         - 5: Terreno con piedra (recursos)
         - 6: Terreno con oro (recursos)
+        
+        Tamaño del mapa: {game_state.get('map_size', {'width': 30, 'height': 15}) if game_state else {'width': 30, 'height': 15}}
         
         Estado actual del juego:
         {json.dumps(game_state) if game_state else 'No hay estado de juego disponible.'}

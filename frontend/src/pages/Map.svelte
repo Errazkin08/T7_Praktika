@@ -70,6 +70,19 @@
   let settlerToFoundCity = null;
   let cities = []; // Array to store all cities
 
+  // Add AI turn visualization variables
+  let processingAITurn = false;
+  let aiActions = [];
+  let currentAIAction = null;
+  let aiActionIndex = 0;
+  let showAIActionCard = false;
+  let aiActionDescription = "";
+  let aiTurnReasoning = "";
+
+  // Add a variable to track and display movement paths
+  let activeMovementPath = null;
+  let debugAIMovement = true; // Enable debugging
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -189,345 +202,363 @@
     }
   }
 
-  // Function to get city icon
-  function getCityIcon(city) {
-    const population = city.population || 0;
-    if (population >= 10) return { type: "emoji", value: "🏙️" };
-    if (population >= 5) return { type: "emoji", value: "🏢" };
-    return { type: "image", value: './ia_assets/city.jpg' };
-  }
-
-  // Function to get terrain background URL based on type
-  function getTerrainImageUrl(terrainType) {
-    switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return './ia_assets/ura_tile.jpg';
-      case TERRAIN_TYPES.NORMAL: return './ia_assets/belarra_tile.jpg';
-      default: return null;
-    }
-  }
-
-  // Keep original color function as fallback for terrains without images
-  function getTerrainColor(terrainType) {
-    switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return '#3399ff';
-      case TERRAIN_TYPES.MINERAL: return '#cc9900';
-      case TERRAIN_TYPES.NORMAL: return '#66cc66';
-      default: return '#66cc66';
-    }
-  }
-
-  // Update unit icon function to use images when available
-  function getUnitImageUrl(unitType) {
-    switch (unitType) {
-      case "warrior": return './ia_assets/warrior.png';
-      case "settler": return './ia_assets/settler.png';
-      default: return null;
-    }
-  }
-
-  function getUnitIcon(unitType) {
-    switch (unitType) {
-      case "settler":
-        return "🏠";
-      case "warrior":
-        return "⚔️";
-      case "archer":
-        return "🏹";
-      case "cavalry":
-        return "🐎";
-      case "builder":
-        return "🔨";
-      default:
-        return "❓";
-    }
-  }
-
-  // Add this new function to get resource icons based on terrain type
-  function getResourceIcon(terrainType) {
-    switch (terrainType) {
-      case 2: return "🪙"; // Gold
-      case 3: return "⚙️"; // Iron
-      case 4: return "🌲"; // Wood
-      case 5: return "🪨"; // Stone
-      default: return null; // No resource
-    }
-  }
-
-  // Get the terrain name with updated resource types
-  function getTerrainName(terrainType) {
-    switch (terrainType) {
-      case TERRAIN_TYPES.WATER: return 'Agua';
-      case 2: return 'Oro';
-      case 3: return 'Hierro';
-      case 4: return 'Madera';
-      case 5: return 'Piedra';
-      case TERRAIN_TYPES.NORMAL: return 'Tierra';
-      default: return 'Desconocido';
-    }
-  }
-
-  function toggleFogOfWar() {
-    showFogOfWar = !showFogOfWar;
-  }
-
-  function zoomIn() {
-    zoomLevel += 0.1;
-    if (zoomLevel > 2) zoomLevel = 2;
-  }
-
-  function zoomOut() {
-    zoomLevel -= 0.1;
-    if (zoomLevel < 0.2) zoomLevel = 0.2;
-  }
-
-  function startDrag(event) {
-    isDragging = true;
-    dragStartX = event.clientX - offsetX;
-    dragStartY = event.clientY - offsetY;
-  }
-
-  function drag(event) {
-    if (!isDragging) return;
-    offsetX = event.clientX - dragStartX;
-    offsetY = event.clientY - dragStartY;
-  }
-
-  function endDrag() {
-    isDragging = false;
-  }
-
-  function selectUnit(unit) {
-    selectedUnit = unit;
-    validMoveTargets = [];
+  async function processAIActions(actions, reasoning) {
+    if (!actions || actions.length === 0) return;
     
-    const totalMovement = unit.movement || 2;
-    const remainingMovement = unit.remainingMovement !== undefined ? 
-                              unit.remainingMovement : 
-                              totalMovement;
+    processingAITurn = true;
+    aiActions = actions;
+    aiActionIndex = 0;
+    aiTurnReasoning = reasoning || "La IA está realizando movimientos estratégicos";
     
-    if (remainingMovement <= 0) {
-      showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
-      selectedUnit = null;
-      return;
-    }
+    showToastNotification("Observando el turno de la IA...", "info", 2000);
     
-    const [unitX, unitY] = unit.position;
-    calculateValidMoveTargets(unitX, unitY, remainingMovement);
-  }
-  
-  function calculateValidMoveTargets(startX, startY, movementPoints) {
-    validMoveTargets = [];
-    const movementRange = 2;
+    // Save current fog of war state and disable it for AI turn
+    const previousFogState = showFogOfWar;
+    showFogOfWar = false;
     
-    for (let y = Math.max(0, startY - movementRange); y <= Math.min(mapHeight - 1, startY + movementRange); y++) {
-      for (let x = Math.max(0, startX - movementRange); x <= Math.min(mapWidth - 1, startX + movementRange); x++) {
-        if (x === startX && y === startY) continue;
-        const steps = Math.abs(x - startX) + Math.abs(y - startY);
-        if (steps > movementRange) continue;
-        if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
-        const occupyingUnit = units.find(u => 
-          u !== selectedUnit && 
-          u.position && 
-          u.position[0] === x && 
-          u.position[1] === y
-        );
-        if (occupyingUnit) continue;
-        if (movementPoints >= 1) {
-          validMoveTargets.push({ x, y, remainingMovement: movementPoints - 1 });
-        }
-      }
-    }
-  }
-  
-  async function moveUnitToPosition(unit, targetX, targetY) {
-    if (movementInProgress) return;
+    // Save current zoom level to restore later
+    const previousZoomLevel = zoomLevel;
     
-    const occupyingUnit = units.find(u => u !== unit && u.position[0] === targetX && u.position[1] === targetY);
-    if (occupyingUnit) {
-      showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`, "error");
-      movementInProgress = false;
-      return;
-    }
-
-    movementInProgress = true;
+    // Ensure AI units exist in the units array
+    ensureAIUnitsExist();
     
-    try {
-      const targetInfo = validMoveTargets.find(target => 
-        target.x === targetX && target.y === targetY
-      );
+    for (let i = 0; i < aiActions.length; i++) {
+      aiActionIndex = i;
+      currentAIAction = aiActions[i];
       
-      if (!targetInfo) {
-        console.error("Target position not in valid moves");
-        return;
-      }
+      console.log(`Processing AI action ${i+1}/${actions.length}:`, currentAIAction);
       
-      const localUnitIndex = units.findIndex(u => u === unit);
-      
-      if (localUnitIndex !== -1) {
-        const originalUnitPosition = [...units[localUnitIndex].position]; 
-        const movementCost = 1;
-        const totalMovement = units[localUnitIndex].movement || 2;
-        
-        if (units[localUnitIndex].remainingMovement === undefined) {
-          units[localUnitIndex].remainingMovement = totalMovement;
-        }
-        
-        if (movementCost > units[localUnitIndex].remainingMovement) {
-          showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
-          movementInProgress = false;
-          return;
-        }
-        
-        units[localUnitIndex].remainingMovement -= movementCost;
-        units[localUnitIndex].position = [targetX, targetY];
-        
-        if (units[localUnitIndex].remainingMovement <= 0) {
-          units[localUnitIndex].status = 'exhausted';
-        } else {
-          units[localUnitIndex].status = 'moved';
-        }
-        
-        units = [...units]; 
-        updateUnitInfoPanel(localUnitIndex);
-        
-        if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
-          let gameDataUnitIndex = -1;
-
-          if (unit.id) { 
-            gameDataUnitIndex = gameData.player.units.findIndex(u => u.id === unit.id);
-          }
+      // Center map on the action location
+      if (currentAIAction.position && Array.isArray(currentAIAction.position)) {
+        if (currentAIAction.type === "movement" && currentAIAction.target_position) {
+          // For movement actions, center between positions
+          const [startX, startY] = currentAIAction.position;
+          const [endX, endY] = currentAIAction.target_position;
           
-          if (gameDataUnitIndex === -1) {
-            gameDataUnitIndex = gameData.player.units.findIndex(u =>
-              u.type_id === unit.type_id && 
-              u.position && Array.isArray(u.position) &&
-              u.position[0] === originalUnitPosition[0] &&
-              u.position[1] === originalUnitPosition[1]
+          centerMapOnPosition((startX + endX) / 2, (startY + endY) / 2);
+          
+          // Adjust zoom for better visibility
+          const oldZoom = zoomLevel;
+          zoomLevel = Math.max(1.5, zoomLevel);
+        } else {
+          centerMapOnPosition(currentAIAction.position[0], currentAIAction.position[1]);
+        }
+        
+        // Wait for camera to adjust
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+      
+      // Display action card
+      aiActionDescription = getActionDescription(currentAIAction);
+      showAIActionCard = true;
+      
+      // Process action visually
+      await visualizeAIAction(currentAIAction);
+      
+      // Keep card visible for a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Hide card between actions
+      showAIActionCard = false;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    // Update game state
+    updateGameStateAfterAITurn();
+    
+    // Restore fog of war to previous state
+    showFogOfWar = previousFogState;
+    
+    // Find a player unit or city to center on
+    await centerOnPlayerPosition();
+    
+    // Restore zoom level
+    zoomLevel = previousZoomLevel;
+    
+    processingAITurn = false;
+    currentAIAction = null;
+    showToastNotification("La IA ha completado su turno", "success");
+  }
+  
+  async function centerOnPlayerPosition() {
+    let centerPosition = null;
+    
+    // First try to find the player's capital city
+    const playerCity = cities.find(c => !c.owner || c.owner === 'player');
+    if (playerCity) {
+      if (Array.isArray(playerCity.position)) {
+        centerPosition = playerCity.position;
+      } else if (playerCity.position) {
+        centerPosition = [playerCity.position.x, playerCity.position.y];
+      }
+    }
+    
+    // If no city found, try to find a player unit
+    if (!centerPosition) {
+      const playerUnit = units.find(u => u.owner === 'player');
+      if (playerUnit && Array.isArray(playerUnit.position)) {
+        centerPosition = playerUnit.position;
+      }
+    }
+    
+    // If no player units or cities, use the start point
+    if (!centerPosition) {
+      centerPosition = startPoint;
+    }
+    
+    // Center map and wait for animation
+    if (centerPosition) {
+      centerMapOnPosition(centerPosition[0], centerPosition[1]);
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+
+  async function visualizeAIAction(action) {
+    try {
+      switch (action.type) {
+        case "movement": {
+          // Find the unit to move
+          let unitIndex = units.findIndex(u => u.id === action.unit_id);
+          
+          if (unitIndex === -1) {
+            // If not found by ID, try by position
+            const [posX, posY] = action.position;
+            unitIndex = units.findIndex(u => 
+              u.position && 
+              Array.isArray(u.position) && 
+              u.position[0] === posX && 
+              u.position[1] === posY &&
+              u.owner === 'ia'
             );
           }
           
-          if (gameDataUnitIndex !== -1) {
-            gameData.player.units[gameDataUnitIndex].position = [targetX, targetY];
-            gameData.player.units[gameDataUnitIndex].status = units[localUnitIndex].status;
-            gameData.player.units[gameDataUnitIndex].remainingMovement = units[localUnitIndex].remainingMovement;
+          if (unitIndex === -1) {
+            console.warn(`Unit for movement not found: ${action.unit_id}. Creating temporary unit for visualization.`);
             
-            console.log(`Unit updated in gameData: ID ${unit.id || 'N/A'}, New Pos [${targetX},${targetY}], Status ${units[localUnitIndex].status}, Remaining Movement: ${units[localUnitIndex].remainingMovement}`);
-          } else {
-            console.warn("Moved unit not found in gameData.player.units. Session not updated for this unit.");
+            // Create a temporary unit if none exists
+            const tempUnit = {
+              id: action.unit_id,
+              position: [...action.position],
+              type_id: action.unit_type || "warrior",
+              owner: 'ia',
+              status: 'ready',
+              remainingMovement: 2
+            };
+            
+            units = [...units, tempUnit];
+            unitIndex = units.length - 1;
           }
+          
+          const unitToMove = units[unitIndex];
+          
+          // Show path
+          activeMovementPath = {
+            fromX: action.position[0],
+            fromY: action.position[1],
+            toX: action.target_position[0],
+            toY: action.target_position[1]
+          };
+          
+          // Add moving class for animation
+          unitToMove.moving = true;
+          units = [...units]; // Update reactivity
+          
+          // Wait for animation
+          await new Promise(resolve => setTimeout(resolve, 1200));
+          
+          // Move unit to target position
+          unitToMove.position = [...action.target_position];
+          unitToMove.remainingMovement = action.state_after.remainingMovement;
+          unitToMove.status = action.state_after.status;
+          unitToMove.moving = false;
+          units = [...units]; // Update reactivity
+          
+          // Clear path after a moment
+          await new Promise(resolve => setTimeout(resolve, 500));
+          activeMovementPath = null;
+          
+          // Update fog of war
+          updateFogOfWarAroundPosition(action.target_position[0], action.target_position[1], 2);
+          break;
         }
         
-        updateFogOfWarAroundPosition(targetX, targetY, 2);
-        
-        if (units[localUnitIndex].remainingMovement <= 0) {
-          selectedUnit = null;
-          validMoveTargets = [];
-        } else {
-          selectUnit(units[localUnitIndex]);
+        case "attack": {
+          // Find attacking unit
+          let attackerIndex = units.findIndex(u => u.id === action.unit_id);
+          
+          if (attackerIndex === -1) {
+            // If not found by ID, try by position
+            const [posX, posY] = action.position;
+            attackerIndex = units.findIndex(u => 
+              u.position && 
+              Array.isArray(u.position) && 
+              u.position[0] === posX && 
+              u.position[1] === posY &&
+              u.owner === 'ia'
+            );
+          }
+          
+          // Find target unit
+          let targetIndex = units.findIndex(u => u.id === action.target_unit_id);
+          
+          if (targetIndex === -1) {
+            // Try to find by position if ID fails
+            const [targetX, targetY] = action.target_position;
+            targetIndex = units.findIndex(u => 
+              u.position && 
+              Array.isArray(u.position) && 
+              u.position[0] === targetX && 
+              u.position[1] === targetY &&
+              u.owner === 'player'
+            );
+          }
+          
+          if (attackerIndex !== -1) {
+            // Animate attack
+            const attacker = units[attackerIndex];
+            attacker.attacking = true;
+            units = [...units]; // Update reactivity
+            
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Update attacker state
+            attacker.status = action.state_after.status;
+            attacker.remainingMovement = action.state_after.remainingMovement;
+            attacker.health = action.state_after.health;
+            attacker.attacking = false;
+            
+            // Update target health if target exists
+            if (targetIndex !== -1) {
+              const target = units[targetIndex];
+              if (action.target_state_after) {
+                target.health = action.target_state_after.health;
+                
+                // Check if target is destroyed
+                if (action.target_state_after.health <= 0) {
+                  // Remove destroyed unit
+                  units.splice(targetIndex, 1);
+                }
+              }
+            }
+            
+            units = [...units]; // Update reactivity
+          }
+          break;
         }
-      } else {
-         console.error("Selected unit not found in local 'units' array.");
+        
+        case "construction": {
+          // Find the unit
+          let builderIndex = units.findIndex(u => u.id === action.unit_id);
+          
+          if (builderIndex === -1) {
+            // If not found by ID, try by position
+            const [posX, posY] = action.position;
+            builderIndex = units.findIndex(u => 
+              u.position && 
+              Array.isArray(u.position) && 
+              u.position[0] === posX && 
+              u.position[1] === posY &&
+              u.owner === 'ia'
+            );
+          }
+          
+          if (builderIndex !== -1) {
+            const builder = units[builderIndex];
+            
+            if (action.building === "city") {
+              // Create new city
+              const newCity = {
+                id: `city_${Date.now()}`,
+                name: action.city_name,
+                position: [...action.position],
+                owner: 'ia',
+                population: 1
+              };
+              
+              // Add city
+              cities = [...cities, newCity];
+              
+              // Remove settler
+              units.splice(builderIndex, 1);
+              units = [...units];
+              
+              // Update fog of war for city
+              updateFogOfWarAroundPosition(action.position[0], action.position[1], 3);
+            } else {
+              // Update builder state
+              builder.status = action.state_after.status;
+              builder.remainingMovement = action.state_after.remainingMovement;
+              units = [...units]; // Update reactivity
+            }
+          }
+          break;
+        }
+        
+        default:
+          console.log("Unhandled action type:", action.type);
       }
-    } catch(err) {
-      console.error("Error in moveUnitToPosition:", err);
-    } 
-    finally {
-      movementInProgress = false;
+    } catch (error) {
+      console.error("Error visualizing AI action:", error);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  function getActionDescription(action) {
+    switch (action.type) {
+      case "movement":
+        return `La unidad ${action.unit_id.replace(/_/g, ' ')} se mueve de [${action.position[0]},${action.position[1]}] a [${action.target_position[0]},${action.target_position[1]}]`;
+      case "attack":
+        return `La unidad ${action.unit_id.replace(/_/g, ' ')} ataca a tu unidad ${action.target_unit_id.replace(/_/g, ' ')}`;
+      case "construction":
+        if (action.building === "city") {
+          return `La IA funda una nueva ciudad: ${action.city_name}`;
+        }
+        return `La IA construye ${action.building}`;
+      default:
+        return `La IA realiza una acción: ${action.type}`;
     }
   }
 
-  function updateUnitInfoPanel(unitIndex) {
-    if (selectedUnitInfo && units[unitIndex]) {
-      if (selectedUnitInfo.id === units[unitIndex].id || 
-         (selectedUnitInfo.position && units[unitIndex].position && 
-          selectedUnitInfo.position[0] === units[unitIndex].position[0] && 
-          selectedUnitInfo.position[1] === units[unitIndex].position[1])) {
-        selectedUnitInfo = units[unitIndex];
+  function ensureAIUnitsExist() {
+    if (!gameData || !gameData.ia || !Array.isArray(gameData.ia.units)) return;
+    
+    // Get current AI units by ID
+    const currentAIUnitIds = units.filter(u => u.owner === 'ia').map(u => u.id);
+    
+    // Add any missing AI units
+    for (const iaUnit of gameData.ia.units) {
+      if (!currentAIUnitIds.includes(iaUnit.id)) {
+        console.log(`Adding missing AI unit to display: ${iaUnit.id}`);
+        
+        const newUnit = {
+          ...iaUnit,
+          owner: 'ia'
+        };
+        
+        units = [...units, newUnit];
       }
     }
   }
 
-  function handleTileClick(x, y) {
-    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
-      moveUnitToPosition(selectedUnit, x, y);
-      return;
-    }
+  function updateGameStateAfterAITurn() {
+    if (!gameData || !gameData.ia) return;
     
-    // Check if there's a city at the clicked position
-    const cityAtPosition = cities.find(city => 
-      (city.position.x === x && city.position.y === y) || 
-      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
-    );
+    // Update gameData with the changes to units
+    const aiUnits = units.filter(u => u.owner === 'ia');
+    gameData.ia.units = aiUnits;
     
-    if (cityAtPosition) {
-      selectedCityInfo = cityAtPosition;
-      selectedTile = null;
-      selectedUnit = null;
-      selectedUnitInfo = null;
-      validMoveTargets = [];
-      return;
-    }
-    
-    const unitAtPosition = units.find(unit => 
-      unit && 
-      unit.position && 
-      Array.isArray(unit.position) && 
-      unit.position[0] === x && 
-      unit.position[1] === y
-    );
-    
-    if (unitAtPosition) {
-      selectedCityInfo = null; // Clear selected city
-      selectedUnitInfo = unitAtPosition;
-      selectedTile = null;
-      
-      if (unitAtPosition.owner === 'ia') {
-        showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
-        selectedUnit = null;
-        validMoveTargets = [];
-        return;
-      }
-      
-      if (unitAtPosition.status === 'exhausted') {
-        showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
-        selectedUnit = null;
-        validMoveTargets = [];
-      } else {
-        selectUnit(unitAtPosition);
-      }
-      return;
-    } else {
-      selectedUnit = null;
-      selectedUnitInfo = null;
-      selectedCityInfo = null; // Clear selected city
-      validMoveTargets = [];
-    }
-    
-    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
-      selectedTile = {
-        x, y,
-        terrainName: 'Desconocido (no explorado)',
-        isExplored: false
-      };
-    } else {
-      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
-
-      selectedTile = {
-        x, y,
-        terrain: terrainType,
-        terrainName: getTerrainName(terrainType),
-        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
-      };
-    }
+    // Update gameData with the changes to cities
+    const aiCities = cities.filter(c => c.owner === 'ia');
+    gameData.ia.cities = aiCities || [];
   }
 
-  // Add function to enter city management screen
-  function enterCity(city) {
-    // Store the selected city ID in the game state or use a URL parameter
-    if (gameData && city) {
-      gameAPI.storeTemporaryData('selectedCityId', city.id);
-      navigate('/city');
-    }
+  function centerMapOnPosition(x, y) {
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight;
+
+    offsetX = (containerWidth / 2) - (x * tileSize * zoomLevel);
+    offsetY = (containerHeight / 2) - (y * tileSize * zoomLevel);
   }
 
   async function endTurn() {
@@ -542,21 +573,24 @@
     currentPlayer.set(gameData.current_player);
     showToastNotification("IA's Turn - Processing...", "info");
     
-    // Call the AI endpoint with current game state
     try {
       console.log("Requesting AI action...");
       const aiResponse = await gameAPI.getAIAction(gameData);
       console.log("AI Response:", aiResponse);
       
-      // Display a toast notification that AI turn is complete
-      showToastNotification("IA has completed its turn", "success");
+      if (aiResponse && aiResponse.actions && aiResponse.actions.length > 0) {
+        await processAIActions(aiResponse.actions, aiResponse.reasoning);
+      } else {
+        showToastNotification("La IA ha completado su turno (sin acciones)", "info");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     } catch (error) {
       console.error("Error getting AI action:", error);
       showToastNotification("Error processing AI turn", "error");
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // Continue with the normal turn sequence after AI's turn
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     gameData.current_player = "player";
     gameData.turn = (gameData.turn || 0) + 1;
@@ -656,6 +690,153 @@
     if (confirm("¿Estás seguro de que quieres salir sin guardar? Se perderá todo el progreso.")) {
       endGame();
       navigate('/home');
+    }
+  }
+
+  function calculateValidMoveTargets(startX, startY, movementPoints) {
+    validMoveTargets = [];
+    const movementRange = Math.min(movementPoints, 2); // Limit movement range to 2 tiles per turn
+    
+    // Check each tile within the movement range
+    for (let y = Math.max(0, startY - movementRange); y <= Math.min(mapHeight - 1, startY + movementRange); y++) {
+      for (let x = Math.max(0, startX - movementRange); x <= Math.min(mapWidth - 1, startX + movementRange); x++) {
+        // Skip the current tile
+        if (x === startX && y === startY) continue;
+        
+        // Calculate Manhattan distance (number of steps)
+        const steps = Math.abs(x - startX) + Math.abs(y - startY);
+        
+        // If beyond movement range, skip
+        if (steps > movementRange) continue;
+        
+        // Skip water tiles
+        if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
+        
+        // Check if the tile is already occupied by another unit
+        const occupyingUnit = units.find(u => 
+          u !== selectedUnit && 
+          u.position && 
+          Array.isArray(u.position) && 
+          u.position[0] === x && 
+          u.position[1] === y
+        );
+        
+        // Skip if occupied
+        if (occupyingUnit) continue;
+        
+        // Check if we have enough movement points to reach this tile
+        if (movementPoints >= steps) {
+          // Add valid target with remaining movement after this move
+          validMoveTargets.push({ 
+            x, 
+            y, 
+            remainingMovement: movementPoints - steps 
+          });
+        }
+      }
+    }
+  }
+
+  function moveUnitToPosition(unit, targetX, targetY) {
+    if (movementInProgress) return;
+    
+    const occupyingUnit = units.find(u => 
+      u !== unit && 
+      u.position && 
+      Array.isArray(u.position) && 
+      u.position[0] === targetX && 
+      u.position[1] === targetY
+    );
+    
+    if (occupyingUnit) {
+      showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`, "error");
+      return;
+    }
+    
+    movementInProgress = true;
+    
+    try {
+      const targetInfo = validMoveTargets.find(target => 
+        target.x === targetX && target.y === targetY
+      );
+      
+      if (!targetInfo) {
+        console.error("Target position not in valid moves");
+        movementInProgress = false;
+        return;
+      }
+      
+      const unitIndex = units.findIndex(u => u === unit);
+      
+      if (unitIndex !== -1) {
+        const originalPosition = [...units[unitIndex].position];
+        
+        // Calculate the movement cost
+        const movementCost = Math.abs(targetX - originalPosition[0]) + Math.abs(targetY - originalPosition[1]);
+        
+        if (units[unitIndex].remainingMovement === undefined) {
+          units[unitIndex].remainingMovement = units[unitIndex].movement || 2;
+        }
+        
+        if (units[unitIndex].remainingMovement < movementCost) {
+          showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
+          movementInProgress = false;
+          return;
+        }
+        
+        // Update unit position and movement points
+        units[unitIndex].position = [targetX, targetY];
+        units[unitIndex].remainingMovement -= movementCost;
+        
+        // Update unit status based on remaining movement
+        if (units[unitIndex].remainingMovement <= 0) {
+          units[unitIndex].status = 'exhausted';
+        } else {
+          units[unitIndex].status = 'moved';
+        }
+        
+        // Ensure reactivity
+        units = [...units];
+        
+        // Update unit info panel if it's showing this unit
+        if (selectedUnitInfo && selectedUnitInfo === units[unitIndex]) {
+          selectedUnitInfo = units[unitIndex];
+        }
+        
+        // Update game data 
+        if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
+          const gameDataUnitIndex = gameData.player.units.findIndex(u => 
+            u.id === unit.id || (
+              u.position && 
+              Array.isArray(u.position) && 
+              u.position[0] === originalPosition[0] && 
+              u.position[1] === originalPosition[1]
+            )
+          );
+          
+          if (gameDataUnitIndex !== -1) {
+            gameData.player.units[gameDataUnitIndex].position = [targetX, targetY];
+            gameData.player.units[gameDataUnitIndex].status = units[unitIndex].status;
+            gameData.player.units[gameDataUnitIndex].remainingMovement = units[unitIndex].remainingMovement;
+          }
+        }
+        
+        // Update fog of war around new position
+        updateFogOfWarAroundPosition(targetX, targetY, 2);
+        
+        // If unit has remaining movement, show updated valid moves
+        if (units[unitIndex].remainingMovement > 0) {
+          selectUnit(units[unitIndex]);
+        } else {
+          // Clear selection if no more movement
+          selectedUnit = null;
+          validMoveTargets = [];
+        }
+      }
+    } catch (error) {
+      console.error("Error moving unit:", error);
+    } finally {
+      movementInProgress = false;
     }
   }
 
@@ -850,6 +1031,216 @@
     }
     grid = [...grid];
   }
+
+  // Function to get city icon
+  function getCityIcon(city) {
+    const population = city.population || 0;
+    if (population >= 10) return { type: "emoji", value: "🏙️" };
+    if (population >= 5) return { type: "emoji", value: "🏢" };
+    return { type: "image", value: './ia_assets/city.jpg' };
+  }
+
+  // Function to get terrain background URL based on type
+  function getTerrainImageUrl(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.WATER: return './ia_assets/ura_tile.jpg';
+      case TERRAIN_TYPES.NORMAL: return './ia_assets/belarra_tile.jpg';
+      default: return null;
+    }
+  }
+
+  // Keep original color function as fallback for terrains without images
+  function getTerrainColor(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.NORMAL: return "#8B4513";
+      case TERRAIN_TYPES.WATER: return "#1E90FF";
+      case TERRAIN_TYPES.MINERAL: return "#808080";
+      default: return "#000";
+    }
+  }
+
+  // Function to get resource icons based on terrain type
+  function getResourceIcon(terrainType) {
+    switch (terrainType) {
+      case 2: return "🪙"; // Gold
+      case 3: return "⚙️"; // Iron
+      case 4: return "🌲"; // Wood
+      case 5: return "🪨"; // Stone
+      default: return null; // No resource
+    }
+  }
+
+  // Get the terrain name with updated resource types
+  function getTerrainName(terrainType) {
+    switch (terrainType) {
+      case TERRAIN_TYPES.WATER: return 'Agua';
+      case 2: return 'Oro';
+      case 3: return 'Hierro';
+      case 4: return 'Madera';
+      case 5: return 'Piedra';
+      case TERRAIN_TYPES.NORMAL: return 'Tierra';
+      default: return 'Desconocido';
+    }
+  }
+
+  function toggleFogOfWar() {
+    showFogOfWar = !showFogOfWar;
+  }
+
+  function zoomIn() {
+    zoomLevel += 0.1;
+    if (zoomLevel > 2) zoomLevel = 2;
+  }
+
+  function zoomOut() {
+    zoomLevel -= 0.1;
+    if (zoomLevel < 0.2) zoomLevel = 0.2;
+  }
+
+  function startDrag(event) {
+    isDragging = true;
+    dragStartX = event.clientX - offsetX;
+    dragStartY = event.clientY - offsetY;
+  }
+
+  function drag(event) {
+    if (!isDragging) return;
+    offsetX = event.clientX - dragStartX;
+    offsetY = event.clientY - dragStartY;
+  }
+
+  function endDrag() {
+    isDragging = false;
+  }
+
+  function selectUnit(unit) {
+    selectedUnit = unit;
+    validMoveTargets = [];
+    
+    const totalMovement = unit.movement || 2;
+    const remainingMovement = unit.remainingMovement !== undefined ? 
+                              unit.remainingMovement : 
+                              totalMovement;
+    
+    if (remainingMovement <= 0) {
+      showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+      selectedUnit = null;
+      return;
+    }
+    
+    const [unitX, unitY] = unit.position;
+    calculateValidMoveTargets(unitX, unitY, remainingMovement);
+  }
+
+  // Add function to enter city management screen
+  function enterCity(city) {
+    // Store the selected city ID in the game state or use a URL parameter
+    if (gameData && city) {
+      gameAPI.storeTemporaryData('selectedCityId', city.id);
+      navigate('/city');
+    }
+  }
+
+  function handleTileClick(x, y) {
+    if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
+      moveUnitToPosition(selectedUnit, x, y);
+      return;
+    }
+    
+    // Check if there's a city at the clicked position
+    const cityAtPosition = cities.find(city => 
+      (city.position.x === x && city.position.y === y) || 
+      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+    );
+    
+    if (cityAtPosition) {
+      selectedCityInfo = cityAtPosition;
+      selectedTile = null;
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      validMoveTargets = [];
+      return;
+    }
+    
+    const unitAtPosition = units.find(unit => 
+      unit && 
+      unit.position && 
+      Array.isArray(unit.position) && 
+      unit.position[0] === x && 
+      unit.position[1] === y
+    );
+    
+    if (unitAtPosition) {
+      selectedCityInfo = null; // Clear selected city
+      selectedUnitInfo = unitAtPosition;
+      selectedTile = null;
+      
+      if (unitAtPosition.owner === 'ia') {
+        showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+        return;
+      }
+      
+      if (unitAtPosition.status === 'exhausted') {
+        showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+        selectedUnit = null;
+        validMoveTargets = [];
+      } else {
+        selectUnit(unitAtPosition);
+      }
+      return;
+    } else {
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      selectedCityInfo = null; // Clear selected city
+      validMoveTargets = [];
+    }
+    
+    if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
+      selectedTile = {
+        x, y,
+        terrainName: 'Desconocido (no explorado)',
+        isExplored: false
+      };
+    } else {
+      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
+
+      selectedTile = {
+        x, y,
+        terrain: terrainType,
+        terrainName: getTerrainName(terrainType),
+        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE
+      };
+    }
+  }
+
+  // Function to get unit icon depending on type
+  function getUnitIcon(unitType) {
+    switch (unitType) {
+      case "settler":
+        return "🏠";
+      case "warrior":
+        return "⚔️";
+      case "archer":
+        return "🏹";
+      case "cavalry":
+        return "🐎";
+      case "builder":
+        return "🔨";
+      default:
+        return "❓";
+    }
+  }
+
+  // Update unit icon function to use images when available
+  function getUnitImageUrl(unitType) {
+    switch (unitType) {
+      case "warrior": return './ia_assets/warrior.png';
+      case "settler": return './ia_assets/settler.png';
+      default: return null;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -900,6 +1291,8 @@
       on:mousemove={drag}
       on:mouseup={endDrag}
       on:mouseleave={endDrag}
+      role="application" 
+      aria-label="Game map"
     >
       <div 
         class="map-grid"
@@ -943,7 +1336,11 @@
                 background-size: cover;
               "
               on:click={() => handleTileClick(x, y)}
+              on:keydown={(e) => e.key === 'Enter' && handleTileClick(x, y)}
+              role="button"
+              tabindex="0"
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
+              aria-label="Map tile at position {x},{y}"
             >
               {#if x % 10 === 0 && y % 10 === 0 && isVisible}
                 <div class="coord-marker">{x},{y}</div>
@@ -1241,6 +1638,80 @@
         <span class="toast-message">{toastMessage}</span>
       </div>
     </div>
+  {/if}
+
+  <!-- Add AI Action Card Display -->
+  {#if processingAITurn && showAIActionCard && currentAIAction}
+    <div class="ai-action-overlay">
+      <div class="ai-action-card">
+        <div class="ai-action-header">
+          <h4>Acción de la IA {aiActionIndex + 1}/{aiActions.length}</h4>
+        </div>
+        
+        <div class="ai-action-content">
+          <div class="ai-action-icon">
+            {#if currentAIAction.type === 'movement'}
+              <span class="action-icon">🚶</span>
+            {:else if currentAIAction.type === 'attack'}
+              <span class="action-icon">⚔️</span>
+            {:else if currentAIAction.type === 'construction'}
+              <span class="action-icon">🏗️</span>
+            {:else}
+              <span class="action-icon">🔄</span>
+            {/if}
+          </div>
+          
+          <div class="ai-action-description">
+            <p>{aiActionDescription}</p>
+            {#if currentAIAction.type === 'attack'}
+              <div class="combat-indicator">
+                <span class="combat-animation">⚔️</span>
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if processingAITurn && aiActionIndex === aiActions.length - 1 && aiTurnReasoning}
+    <div class="ai-reasoning-overlay">
+      <div class="ai-reasoning-card">
+        <h4>Estrategia de la IA</h4>
+        <p>{aiTurnReasoning}</p>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Add movement path visualization -->
+  {#if activeMovementPath}
+    <div 
+      class="movement-path-indicator" 
+      style="
+        left: {activeMovementPath.fromX * tileSize}px;
+        top: {activeMovementPath.fromY * tileSize}px;
+        width: {tileSize}px;
+        height: {tileSize}px;
+      "
+    ></div>
+    <div 
+      class="movement-path-indicator target" 
+      style="
+        left: {activeMovementPath.toX * tileSize}px;
+        top: {activeMovementPath.toY * tileSize}px;
+        width: {tileSize}px;
+        height: {tileSize}px;
+      "
+    ></div>
+    <div 
+      class="movement-path-line" 
+      style="
+        left: {Math.min(activeMovementPath.fromX, activeMovementPath.toX) * tileSize + tileSize/2}px;
+        top: {Math.min(activeMovementPath.fromY, activeMovementPath.toY) * tileSize + tileSize/2}px;
+        width: {Math.abs(activeMovementPath.toX - activeMovementPath.fromX) * tileSize}px;
+        height: {Math.abs(activeMovementPath.toY - activeMovementPath.fromY) * tileSize}px;
+      "
+    ></div>
   {/if}
 </div>
 

@@ -3,7 +3,7 @@ import requests
 import time
 import json
 import os
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from dotenv import load_dotenv
 
 class GroqAPIClient:
@@ -13,13 +13,10 @@ class GroqAPIClient:
     
     # Lista de modelos disponibles en Groq (agrega o quita según necesidad)
     MODELS = [
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "meta-llama/llama-4-scout-17b-16e-instruct"
-        "llama-3.3-70b-versatile",
-        "deepseek-r1-distill-llama-70b",
-        "meta-llama/Llama-Guard-4-12B"
-        "qwen-qwq-32b",
-        
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "compound-beta-mini",
+        "compound-beta",
+        ""
     ]
     
     def __init__(self, api_key: Optional[str] = None):
@@ -43,6 +40,8 @@ class GroqAPIClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        # Inicializar el historial de conversación
+        self.conversation_history = []
         print(f"Cliente inicializado. Modelo inicial: {self.current_model}")
     
     @property
@@ -56,30 +55,43 @@ class GroqAPIClient:
         print(f"Cambiando al modelo: {self.current_model}")
         return self.current_model
     
-    def call_api(self, prompt: str, temperature: float = 0.3) -> Dict[str, Any]:
+    def set_system_instructions(self, instructions: str) -> None:
+        """Establece las instrucciones del sistema como primer mensaje en el historial de conversación."""
+        # Limpiar el historial actual y establecer el mensaje del sistema
+        self.conversation_history = [
+            {"role": "system", "content": instructions}
+        ]
+        print("Instrucciones del sistema establecidas en el historial de conversación")
+    
+    def call_api(self, prompt: str = None, temperature: float = 0.4) -> Dict[str, Any]:
         """
         Realiza una llamada a la API de Groq con manejo de errores.
         
         Args:
-            prompt: El texto del prompt a enviar.
-            max_tokens: Número máximo de tokens en la respuesta.
+            prompt: El texto del prompt a enviar (opcional si ya hay historial).
             temperature: Temperatura para la generación (0.0 - 1.0).
-            retry_delay: Tiempo en segundos entre reintentos.
-            max_retries: Número máximo de reintentos antes de cambiar de modelo.
             
         Returns:
             Respuesta de la API en formato diccionario.
         """
+        # Si se proporciona un nuevo prompt, agregarlo al historial
+        if prompt:
+            self.conversation_history.append({"role": "user", "content": prompt})
+        
+        # Asegurar que hay mensajes para enviar
+        if not self.conversation_history:
+            raise ValueError("No hay mensajes en el historial de conversación para enviar")
+        
         payload = {
             "model": self.current_model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": self.conversation_history,
             "temperature": temperature
         }
         
         retries = 0
         while retries < len(self.MODELS):  # Intentar con todos los modelos si es necesario
             try:
-                print(f"Enviando solicitud a {self.current_model}")
+                print(f"Enviando solicitud a {self.current_model} con {len(self.conversation_history)} mensajes")
                 response = requests.post(
                     self.BASE_URL,
                     headers=self.headers,
@@ -91,6 +103,23 @@ class GroqAPIClient:
                 if response.status_code == 200:
                     data = response.json()
                     print(f"Respuesta exitosa recibida (tokens: {data.get('usage', {}).get('total_tokens', 'N/A')})")
+                    
+                    # Guardar la respuesta del asistente en el historial
+                    if "choices" in data and len(data["choices"]) > 0:
+                        self.conversation_history.append({
+                            "role": "assistant", 
+                            "content": data["choices"][0]["message"]["content"]
+                        })
+                        
+                        # Limitar el historial si es necesario (mantener sistema + últimos 4 pares)
+                        if len(self.conversation_history) > 9:  # sistema + 4 pares
+                            # Mantener el mensaje del sistema
+                            system_msg = self.conversation_history[0] if self.conversation_history[0]["role"] == "system" else None
+                            # Mantener los últimos 8 mensajes (4 pares)
+                            recent_msgs = self.conversation_history[-8:]
+                            # Reconstruir el historial
+                            self.conversation_history = ([system_msg] if system_msg else []) + recent_msgs
+                    
                     retries = 0
                     return data
                 
@@ -130,12 +159,23 @@ class GroqAPIClient:
         # Si se agotaron todos los reintentos
         raise Exception("Se agotaron todos los reintentos con todos los modelos disponibles.")
     
-    def run_call(self, prompt: str) -> str:
-        """        
+    def run_call(self, prompt: str = None, system_instructions: str = None) -> str:
+        """
+        Ejecuta una llamada a la API con manejo del historial de conversación.
+        
         Args:
-            prompt: El texto del prompt fijo a enviar.
+            prompt: El texto del prompt a enviar (opcional si continuamos conversación).
+            system_instructions: Instrucciones del sistema (solo necesario en la primera llamada).
+            
+        Returns:
+            Contenido de la respuesta.
         """
         try:
+            # Si se proporcionan instrucciones del sistema, establecer el contexto
+            if system_instructions:
+                self.set_system_instructions(system_instructions)
+            
+            # Hacer la llamada a la API
             response = self.call_api(prompt)
             
             # Extraer y mostrar la respuesta
@@ -157,148 +197,84 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
     Args:
         prompt: El prompt principal para la IA.
         game_state: Estado actual del juego en formato JSON.
-        rules: Las reglas del juego.
     
     Returns:
         Respuesta de la IA, generalmente en formato JSON.
     """
     try:
-        # Inicializar el cliente
-        client = GroqAPIClient()
-        
-        # Siempre incluimos las instrucciones del sistema en cada llamada
-        system_instructions = f"""
-        Eres una IA que controla un jugador en un juego de estrategia por turnos tipo Civilization. 
-        Tu objetivo es tomar decisiones estratégicas según el estado del juego que recibirás.
-        Debes responder EXCLUSIVAMENTE en formato JSON según el esquema proporcionado, aparte del JSON no añadas nada más.
-        No debes incluir comentarios, explicaciones o cualquier otro texto fuera del JSON.
-        Estas son las reglas del juego:
-        -Cada unidad puede movrse dos veces por turno.
-        -Cada unidad puede atacar una vez por turno.
-        -Cada unidad puede construir una vez por turno.
-        -No puede haber dos unidades en la misma posición. (IMPORTANTE)
-        -Las unidades no se pueden salir del mapa, es decir en un mapa 20x20 no pueden ir a las posiciones [20,0] o [0,20], ya que las coordenadas empiezan por el 0, para saber el tamaño del mapa fijate en el valor map_size del json del game que te paso.
-        -Las unidades no pueden moverse a través de otras unidades.
-        -Las unidades no pueden moverse a través de agua ni tampoco pueden estar en agua. (IMPORTANTE)
-
-        """
+        # Inicializar el cliente (mantenemos una instancia persistente)
+        if not hasattr(iaDeitu, "_client"):
+            iaDeitu._client = GroqAPIClient()
+            
+            # Instrucciones del sistema que solo se envían una vez
+            system_instructions = """
+            Eres una IA que controla un jugador en un juego de estrategia por turnos tipo Civilization. 
+            Tu objetivo es tomar decisiones estratégicas según el estado del juego que recibirás.
+            Debes responder EXCLUSIVAMENTE en formato JSON según el esquema proporcionado, aparte del JSON no añadas nada más.
+            No debes incluir comentarios, explicaciones o cualquier otro texto fuera del JSON.
+            Estas son las reglas del juego:
+            -Cada unidad puede movrse dos veces por turno.
+            -Cada unidad puede atacar una vez por turno.
+            -Cada unidad puede construir una vez por turno.
+            -No puede haber dos unidades en la misma posición. (IMPORTANTE)
+            -Las unidades no se pueden salir del mapa, es decir en un mapa 20x20 no pueden ir a las posiciones [20,0] o [0,20], ya que las coordenadas empiezan por el 0, para saber el tamaño del mapa fijate en el valor map_size del json del game que te paso.
+            -Las unidades no pueden moverse a través de otras unidades.
+            -Las unidades no pueden moverse a través de agua ni tampoco pueden estar en agua. (IMPORTANTE)
+            
+            Información sobre el terreno:
+            - 0: Tierra (terreno normal)
+            - 1: Agua (no transitable)
+            - 2: Terreno con minerales (recursos)
+            - 3: Terreno con hierro (recursos)
+            - 4: Terreno con madera (bosque)
+            - 5: Terreno con piedra (recursos)
+            - 6: Terreno con oro (recursos)
+            
+            Estructura JSON de respuesta:
+            {
+              "ai_turn_id": "[ID único para este turno]",
+              "game_id": "[ID del juego actual]",
+              "turn_number": [número del turno actual],
+              "actions": [
+                {
+                  "action_id": [número secuencial de acción],
+                  "type": "[tipo de acción/ movimiento/ataque/construcción]",
+                  "unit_id": "[ID de la unidad que realiza la acción]",
+                  "position":[
+                    [coordenada_x, coordenada_y]
+                  ],
+                  // otros campos según el tipo de acción
+                  "state_before": { /* estado resumido antes de la acción */ },
+                  "state_after": { /* estado resumido después de la acción */ }
+                }
+              ],
+              "reasoning": "[Explicación breve de tu estrategia en este turno]"
+            }
+            """
+            
+            # Establecer las instrucciones del sistema en el cliente
+            iaDeitu._client.set_system_instructions(system_instructions)
+            
+        # Construir el mensaje actual con el estado del juego y prompt específico
         game_prompt = f"""
-        {system_instructions}
-        
         Basado en el estado actual del juego y tus objetivos, genera tu siguiente turno de acciones.
         
         IMPORTANTE: NO puedes usar directamente los elementos map_data.startPoint, grid y visibleObjects del JSON 
         del estado del juego. Estos son datos internos del motor de juego.
         
-        Información sobre el terreno:
-        - 0: Tierra (terreno normal)
-        - 1: Agua (no transitable)
-        - 2: Terreno con minerales (recursos)
-        - 3: Terreno con hierro (recursos)
-        - 4: Terreno con madera (bosque)
-        - 5: Terreno con piedra (recursos)
-        - 6: Terreno con oro (recursos)
-        
-        Tamaño del mapa: {game_state.get('map_size', {'width': 30, 'height': 15}) if game_state else {'width': 30, 'height': 15}}
+        Tamaño del mapa: {game_state.get('map_data').get('map_size') if game_state else {'width': 30, 'height': 15}}
         
         Estado actual del juego:
         {json.dumps(game_state) if game_state else 'No hay estado de juego disponible.'}
         
         {prompt}
         
-        Responde ÚNICAMENTE con un JSON válido siguiendo esta estructura:
-        {{
-          "ai_turn_id": "[ID único para este turno]",
-          "game_id": "[ID del juego actual]",
-          "turn_number": [número del turno actual],
-          "actions": [
-            {{
-              "action_id": [número secuencial de acción],
-              "type": "[tipo de acción/ movimiento/ataque/construcción]",
-                "unit_id": "[ID de la unidad que realiza la acción]",
-                "position":[
-                  [coordenada_x, coordenada_y]
-                ],
-              // otros campos según el tipo de acción
-              "state_before": {{ /* estado resumido antes de la acción */ }},
-              "state_after": {{ /* estado resumido después de la acción */ }}
-            }},
-            // más acciones...
-          ],
-          "reasoning": "[Explicación breve de tu estrategia en este turno]"
-        }}
-
-        Aqui tienes un ejemplo de respuesta:
-        {{
-  "ai_turn_id": "ai_turn_1684159782",
-  "game_id": "game_12345",
-  "turn_number": 5,
-  "actions": [
-    {{
-      "action_id": 1,
-      "type": "movement",
-      "unit_id": "warrior_01",
-      "position": [15, 8],
-      "target_position": [16, 9],
-      "state_before": {{
-        "position": [15, 8],
-        "remainingMovement": 2,
-        "status": "ready"
-      }},
-      "state_after": {{
-        "position": [16, 9],
-        "remainingMovement": 1,
-        "status": "moved"
-      }}
-        }},
-    {{
-      "action_id": 2,
-      "type": "attack",
-      "unit_id": "warrior_01",
-      "position": [16, 9],
-      "target_unit_id": "player_settler_03",
-      "target_position": [17, 9],
-      "state_before": {{
-        "position": [16, 9],
-        "remainingMovement": 1,
-        "status": "moved",
-        "health": 100
-      }},
-      "state_after": {{
-        "position": [16, 9],
-        "remainingMovement": 0,
-        "status": "exhausted",
-        "health": 85
-      }}
-    }},
-    {{
-      "action_id": 3,
-      "type": "construction",
-      "unit_id": "settler_02",
-      "position": [12, 5],
-      "building": "city",
-      "city_name": "New Atlantis",
-      "state_before": {{
-        "position": [12, 5],
-        "remainingMovement": 2,
-        "status": "ready"
-      }},
-      "state_after": {{
-        "position": [12, 5],
-        "remainingMovement": 0,
-        "status": "exhausted"
-      }}
-    }}
-  ],
-  "reasoning": "Advancing warrior units toward player territory to apply pressure while establishing a new city near resources to secure economic advantage."
-}}
-
         Recuerda que el JSON debe ser válido y no debe contener comillas al principio o al final.
         Si no puedes realizar ninguna acción, responde con un JSON vacío.
         """
         
-        # Ejecutar la llamada a la API y devolver directamente el resultado
-        return client.run_call(prompt=game_prompt)
+        # Ejecutar la llamada a la API con el prompt específico del juego
+        return iaDeitu._client.run_call(prompt=game_prompt)
         
     except Exception as e:
         print(f"Error en la ejecución: {str(e)}")

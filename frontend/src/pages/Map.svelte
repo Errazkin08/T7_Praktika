@@ -1106,10 +1106,10 @@
   // Function to get resource icons based on terrain type
   function getResourceIcon(terrainType) {
     switch (terrainType) {
-      case 2: return "🪙"; // Gold
-      case 3: return "⚙️"; // Iron
-      case 4: return "🌲"; // Wood
-      case 5: return "🪨"; // Stone
+      case 2: return { type: "emoji", value: "🪙" }; // Gold
+      case 3: return { type: "image", value: "./ia_assets/metala.png" }; // Iron/Metal
+      case 4: return { type: "image", value: "./ia_assets/zuhaitza.png" }; // Wood/Tree
+      case 5: return { type: "image", value: "./ia_assets/harria.png" }; // Stone
       default: return null; // No resource
     }
   }
@@ -1392,7 +1392,11 @@
               
               {#if hasResource && isVisible}
                 <div class="resource-marker" title="{getTerrainName(terrainType)}">
-                  <span class="resource-icon">{getResourceIcon(terrainType)}</span>
+                  {#if getResourceIcon(terrainType).type === "emoji"}
+                    <span class="resource-icon">{getResourceIcon(terrainType).value}</span>
+                  {:else}
+                    <img src={getResourceIcon(terrainType).value} alt="{getTerrainName(terrainType)}" class="resource-image" />
+                  {/if}
                 </div>
               {/if}
               
@@ -1656,21 +1660,27 @@
         <div class="resource-value">{gameData.player.resources.food || 0}</div>
       </div>
       <div class="resource gold">
-        <div class="resource-icon">💰</div>
+        <div class="resource-icon">🪙</div>
         <div class="resource-value">{gameData.player.resources.gold || 0}</div>
       </div>
       <div class="resource wood">
-        <div class="resource-icon">🪵</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.wood || 0}</div>
       </div>
       <!-- Add iron resource -->
       <div class="resource iron">
-        <div class="resource-icon">⚙️</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/metala.png" alt="Iron" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.iron || 0}</div>
       </div>
       <!-- Add stone resource -->
       <div class="resource stone">
-        <div class="resource-icon">🪨</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/harria.png" alt="Stone" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.stone || 0}</div>
       </div>
     </div>
@@ -1765,6 +1775,18 @@
   .city-image {
     width: 100%;
     height: 100%;
+    object-fit: contain;
+  }
+  
+  .resource-image {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+  }
+  
+  .resource-bar-icon {
+    width: 24px;
+    height: 24px;
     object-fit: contain;
   }
 </style>

@@ -351,6 +351,13 @@
           
           const unitToMove = units[unitIndex];
           
+          // Check if target position is water (invalid move)
+          const [targetX, targetY] = action.target_position;
+          if (terrain[targetY] && terrain[targetY][targetX] === TERRAIN_TYPES.WATER) {
+            console.warn(`AI attempted invalid move to water tile at [${targetX}, ${targetY}]. Movement ignored.`);
+            break;
+          }
+          
           // Show path
           activeMovementPath = {
             fromX: action.position[0],

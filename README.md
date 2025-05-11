@@ -8,7 +8,13 @@ Erabiliko ditugun teknologiak:
 - Back-End: **Flask**
 
 ---
-## Exekutatzeko komandoa:
+## Exekutatzeko pausoak:
+### .env fitxategi bat sortu erroan:
+Ondorengoa eduki behar da .env fitxategian:
+```
+GROQ_API_KEY=[zure api key]
+```
+### Exekutatzeko komandoak:
 **Lehenengo aldia bada:**
 ```
 docker-compose up --build 

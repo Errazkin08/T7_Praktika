@@ -1071,3 +1071,96 @@ def reset_troops_status(username):
     
     session['game'] = game
     return True, "All troops reset to ready status"
+
+
+def get_building_types():
+    #Define different building types like sawmill, quarry, farm, etc.
+    building_types = [
+        {
+            "type_id": "sawmill",
+            "name": "Sawmill",
+            "category": "production",
+            "cost": {
+                "wood": 20,
+                "stone": 20
+            },
+            "description": "Produces wood over time"
+        },
+        { 
+            "type_id": "quarry",
+            "name": "Quarry",
+            "category": "production",
+            "cost": {
+                "wood": 30, 
+                "stone": 20
+            },
+            "description": "Produces stone over time"
+        },
+        {
+            "type_id": "farm",
+            "name": "Farm",
+            "category": "production",
+            "cost": {
+                "wood": 40
+            },
+            "description": "Produces food over time"
+        },
+        {
+            "type_id": "mine",
+            "name": "Mine",
+            "category": "production",
+            "cost": {
+                "wood": 50,
+                "stone": 50
+            },
+            "description": "Produces minerals over time"
+        }
+
+    ]
+
+    return building_types
+
+def get_building_type(type_id):
+    """
+    Get a specific building type by its ID
+    """
+    building_types = get_building_types()
+    for building_type in building_types:
+        if building_type["type_id"] == type_id:
+            return building_type
+    return None
+
+def add_building_to_city(city_id, type_id):
+    """
+    Add a new building to a city
+    """
+    game = session.get('game')
+    if not game or "cities" not in game:
+        return False, "No cities found"
+
+    city = next((c for c in game["cities"] if c["id"] == city_id), None)
+    if not city:
+        return False, "City not found"
+
+    building_type = get_building_type(type_id)
+    if not building_type:
+        return False, "Invalid building type"
+
+    # Check if the city has a buildings list, if not, create one
+    if "buildings" not in city:
+        city["buildings"] = []
+
+    # Create the new building
+    new_building = {
+        "id": f"building-{datetime.now()}",
+        "type_id": type_id,
+        "name": building_type["name"],
+        "category": building_type["category"],
+        "cost": building_type["cost"],
+        "output": building_type["output"],
+        "description": building_type["description"]
+    }
+
+    city["buildings"].append(new_building)
+    session['game'] = game
+    return True, "Building added to city"

@@ -139,8 +139,8 @@
     switch (type && type.toLowerCase()) {
       case 'warrior': return { type: 'image', url: './ia_assets/warrior.png' };
       case 'settler': return { type: 'image', url: './ia_assets/settler.png' };
-      case 'archer': return { type: 'emoji', value: '🏹' };
-      case 'cavalry': return { type: 'emoji', value: '🐎' };
+      case 'archer': return { type: 'image', url: './ia_assets/archer.png' }; // Changed from emoji to image
+      case 'cavalry': return { type: 'image', url: './ia_assets/cavalry.png' };
       case 'builder': return { type: 'emoji', value: '🔨' };
       default: return { type: 'emoji', value: '👤' };
     }
@@ -378,7 +378,7 @@
                             
                             <div class="troop-details">
                               <span class="troop-name">{troopType.name}</span>
-                              <span class="troop-cost">{troopType.cost ? `${troopType.cost.food || 0}🌾 ${troopType.cost.gold || 0}💰` : 'Costo no disponible'}</span>
+                              <span class="troop-cost">{troopType.cost ? `${troopType.cost.food || 0}🌾 ${troopType.cost.gold || 0}🪙` : 'Costo no disponible'}</span>
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
@@ -527,19 +527,25 @@
         <div class="resource-value">{gameData.player.resources.food || 0}</div>
       </div>
       <div class="resource gold">
-        <div class="resource-icon">💰</div>
+        <div class="resource-icon">🪙</div>
         <div class="resource-value">{gameData.player.resources.gold || 0}</div>
       </div>
       <div class="resource wood">
-        <div class="resource-icon">🪵</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.wood || 0}</div>
       </div>
       <div class="resource iron">
-        <div class="resource-icon">⚙️</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/metala.png" alt="Iron" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.iron || 0}</div>
       </div>
       <div class="resource stone">
-        <div class="resource-icon">🪨</div>
+        <div class="resource-icon">
+          <img src="./ia_assets/harria.png" alt="Stone" class="resource-bar-icon" />
+        </div>
         <div class="resource-value">{gameData.player.resources.stone || 0}</div>
       </div>
     </div>
@@ -1175,5 +1181,11 @@
     font-weight: bold;
     display: block;
     margin-bottom: 8px;
+  }
+
+  .resource-bar-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
   }
 </style>

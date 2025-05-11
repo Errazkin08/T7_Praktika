@@ -2,7 +2,9 @@
 import requests
 import time
 import json
+import os
 from typing import Dict, Optional, Any
+from dotenv import load_dotenv
 
 class GroqAPIClient:
     """Cliente para realizar llamadas a la API de Groq con manejo de errores y cambio de modelos."""
@@ -12,9 +14,11 @@ class GroqAPIClient:
     # Lista de modelos disponibles en Groq (agrega o quita según necesidad)
     MODELS = [
         "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "llama3-8b-8192",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "meta-llama/llama-4-scout-17b-16e-instruct"
+        "llama-3.3-70b-versatile",
         "deepseek-r1-distill-llama-70b",
+        "meta-llama/Llama-Guard-4-12B"
+        "qwen-qwq-32b",
         
     ]
     
@@ -26,7 +30,13 @@ class GroqAPIClient:
             api_key: Clave de API de Groq. Si no se proporciona, se intentará
                      obtener de la variable de entorno GROQ_API_KEY.
         """
-        self.api_key = "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"
+        # Cargar variables de entorno desde el archivo .env
+        load_dotenv()
+        
+        # Usar la API key proporcionada o buscarla en las variables de entorno
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        if not self.api_key:
+            raise ValueError("API key debe ser proporcionada o configurada en la variable de entorno GROQ_API_KEY")
                 
         self.current_model_index = 0
         self.headers = {
@@ -210,6 +220,71 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
           ],
           "reasoning": "[Explicación breve de tu estrategia en este turno]"
         }}
+
+        Aqui tienes un ejemplo de respuesta:
+        {{
+  "ai_turn_id": "ai_turn_1684159782",
+  "game_id": "game_12345",
+  "turn_number": 5,
+  "actions": [
+    {{
+      "action_id": 1,
+      "type": "movement",
+      "unit_id": "warrior_01",
+      "position": [15, 8],
+      "target_position": [16, 9],
+      "state_before": {{
+        "position": [15, 8],
+        "remainingMovement": 2,
+        "status": "ready"
+      }},
+      "state_after": {{
+        "position": [16, 9],
+        "remainingMovement": 1,
+        "status": "moved"
+      }}
+        }},
+    {{
+      "action_id": 2,
+      "type": "attack",
+      "unit_id": "warrior_01",
+      "position": [16, 9],
+      "target_unit_id": "player_settler_03",
+      "target_position": [17, 9],
+      "state_before": {{
+        "position": [16, 9],
+        "remainingMovement": 1,
+        "status": "moved",
+        "health": 100
+      }},
+      "state_after": {{
+        "position": [16, 9],
+        "remainingMovement": 0,
+        "status": "exhausted",
+        "health": 85
+      }}
+    }},
+    {{
+      "action_id": 3,
+      "type": "construction",
+      "unit_id": "settler_02",
+      "position": [12, 5],
+      "building": "city",
+      "city_name": "New Atlantis",
+      "state_before": {{
+        "position": [12, 5],
+        "remainingMovement": 2,
+        "status": "ready"
+      }},
+      "state_after": {{
+        "position": [12, 5],
+        "remainingMovement": 0,
+        "status": "exhausted"
+      }}
+    }}
+  ],
+  "reasoning": "Advancing warrior units toward player territory to apply pressure while establishing a new city near resources to secure economic advantage."
+}}
 
         Recuerda que el JSON debe ser válido y no debe contener comillas al principio o al final.
         Si no puedes realizar ninguna acción, responde con un JSON vacío.

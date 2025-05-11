@@ -6,7 +6,7 @@ WORKDIR /app
 COPY app.py database.py routes.py IAProba.py ./
 
 # Install all necessary dependencies (added flask-session)
-RUN pip install flask pymongo groq requests flask-cors flask-session
+RUN pip install flask pymongo groq requests flask-cors flask-session python-dotenv
 
 # Environment variables
 ENV MONGO_URI=mongodb://mongodb:27017/

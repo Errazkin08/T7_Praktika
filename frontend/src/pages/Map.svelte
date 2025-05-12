@@ -615,60 +615,61 @@
 
     console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
 
-    // Handle player city production before switching to AI turn
-    const completedProductions = await processCityProduction();
-    
-    // If we just completed a production that requires unit placement, block turn end
-    if (awaitingUnitPlacement && newlyProducedUnit) {
-      showToastNotification("Nueva unidad producida. Debes colocarla antes de finalizar el turno", "success", 5000);
-      return;
-    }
-
-    // Show notifications for completed productions (that don't require placement)
-    if (completedProductions && completedProductions.length > 0) {
-      // Show notifications sequentially with a slight delay between them
-      for (let i = 0; i < completedProductions.length; i++) {
-        const production = completedProductions[i];
-        // Use a timeout to stagger notifications
-        setTimeout(() => {
-          showToastNotification(production.message, "success", 4000);
-        }, i * 1000); // 1 second between notifications
+    try {  // Add the missing try statement here
+      // Handle player city production before switching to AI turn
+      const completedProductions = await processCityProduction();
+      
+      // If we just completed a production that requires unit placement, block turn end
+      if (awaitingUnitPlacement && newlyProducedUnit) {
+        showToastNotification("Nueva unidad producida. Debes colocarla antes de finalizar el turno", "success", 5000);
+        return;
       }
-      
-      // Wait a moment for the player to see notifications before proceeding to AI turn
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
 
-    gameData.current_player = "ia";
-    currentPlayer.set(gameData.current_player);
-    showToastNotification("IA's Turn - Processing...", "info");
-    
-    // Process AI city production before AI actions
-    const aiCompletedProductions = await processAICityProduction();
-    
-    try {
-      console.log("Requesting AI action...");
-      const aiResponse = await gameAPI.getAIAction(gameData);
-      console.log("AI Response:", aiResponse);
-      
-      if (aiResponse && aiResponse.actions && aiResponse.actions.length > 0) {
-        // Show AI production notifications if there were any
-        if (aiCompletedProductions && aiCompletedProductions.length > 0) {
-          showToastNotification(`La IA ha completado ${aiCompletedProductions.length} producciones`, "info", 3000);
+      // Show notifications for completed productions (that don't require placement)
+      if (completedProductions && completedProductions.length > 0) {
+        // Show notifications sequentially with a slight delay between them
+        for (let i = 0; i < completedProductions.length; i++) {
+          const production = completedProductions[i];
+          // Use a timeout to stagger notifications
+          setTimeout(() => {
+            showToastNotification(production.message, "success", 4000);
+          }, i * 1000); // 1 second between notifications
         }
         
-        await processAIActions(aiResponse.actions, aiResponse.reasoning);
-      } else {
-        showToastNotification("La IA ha completado su turno (sin acciones)", "info");
+        // Wait a moment for the player to see notifications before proceeding to AI turn
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      gameData.current_player = "ia";
+      currentPlayer.set(gameData.current_player);
+      showToastNotification("IA's Turn - Processing...", "info");
+      
+      // Process AI city production before AI actions
+      const aiCompletedProductions = await processAICityProduction();
+      
+      try {
+        console.log("Requesting AI action...");
+        const aiResponse = await gameAPI.getAIAction(gameData);
+        console.log("AI Response:", aiResponse);
+        
+        if (aiResponse && aiResponse.actions && aiResponse.actions.length > 0) {
+          // Show AI production notifications if there were any
+          if (aiCompletedProductions && aiCompletedProductions.length > 0) {
+            showToastNotification(`La IA ha completado ${aiCompletedProductions.length} producciones`, "info", 3000);
+          }
+          
+          await processAIActions(aiResponse.actions, aiResponse.reasoning);
+        } else {
+          showToastNotification("La IA ha completado su turno (sin acciones)", "info");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error("Error getting AI action:", error);
+        showToastNotification("Error processing AI turn", "error");
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
-    } catch (error) {
-      console.error("Error getting AI action:", error);
-      showToastNotification("Error processing AI turn", "error");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       gameData.current_player = "player";
       gameData.turn = (gameData.turn || 0) + 1;

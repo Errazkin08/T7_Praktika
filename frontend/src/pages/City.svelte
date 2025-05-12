@@ -229,14 +229,22 @@
   }
 
   function getBuildingIcon(type) {
-    switch (type && type.toLowerCase()) {
-      case 'farm': return { type: 'emoji', value: '🌾' };
+    // Convert type to lowercase and remove spaces for comparison
+    const normalizedType = type ? type.toLowerCase().replace(/\s+/g, '') : '';
+    
+    switch (normalizedType) {
+      case 'farm': return { type: 'image', url: './ia_assets/farm.jpg' };
       case 'barracks': return { type: 'emoji', value: '⚔️' };
       case 'library': return { type: 'emoji', value: '📚' };
       case 'market': return { type: 'emoji', value: '🏪' };
       case 'wall': return { type: 'emoji', value: '🧱' };
       case 'tower': return { type: 'emoji', value: '🗼' };
       case 'temple': return { type: 'emoji', value: '⛪' };
+      // Use the new image paths for specific buildings
+      case 'quarry': return { type: 'image', url: './ia_assets/quarry.jpg' };
+      case 'sawmill': return { type: 'image', url: './ia_assets/sawmill.png' };
+      case 'ironmine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
+      case 'goldmine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       default: return { type: 'emoji', value: '🏛️' };
     }
   }
@@ -615,6 +623,57 @@
                               {/if}
                               
                               <div class="attributes-grid">
+                                <!-- Level Information -->
+                                {#if buildingType.level !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">⭐</span>
+                                    <span class="attribute-label">Nivel:</span>
+                                    <span class="attribute-value">{buildingType.level}</span>
+                                  </div>
+                                {/if}
+                                
+                                <!-- Level Upgrade Cost -->
+                                {#if buildingType.level_upgrade !== undefined}
+                                  <div class="attribute">
+                                    <span class="attribute-icon">⬆️</span>
+                                    <span class="attribute-label">Mejora:</span>
+                                    <span class="attribute-value">{buildingType.level_upgrade}</span>
+                                  </div>
+                                {/if}
+                                
+                                <!-- Output Resources -->
+                                {#if buildingType.output}
+                                  <!-- Replace the original output display with more compact version -->
+                                  <div class="resource-output-attribute">
+                                    <div class="resource-output-header">
+                                      <span class="attribute-icon">⚒️</span>
+                                      <span class="attribute-label">Producción</span>
+                                    </div>
+                                    {#each Object.entries(buildingType.output) as [resource, amount]}
+                                      <div class="resource-item">
+                                        <span class="resource-icon-container">
+                                          {#if resource === 'food'}
+                                            <img src="./ia_assets/janaria.png" alt="Food" class="resource-icon-small" />
+                                          {:else if resource === 'gold'}
+                                            <img src="./ia_assets/lingotes_oro.png" alt="Gold" class="resource-icon-small" />
+                                          {:else if resource === 'wood'}
+                                            <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-icon-small" />
+                                          {:else if resource === 'stone'}
+                                            <img src="./ia_assets/harria.png" alt="Stone" class="resource-icon-small" />
+                                          {:else if resource === 'iron'}
+                                            <img src="./ia_assets/lingote_hierro.png" alt="Iron" class="resource-icon-small" />
+                                          {:else}
+                                            {resource} 
+                                          {/if}
+                                        </span>
+                                        <span class="resource-name">{resource}:</span>
+                                        <span class="resource-output-value">+{amount}</span>
+                                      </div>
+                                    {/each}
+                                  </div>
+                                {/if}
+                                
+                                <!-- Other building attributes -->
                                 {#if buildingType.production_bonus !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">⚒️</span>
@@ -682,6 +741,48 @@
                     {/if}
                     
                     <div class="building-stats">
+                      <!-- Level Information -->
+                      <div class="building-stat">
+                        <span class="stat-icon">⭐</span>
+                        <span class="stat-label">Nivel:</span>
+                        <span class="stat-value">{building.level || 1}</span>
+                      </div>
+                      
+                      <!-- Output Resources -->
+                      {#if building.output}
+                        {#each Object.entries(building.output) as [resource, amount]}
+                          <div class="building-stat resource-output">
+                            <span class="stat-icon">
+                              {#if resource === 'food'}
+                                <img src="./ia_assets/janaria.png" alt="Food" class="resource-icon-small" />
+                              {:else if resource === 'gold'}
+                                <img src="./ia_assets/lingotes_oro.png" alt="Gold" class="resource-icon-small" />
+                              {:else if resource === 'wood'}
+                                <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-icon-small" />
+                              {:else if resource === 'stone'}
+                                <img src="./ia_assets/harria.png" alt="Stone" class="resource-icon-small" />
+                              {:else if resource === 'iron'}
+                                <img src="./ia_assets/lingote_hierro.png" alt="Iron" class="resource-icon-small" />
+                              {:else}
+                                {resource} 
+                              {/if}
+                            </span>
+                            <span class="stat-label">Producción:</span>
+                            <span class="stat-value">+{amount}/turno</span>
+                          </div>
+                        {/each}
+                      {/if}
+                      
+                      <!-- Level Upgrade Information -->
+                      {#if building.level_upgrade !== undefined}
+                        <div class="building-stat upgrade-info">
+                          <span class="stat-icon">⬆️</span>
+                          <span class="stat-label">Mejora al siguiente nivel:</span>
+                          <span class="stat-value">{building.level_upgrade}</span>
+                        </div>
+                      {/if}
+                      
+                      <!-- Other building stats -->
                       {#if building.production_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">⚒️</span>
@@ -723,10 +824,12 @@
                       {/if}
                     </div>
                     
-                    <div class="building-level">
-                      <span class="level-label">Nivel:</span>
-                      <span class="level-value">{building.level || 1}</span>
-                    </div>
+                    <!-- Upgrade Building Button -->
+                    {#if building.level !== undefined && building.level_upgrade !== undefined}
+                      <div class="building-upgrade">
+                        <button class="upgrade-button">Mejorar a Nivel {building.level + 1}</button>
+                      </div>
+                    {/if}
                   </div>
                 {/each}
               </div>

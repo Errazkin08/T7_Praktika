@@ -670,47 +670,54 @@
     
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    gameData.current_player = "player";
-    gameData.turn = (gameData.turn || 0) + 1;
-    currentPlayer.set(gameData.current_player);
-    currentTurn.set(gameData.turn);
+      gameData.current_player = "player";
+      gameData.turn = (gameData.turn || 0) + 1;
+      currentPlayer.set(gameData.current_player);
+      currentTurn.set(gameData.turn);
 
-    const aiUnits = units.filter(unit => unit.owner === 'ia');
+      const aiUnits = units.filter(unit => unit.owner === 'ia');
 
-    if (gameData.player && Array.isArray(gameData.player.units)) {
-      gameData.player.units.forEach((unit, index) => {
-        unit.status = "ready";
-        unit.remainingMovement = unit.movement || 2;
+      if (gameData.player && Array.isArray(gameData.player.units)) {
+        gameData.player.units.forEach((unit, index) => {
+          unit.status = "ready";
+          unit.remainingMovement = unit.movement || 2;
+          
+          if (selectedUnitInfo && selectedUnitInfo.id === unit.id) {
+            selectedUnitInfo = unit;
+          }
+        });
         
-        if (selectedUnitInfo && selectedUnitInfo.id === unit.id) {
-          selectedUnitInfo = unit;
+        let updatedUnits = [...gameData.player.units];
+        
+        if (aiUnits.length > 0) {
+          updatedUnits = [...updatedUnits, ...aiUnits];
         }
-      });
-      
-      let updatedUnits = [...gameData.player.units];
-      
-      if (aiUnits.length > 0) {
-        updatedUnits = [...updatedUnits, ...aiUnits];
+        
+        units = updatedUnits;
+        
+        console.log("Units after turn end:", units.length, "- Player:", 
+          units.filter(u => u.owner === 'player').length, 
+          "AI:", units.filter(u => u.owner === 'ia').length);
       }
       
-      units = updatedUnits;
-      
-      console.log("Units after turn end:", units.length, "- Player:", 
-        units.filter(u => u.owner === 'player').length, 
-        "AI:", units.filter(u => u.owner === 'ia').length);
-    }
-    
-    selectedUnit = null;
-    selectedUnitInfo = null;
-    validMoveTargets = [];
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      validMoveTargets = [];
 
-    try {
-      await gameAPI.updateGameSession(gameData);
-      console.log(`Game session updated for Turn ${gameData.turn}.`);
-      showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
+      try {
+        await gameAPI.updateGameSession(gameData);
+        console.log(`Game session updated for Turn ${gameData.turn}.`);
+        showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
+      } catch (error) {
+        console.error("Failed to update game session after ending turn:", error);
+        showToastNotification("Error saving turn data to server.", "error");
+      }
     } catch (error) {
-      console.error("Failed to update game session after ending turn:", error);
-      showToastNotification("Error saving turn data to server.", "error");
+      console.error("Unexpected error during end turn:", error);
+      showToastNotification("Error inesperado al finalizar turno", "error");
+    } finally {
+      // Always re-enable the button when done, regardless of whether there was an error
+      processingAITurn = false;
     }
   }
 
@@ -1876,8 +1883,14 @@
         </span>
       </div>
       <div class="right-controls">
-        <button class="end-turn-button" on:click={endTurn} title="Finalizar Turno">
-          Terminar Turno
+        <button 
+          class="end-turn-button" 
+          on:click={endTurn} 
+          title="{processingAITurn ? 'Procesando turno de la IA...' : 'Finalizar Turno'}"
+          disabled={processingAITurn}
+          class:processing={processingAITurn}
+        >
+          {processingAITurn ? 'IA pensando...' : 'Terminar Turno'}
         </button>
         <button on:click={toggleFogOfWar} title="{showFogOfWar ? 'Desactivar' : 'Activar'} Niebla de Guerra" class:active={showFogOfWar}>
           {showFogOfWar ? '👁️' : '🌫️'} Niebla

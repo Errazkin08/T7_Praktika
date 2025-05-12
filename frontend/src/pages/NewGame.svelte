@@ -20,6 +20,11 @@
     difficulty: "medium",
     name: ""
   };
+
+  // Civilization selection
+  let civilizations = [];
+  let selectedPlayerCiv = null;
+  let selectedAICiv = null;
   
   // Redirect to welcome page if not logged in
   onMount(async () => {
@@ -31,6 +36,9 @@
       
       // Cargar todos los mapas disponibles
       await loadExistingMaps();
+      
+      // Load available civilizations
+      await loadCivilizations();
     } catch (err) {
       console.error("Error in NewGame component:", err);
       error = err.message;
@@ -58,7 +66,88 @@
       isLoading = false;
     }
   }
+
+  // Load civilizations from the API
+  async function loadCivilizations() {
+    try {
+      const response = await fetch('/api/civilizations');
+      if (!response.ok) {
+        throw new Error('Failed to load civilizations');
+      }
+      civilizations = await response.json();
+      
+      // Set default selections
+      if (civilizations.length > 0) {
+        selectedPlayerCiv = civilizations[0];
+        // Select a different civ for AI
+        selectedAICiv = civilizations.length > 1 ? civilizations[1] : civilizations[0];
+      }
+    } catch (err) {
+      console.error("Error loading civilizations:", err);
+      error = "No se pudieron cargar las civilizaciones: " + err.message;
+      
+      // Provide default civilizations in case of error
+      civilizations = [
+        {
+          "civ_id": "rome",
+          "name": "Rome",
+          "description": "Masters of warfare and organization",
+          "bonuses": ["All units gain +1 experience per combat", "Cities grow 10% faster"],
+          "image": "rome.png"
+        },
+        {
+          "civ_id": "egypt",
+          "name": "Egypt",
+          "description": "Masters of agriculture and construction",
+          "bonuses": ["Farms produce 20% more food", "Stone buildings cost 15% less"],
+          "image": "egypt.png"
+        },
+        {
+          "civ_id": "greece",
+          "name": "Greece",
+          "description": "Masters of philosophy and naval warfare",
+          "bonuses": ["Naval units have +1 movement", "Science buildings produce 15% more research"],
+          "image": "greece.png"
+        },
+        {
+          "civ_id": "mongolia",
+          "name": "Mongolia",
+          "description": "Masters of cavalry and conquest",
+          "bonuses": ["Mounted units have +1 movement", "Conquered cities produce no unhappiness"],
+          "image": "mongolia.png"
+        }
+      ];
+      selectedPlayerCiv = civilizations[0];
+      selectedAICiv = civilizations[1];
+    }
+  }
   
+  // Set the civilization for player
+  function selectPlayerCiv(civ) {
+    selectedPlayerCiv = civ;
+    
+    // If AI has the same civ, select a different one
+    if (selectedAICiv && selectedAICiv.civ_id === civ.civ_id) {
+      const otherCivs = civilizations.filter(c => c.civ_id !== civ.civ_id);
+      if (otherCivs.length > 0) {
+        selectedAICiv = otherCivs[0];
+      }
+    }
+  }
+  
+  // Set the civilization for AI
+  function selectAICiv(civ) {
+    selectedAICiv = civ;
+    
+    // If player has the same civ, select a different one
+    if (selectedPlayerCiv && selectedPlayerCiv.civ_id === civ.civ_id) {
+      const otherCivs = civilizations.filter(c => c.civ_id !== civ.civ_id);
+      if (otherCivs.length > 0) {
+        selectedPlayerCiv = otherCivs[0];
+      }
+    }
+  }
+
   // Función para crear un nuevo mapa
   async function createNewMap() {
     try {
@@ -126,22 +215,29 @@
         return;
       }
       
+      if (!selectedPlayerCiv || !selectedAICiv) {
+        error = "Debes seleccionar civilizaciones para el jugador y la IA";
+        return;
+      }
+      
       isLoading = true;
       
       // Aseguramos que tenemos un valor de string para map_id
       const mapId = String(selectedMap.map_id || selectedMap._id);
       
-      // Datos para crear la partida
+      // Datos para crear la partida con civilizaciones
       const gameData = {
-        map: mapId,
+        map_id: mapId,
         name: gameName,
-        difficulty: selectedMap.difficulty || "medium"
+        difficulty: selectedMap.difficulty || "medium",
+        player_civ_id: selectedPlayerCiv.civ_id,
+        ai_civ_id: selectedAICiv.civ_id
       };
       
       console.log("Creating game with data:", gameData);
       
-      // Llamar al endpoint para crear una partida
-      const result = await gameAPI.createGameWithMap(gameData);
+      // Llamar al endpoint para crear una partida con civilización
+      const result = await gameAPI.createGameWithCivilization(gameData);
       
       console.log("Game created:", result);
       
@@ -150,7 +246,9 @@
         mapId: mapId,
         difficulty: selectedMap.difficulty,
         width: selectedMap.width,
-        height: selectedMap.height
+        height: selectedMap.height,
+        playerCiv: selectedPlayerCiv.name,
+        aiCiv: selectedAICiv.name
       });
       
       // Navegar al mapa para iniciar la partida
@@ -192,6 +290,98 @@
         <div class="form-group">
           <label for="game-name">Nombre de la Partida:</label>
           <input type="text" id="game-name" bind:value={gameName} placeholder="Introduce un nombre para tu partida" />
+        </div>
+      </div>
+      
+      <!-- Civilization Selection Section -->
+      <div class="config-section">
+        <h2>Selección de Civilización</h2>
+        
+        <div class="civs-container">
+          <div class="civ-selection player-civ">
+            <h3>Tu Civilización</h3>
+            <div class="civs-grid">
+              {#each civilizations as civ}
+                <div 
+                  class="civ-card" 
+                  class:selected={selectedPlayerCiv && selectedPlayerCiv.civ_id === civ.civ_id}
+                  on:click={() => selectPlayerCiv(civ)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => e.key === 'Enter' && selectPlayerCiv(civ)}
+                >
+                  <div class="civ-icon">
+                    {#if civ.civ_id === 'rome'}
+                      <img src="/ia_assets/Erroma.jpeg" alt="Rome" />
+                    {:else if civ.civ_id === 'egypt'}
+                      <img src="/ia_assets/Egipto.jpeg" alt="Egypt" />
+                    {:else if civ.civ_id === 'greece'}
+                      <img src="/ia_assets/Grezia.jpeg" alt="Greece" />
+                    {:else if civ.civ_id === 'mongolia'}
+                      <img src="/ia_assets/Mongolia.jpeg" alt="Mongolia" />
+                    {/if}
+                  </div>
+                  <div class="civ-info">
+                    <h4>{civ.name}</h4>
+                    <p class="civ-description">{civ.description}</p>
+                    <div class="civ-bonuses">
+                      <h5>Ventajas:</h5>
+                      <ul>
+                        {#each civ.bonuses as bonus}
+                          <li>{bonus}</li>
+                        {/each}
+                      </ul>
+                    </div>
+                    
+                    {#if civ.starting_resources}
+                      <div class="civ-resources">
+                        <h5>Recursos iniciales:</h5>
+                        <ul>
+                          <li>Comida: {civ.starting_resources.food}</li>
+                          <li>Oro: {civ.starting_resources.gold}</li>
+                          <li>Madera: {civ.starting_resources.wood}</li>
+                          <li>Piedra: {civ.starting_resources.stone}</li>
+                          <li>Hierro: {civ.starting_resources.iron}</li>
+                        </ul>
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          
+          <div class="civ-selection ai-civ">
+            <h3>Civilización de la IA</h3>
+            <div class="civs-grid">
+              {#each civilizations as civ}
+                <div 
+                  class="civ-card" 
+                  class:selected={selectedAICiv && selectedAICiv.civ_id === civ.civ_id}
+                  on:click={() => selectAICiv(civ)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => e.key === 'Enter' && selectAICiv(civ)}
+                >
+                  <div class="civ-icon">
+                    {#if civ.civ_id === 'rome'}
+                      <img src="/ia_assets/Erroma.jpeg" alt="Rome" />
+                    {:else if civ.civ_id === 'egypt'}
+                      <img src="/ia_assets/Egipto.jpeg" alt="Egypt" />
+                    {:else if civ.civ_id === 'greece'}
+                      <img src="/ia_assets/Grezia.jpeg" alt="Greece" />
+                    {:else if civ.civ_id === 'mongolia'}
+                      <img src="/ia_assets/Mongolia.jpeg" alt="Mongolia" />
+                    {/if}
+                  </div>
+                  <div class="civ-info">
+                    <h4>{civ.name}</h4>
+                    <p class="civ-description">{civ.description}</p>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
         </div>
       </div>
       
@@ -271,7 +461,7 @@
         {/if}
       </div>
       
-      <button class="start-button" on:click={startNewGame} disabled={isLoading || !selectedMap}>
+      <button class="start-button" on:click={startNewGame} disabled={isLoading || !selectedMap || !selectedPlayerCiv || !selectedAICiv}>
         {isLoading ? 'Iniciando...' : 'Comenzar Partida'}
       </button>
     </div>
@@ -501,5 +691,114 @@
     background-color: #f8f9fa;
     border-radius: 4px;
     color: #6c757d;
+  }
+  
+  .civs-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .civ-selection h3 {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .civs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  
+  .civ-card {
+    background-color: white;
+    border-radius: 6px;
+    padding: 1rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 3px solid transparent;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .civ-card:hover {
+    transform: translateY(-3px);
+  }
+  
+  .civ-card.selected {
+    border-color: #4CAF50;
+    background-color: #f0fff0;
+  }
+  
+  .civ-icon {
+    height: 80px;
+    width: 80px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .civ-icon img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  .civ-info {
+    text-align: center;
+  }
+  
+  .civ-info h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1.2rem;
+    color: #333;
+  }
+  
+  .civ-description {
+    color: #666;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .civ-bonuses {
+    text-align: left;
+    margin-bottom: 1rem;
+  }
+  
+  .civ-bonuses h5, .civ-resources h5 {
+    margin: 0 0 0.3rem;
+    font-size: 0.9rem;
+    color: #555;
+  }
+  
+  .civ-bonuses ul, .civ-resources ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.85rem;
+  }
+  
+  .civ-bonuses li, .civ-resources li {
+    margin-bottom: 0.2rem;
+  }
+  
+  .civ-resources {
+    text-align: left;
+    font-size: 0.85rem;
+  }
+  
+  .ai-civ .civ-card {
+    padding: 0.8rem;
+  }
+  
+  .ai-civ .civ-icon {
+    height: 60px;
+    width: 60px;
+  }
+  
+  .ai-civ .civ-bonuses, .ai-civ .civ-resources {
+    display: none;
   }
 </style>

@@ -455,6 +455,37 @@ export const gameAPI = {
   },
 
   /**
+   * Create a new game with civilization selection
+   */
+  async createGameWithCivilization(gameData) {
+    try {
+      const response = await fetch('/api/games/civilization', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          map_id: gameData.map_id,
+          name: gameData.name,
+          difficulty: gameData.difficulty,
+          civ_id: gameData.player_civ_id,
+          ai_civ_id: gameData.ai_civ_id
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Error creating game with civilization:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Delete a map by ID
    */
   async deleteMap(mapId) {

@@ -1203,7 +1203,8 @@ def get_civilization_types():
             "starting_units": {
                 "settler": 2,
                 "warrior": 1
-            }
+            },
+            "image": "ia_assets/Egipto.jpeg"
         },
         {
             "civ_id": "greece",
@@ -1224,7 +1225,8 @@ def get_civilization_types():
                 "settler": 1,
                 "warrior": 1,
                 "archer": 1  # Greece gets an extra archer
-            }
+            },
+            "image": "ia_assets/Grezia.jpeg"
         },
         {
             "civ_id": "rome",
@@ -1244,7 +1246,8 @@ def get_civilization_types():
             "starting_units": {
                 "settler": 1,
                 "warrior": 2  # Rome gets an extra warrior
-            }
+            },
+            "image":"ia_assets/Erroma.jpeg"
         },
         {
             "civ_id": "mongolia",
@@ -1265,7 +1268,8 @@ def get_civilization_types():
                 "settler": 1,
                 "warrior": 1,
                 "cavalry": 1  # Mongolia gets a cavalry unit
-            }
+            },
+            "image":"ia_assets/Mongolia.jpeg"
         }
     ]
     return civilizations
@@ -1286,13 +1290,14 @@ def get_civilization_by_id(civ_id):
             return civ
     return None
 
-def apply_civilization_bonuses(game, civ_id):
+def apply_civilization_bonuses(game, civ_id, player_type="player"):
     """
     Apply civilization-specific bonuses to a game
     
     Args:
         game: The game dictionary to modify
         civ_id: The ID of the civilization to apply
+        player_type: Either "player" or "ia"
         
     Returns:
         The modified game dictionary
@@ -1304,22 +1309,26 @@ def apply_civilization_bonuses(game, civ_id):
     
     # Apply resource bonuses
     if "starting_resources" in civilization:
-        game["player"]["resources"] = civilization["starting_resources"]
+        game[player_type]["resources"] = civilization["starting_resources"]
     
     # Adjust starting units based on civilization
     if "starting_units" in civilization:
         # Clear existing units - we'll replace them completely
-        game["player"]["units"] = []
+        game[player_type]["units"] = []
         
         # Find starting position from the map data
-        start_position = game["map_data"]["startPoint"] if "map_data" in game and "startPoint" in game["map_data"] else [15, 7]
+        if player_type == "player":
+            start_position = game["map_data"]["startPoint"] if "map_data" in game and "startPoint" in game["map_data"] else [15, 7]
+        else:
+            # For AI, use a distant valid position
+            start_position = find_distant_valid_position(game["map_data"])
         
         # Add the specified starting units
         for unit_type, count in civilization["starting_units"].items():
             for i in range(count):
                 # Find a valid position for this unit
                 # First unit at start position, others adjacent
-                if len(game["player"]["units"]) == 0:
+                if len(game[player_type]["units"]) == 0:
                     position = start_position[:]  # Copy to avoid reference issues
                 else:
                     # Find an adjacent position
@@ -1329,10 +1338,10 @@ def apply_civilization_bonuses(game, civ_id):
                 # Create the unit and add to player's units
                 unit = get_troop_type(unit_type, position)
                 if unit:
-                    game["player"]["units"].append(unit)
+                    game[player_type]["units"].append(unit)
         
     # Add the civilization info to the game
-    game["player"]["civilization"] = {
+    game[player_type]["civilization"] = {
         "id": civilization["civ_id"],
         "name": civilization["name"],
         "bonuses": civilization["bonuses"]
@@ -1340,14 +1349,14 @@ def apply_civilization_bonuses(game, civ_id):
     
     return game
 
-def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_name="New Game"):
-    """Add a new game for a user with optional civilization selection"""
+def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_name="New Game", ai_civ_id=None):
+    """Add a new game for a user with optional civilization selection for player and AI"""
     try:
         # First create a base game
         result = add_game(username, map_id, difficulty, game_name)
         
         # If no game was created or no civilization was specified, return
-        if not result or not civ_id:
+        if not result:
             return result
             
         # Get the created game
@@ -1355,11 +1364,20 @@ def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_n
         if not game:
             return result
             
-        # Apply civilization bonuses
-        modified_game = apply_civilization_bonuses(game, civ_id)
+        # Apply player civilization bonuses
+        if civ_id:
+            modified_game = apply_civilization_bonuses(game, civ_id, "player")
+            
+            # Update the game in the session
+            game = modified_game
+            session['game'] = modified_game
         
-        # Update the game in the session
-        session['game'] = modified_game
+        # Apply AI civilization bonuses if specified
+        if ai_civ_id:
+            modified_game = apply_civilization_bonuses(game, ai_civ_id, "ia")
+            
+            # Update the game in the session
+            session['game'] = modified_game
         
         # Update the game in the database
         db = get_db()

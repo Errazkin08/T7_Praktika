@@ -1502,13 +1502,17 @@
   }
 
   // Update the enterCity function to be more reliable
-  function enterCity(city) {
+  async function enterCity(city) {
     if (!gameData || !city) {
       showToastNotification("Error al acceder a la ciudad", "error");
       return;
     }
     
     try {
+      // Save current game state to session before navigating
+      console.log("Guardando estado del juego en sesión antes de entrar a la ciudad");
+      await gameAPI.updateGameSession(gameData);
+      
       // Store the city ID in both in-memory storage and localStorage
       const cityId = city.id;
       
@@ -1527,7 +1531,7 @@
       navigate('/city');
     } catch (error) {
       console.error("Error entering city:", error);
-      showToastNotification("Error al acceder a la ciudad", "error");
+      showToastNotification("Error al acceder a la ciudad: " + error.message, "error");
     }
   }
 

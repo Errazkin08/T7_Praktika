@@ -153,12 +153,12 @@ def add_map(width, height, startPoint, difficulty="easy", name=None):
             if distance <= 4 and terrain[y][x] == 1:  # If it's water and within perimeter
                 terrain[y][x] = 0  # Change to normal terrain
     
-    # Set visibility for a 3x3 area around the start point
+    # Set visibility for a 5x5 area around the start point (increased from 3x3)
     x, y = startPoint
     
-    # Loop through a 3x3 grid centered at the start point
-    for dy in range(-1, 2):  # -1, 0, 1
-        for dx in range(-1, 2):  # -1, 0, 1
+    # Loop through a 5x5 grid centered at the start point
+    for dy in range(-2, 3):  # -2, -1, 0, 1, 2
+        for dx in range(-2, 3):  # -2, -1, 0, 1, 2
             nx, ny = x + dx, y + dy
             # Check if position is within map boundaries
             if 0 <= nx < width and 0 <= ny < height:
@@ -1182,17 +1182,13 @@ def add_building_to_city(city_id, type_id):
 
 def get_civilization_types():
     """
-    Get all available civilization types with their unique bonuses and starting resources
+    Get all available civilization types with their unique starting resources and units
     """
     civilizations = [
         {
             "civ_id": "egypt",
             "name": "Egypt",
             "description": "Masters of agriculture and construction",
-            "bonuses": [
-                "Farms produce 20% more food",
-                "Stone buildings cost 15% less"
-            ],
             "starting_resources": {
                 "food": 120,  # +20% food
                 "gold": 50,
@@ -1210,10 +1206,6 @@ def get_civilization_types():
             "civ_id": "greece",
             "name": "Greece",
             "description": "Masters of philosophy and naval warfare",
-            "bonuses": [
-                "Naval units have +1 movement",
-                "Science buildings produce 15% more research"
-            ],
             "starting_resources": {
                 "food": 100,
                 "gold": 60,   # +20% gold (trade)
@@ -1232,10 +1224,6 @@ def get_civilization_types():
             "civ_id": "rome",
             "name": "Rome",
             "description": "Masters of warfare and organization",
-            "bonuses": [
-                "All units gain +1 experience per combat",
-                "Cities grow 10% faster"
-            ],
             "starting_resources": {
                 "food": 110,   # +10% food 
                 "gold": 70,    # +40% gold (empire)
@@ -1253,10 +1241,6 @@ def get_civilization_types():
             "civ_id": "mongolia",
             "name": "Mongolia",
             "description": "Masters of cavalry and conquest",
-            "bonuses": [
-                "Mounted units have +1 movement",
-                "Conquered cities produce no unhappiness"
-            ],
             "starting_resources": {
                 "food": 90,    # -10% food (nomadic)
                 "gold": 40,    # -20% gold (less trade) 
@@ -1292,7 +1276,7 @@ def get_civilization_by_id(civ_id):
 
 def apply_civilization_bonuses(game, civ_id, player_type="player"):
     """
-    Apply civilization-specific bonuses to a game
+    Apply civilization-specific resources and units to a game
     
     Args:
         game: The game dictionary to modify
@@ -1316,6 +1300,9 @@ def apply_civilization_bonuses(game, civ_id, player_type="player"):
         # Clear existing units - we'll replace them completely
         game[player_type]["units"] = []
         
+        # Track occupied positions to avoid placing units in the same place
+        occupied_positions = []
+        
         # Find starting position from the map data
         if player_type == "player":
             start_position = game["map_data"]["startPoint"] if "map_data" in game and "startPoint" in game["map_data"] else [15, 7]
@@ -1326,28 +1313,83 @@ def apply_civilization_bonuses(game, civ_id, player_type="player"):
         # Add the specified starting units
         for unit_type, count in civilization["starting_units"].items():
             for i in range(count):
-                # Find a valid position for this unit
-                # First unit at start position, others adjacent
-                if len(game[player_type]["units"]) == 0:
+                position = None
+                
+                # First unit at start position if not occupied
+                if len(game[player_type]["units"]) == 0 and start_position not in occupied_positions:
                     position = start_position[:]  # Copy to avoid reference issues
                 else:
-                    # Find an adjacent position
-                    map_data = game["map_data"]
-                    position = find_adjacent_valid_position(map_data, start_position)
+                    # Find an unoccupied adjacent position
+                    position = find_unoccupied_position(
+                        game["map_data"], 
+                        start_position, 
+                        occupied_positions
+                    )
                 
-                # Create the unit and add to player's units
-                unit = get_troop_type(unit_type, position)
-                if unit:
-                    game[player_type]["units"].append(unit)
+                if position:
+                    # Mark the position as occupied
+                    occupied_positions.append(position[:])
+                    
+                    # Create the unit and add to player's units
+                    unit = get_troop_type(unit_type, position)
+                    if unit:
+                        game[player_type]["units"].append(unit)
         
     # Add the civilization info to the game
     game[player_type]["civilization"] = {
         "id": civilization["civ_id"],
-        "name": civilization["name"],
-        "bonuses": civilization["bonuses"]
+        "name": civilization["name"]
     }
     
     return game
+
+def find_unoccupied_position(map_data, start_position, occupied_positions):
+    """
+    Find a valid position near the start position that isn't occupied and isn't water
+    
+    Args:
+        map_data: The map data containing terrain information
+        start_position: The reference position to search near
+        occupied_positions: List of positions that are already occupied
+        
+    Returns:
+        A valid [x, y] position or None if no valid position could be found
+    """
+    width = map_data.get("width", 30)
+    height = map_data.get("height", 15)
+    terrain = map_data.get("terrain", [])
+    x, y = start_position
+    
+    # Try positions with increasing distance from the start
+    for distance in range(1, 10):  # Try up to 10 tiles away if needed
+        # Check all positions at the current Manhattan distance
+        for dx in range(-distance, distance + 1):
+            for dy in range(-distance + abs(dx), distance - abs(dx) + 1, 2):
+                # Calculate potential position
+                new_x = x + dx
+                new_y = y + dy
+                new_pos = [new_x, new_y]
+                
+                # Check if position is within map bounds
+                if 0 <= new_x < width and 0 <= new_y < height:
+                    # Check if position is not water
+                    if terrain and len(terrain) > new_y and len(terrain[new_y]) > new_x and terrain[new_y][new_x] != 1:
+                        # Check if position is not occupied
+                        if not any(pos[0] == new_x and pos[1] == new_y for pos in occupied_positions):
+                            return new_pos
+    
+    # If we couldn't find a position with our algorithm, try a more brute-force approach
+    for y in range(height):
+        for x in range(width):
+            # Skip water tiles
+            if terrain and len(terrain) > y and len(terrain[y]) > x and terrain[y][x] != 1:
+                new_pos = [x, y]
+                # Check if position is not occupied
+                if not any(pos[0] == x and pos[1] == y for pos in occupied_positions):
+                    return new_pos
+    
+    # If all else fails, return None
+    return None
 
 def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_name="New Game", ai_civ_id=None):
     """Add a new game for a user with optional civilization selection for player and AI"""

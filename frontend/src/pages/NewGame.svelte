@@ -92,29 +92,71 @@
           "civ_id": "rome",
           "name": "Rome",
           "description": "Masters of warfare and organization",
-          "bonuses": ["All units gain +1 experience per combat", "Cities grow 10% faster"],
-          "image": "rome.png"
+          "starting_resources": {
+            "food": 110,
+            "gold": 70,
+            "wood": 20,
+            "stone": 20,
+            "iron": 15
+          },
+          "starting_units": {
+            "settler": 1,
+            "warrior": 2
+          },
+          "image": "ia_assets/Erroma.jpeg"
         },
         {
           "civ_id": "egypt",
           "name": "Egypt",
           "description": "Masters of agriculture and construction",
-          "bonuses": ["Farms produce 20% more food", "Stone buildings cost 15% less"],
-          "image": "egypt.png"
+          "starting_resources": {
+            "food": 120,
+            "gold": 50,
+            "wood": 15,
+            "stone": 30,
+            "iron": 10
+          },
+          "starting_units": {
+            "settler": 2,
+            "warrior": 1
+          },
+          "image": "ia_assets/Egipto.jpeg"
         },
         {
           "civ_id": "greece",
           "name": "Greece",
           "description": "Masters of philosophy and naval warfare",
-          "bonuses": ["Naval units have +1 movement", "Science buildings produce 15% more research"],
-          "image": "greece.png"
+          "starting_resources": {
+            "food": 100,
+            "gold": 60,
+            "wood": 25,
+            "stone": 25,
+            "iron": 5
+          },
+          "starting_units": {
+            "settler": 1,
+            "warrior": 1,
+            "archer": 1
+          },
+          "image": "ia_assets/Grezia.jpeg"
         },
         {
           "civ_id": "mongolia",
           "name": "Mongolia",
           "description": "Masters of cavalry and conquest",
-          "bonuses": ["Mounted units have +1 movement", "Conquered cities produce no unhappiness"],
-          "image": "mongolia.png"
+          "starting_resources": {
+            "food": 90,
+            "gold": 40,
+            "wood": 15,
+            "stone": 15,
+            "iron": 25
+          },
+          "starting_units": {
+            "settler": 1,
+            "warrior": 1,
+            "cavalry": 1
+          },
+          "image": "ia_assets/Mongolia.jpeg"
         }
       ];
       selectedPlayerCiv = civilizations[0];
@@ -324,14 +366,29 @@
                   <div class="civ-info">
                     <h4>{civ.name}</h4>
                     <p class="civ-description">{civ.description}</p>
-                    <div class="civ-bonuses">
-                      <h5>Ventajas:</h5>
-                      <ul>
-                        {#each civ.bonuses as bonus}
-                          <li>{bonus}</li>
-                        {/each}
-                      </ul>
-                    </div>
+                    
+                    {#if civ.starting_units}
+                      <div class="civ-units">
+                        <h5>Unidades iniciales:</h5>
+                        <ul>
+                          {#each Object.entries(civ.starting_units) as [unit, count]}
+                            <li>
+                              {#if unit === "settler"}
+                                Colonizador: {count}
+                              {:else if unit === "warrior"}
+                                Guerrero: {count}
+                              {:else if unit === "archer"}
+                                Arquero: {count}
+                              {:else if unit === "cavalry"}
+                                Caballería: {count}
+                              {:else}
+                                {unit}: {count}
+                              {/if}
+                            </li>
+                          {/each}
+                        </ul>
+                      </div>
+                    {/if}
                     
                     {#if civ.starting_resources}
                       <div class="civ-resources">
@@ -763,24 +820,24 @@
     font-size: 0.9rem;
   }
   
-  .civ-bonuses {
+  .civ-units {
     text-align: left;
     margin-bottom: 1rem;
   }
   
-  .civ-bonuses h5, .civ-resources h5 {
+  .civ-units h5, .civ-resources h5 {
     margin: 0 0 0.3rem;
     font-size: 0.9rem;
     color: #555;
   }
   
-  .civ-bonuses ul, .civ-resources ul {
+  .civ-units ul, .civ-resources ul {
     margin: 0;
     padding-left: 1.2rem;
     font-size: 0.85rem;
   }
   
-  .civ-bonuses li, .civ-resources li {
+  .civ-units li, .civ-resources li {
     margin-bottom: 0.2rem;
   }
   
@@ -789,16 +846,7 @@
     font-size: 0.85rem;
   }
   
-  .ai-civ .civ-card {
-    padding: 0.8rem;
-  }
-  
-  .ai-civ .civ-icon {
-    height: 60px;
-    width: 60px;
-  }
-  
-  .ai-civ .civ-bonuses, .ai-civ .civ-resources {
+  .ai-civ .civ-units, .ai-civ .civ-resources {
     display: none;
   }
 </style>

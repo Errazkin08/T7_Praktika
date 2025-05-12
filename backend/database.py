@@ -1179,3 +1179,196 @@ def add_building_to_city(city_id, type_id):
     city["buildings"].append(new_building)
     session['game'] = game
     return True, "Building added to city"
+
+def get_civilization_types():
+    """
+    Get all available civilization types with their unique bonuses and starting resources
+    """
+    civilizations = [
+        {
+            "civ_id": "egypt",
+            "name": "Egypt",
+            "description": "Masters of agriculture and construction",
+            "bonuses": [
+                "Farms produce 20% more food",
+                "Stone buildings cost 15% less"
+            ],
+            "starting_resources": {
+                "food": 120,  # +20% food
+                "gold": 50,
+                "wood": 15,   # -25% wood (desert)
+                "stone": 30,  # +50% stone (pyramids)
+                "iron": 10
+            },
+            "starting_units": {
+                "settler": 2,
+                "warrior": 1
+            }
+        },
+        {
+            "civ_id": "greece",
+            "name": "Greece",
+            "description": "Masters of philosophy and naval warfare",
+            "bonuses": [
+                "Naval units have +1 movement",
+                "Science buildings produce 15% more research"
+            ],
+            "starting_resources": {
+                "food": 100,
+                "gold": 60,   # +20% gold (trade)
+                "wood": 25,   # +25% wood (shipbuilding)
+                "stone": 25,   # +25% stone (architecture)
+                "iron": 5     # -50% iron
+            },
+            "starting_units": {
+                "settler": 1,
+                "warrior": 1,
+                "archer": 1  # Greece gets an extra archer
+            }
+        },
+        {
+            "civ_id": "rome",
+            "name": "Rome",
+            "description": "Masters of warfare and organization",
+            "bonuses": [
+                "All units gain +1 experience per combat",
+                "Cities grow 10% faster"
+            ],
+            "starting_resources": {
+                "food": 110,   # +10% food 
+                "gold": 70,    # +40% gold (empire)
+                "wood": 20,
+                "stone": 20,
+                "iron": 15     # +50% iron (weapons)
+            },
+            "starting_units": {
+                "settler": 1,
+                "warrior": 2  # Rome gets an extra warrior
+            }
+        },
+        {
+            "civ_id": "mongolia",
+            "name": "Mongolia",
+            "description": "Masters of cavalry and conquest",
+            "bonuses": [
+                "Mounted units have +1 movement",
+                "Conquered cities produce no unhappiness"
+            ],
+            "starting_resources": {
+                "food": 90,    # -10% food (nomadic)
+                "gold": 40,    # -20% gold (less trade) 
+                "wood": 15,    # -25% wood
+                "stone": 15,   # -25% stone
+                "iron": 25     # +150% iron (weapons)
+            },
+            "starting_units": {
+                "settler": 1,
+                "warrior": 1,
+                "cavalry": 1  # Mongolia gets a cavalry unit
+            }
+        }
+    ]
+    return civilizations
+
+def get_civilization_by_id(civ_id):
+    """
+    Get a specific civilization by its ID
+    
+    Args:
+        civ_id: The ID of the civilization to retrieve
+        
+    Returns:
+        The civilization data dictionary or None if not found
+    """
+    civilizations = get_civilization_types()
+    for civ in civilizations:
+        if civ["civ_id"] == civ_id:
+            return civ
+    return None
+
+def apply_civilization_bonuses(game, civ_id):
+    """
+    Apply civilization-specific bonuses to a game
+    
+    Args:
+        game: The game dictionary to modify
+        civ_id: The ID of the civilization to apply
+        
+    Returns:
+        The modified game dictionary
+    """
+    civilization = get_civilization_by_id(civ_id)
+    if not civilization:
+        # If no valid civilization, return the game unchanged
+        return game
+    
+    # Apply resource bonuses
+    if "starting_resources" in civilization:
+        game["player"]["resources"] = civilization["starting_resources"]
+    
+    # Adjust starting units based on civilization
+    if "starting_units" in civilization:
+        # Clear existing units - we'll replace them completely
+        game["player"]["units"] = []
+        
+        # Find starting position from the map data
+        start_position = game["map_data"]["startPoint"] if "map_data" in game and "startPoint" in game["map_data"] else [15, 7]
+        
+        # Add the specified starting units
+        for unit_type, count in civilization["starting_units"].items():
+            for i in range(count):
+                # Find a valid position for this unit
+                # First unit at start position, others adjacent
+                if len(game["player"]["units"]) == 0:
+                    position = start_position[:]  # Copy to avoid reference issues
+                else:
+                    # Find an adjacent position
+                    map_data = game["map_data"]
+                    position = find_adjacent_valid_position(map_data, start_position)
+                
+                # Create the unit and add to player's units
+                unit = get_troop_type(unit_type, position)
+                if unit:
+                    game["player"]["units"].append(unit)
+        
+    # Add the civilization info to the game
+    game["player"]["civilization"] = {
+        "id": civilization["civ_id"],
+        "name": civilization["name"],
+        "bonuses": civilization["bonuses"]
+    }
+    
+    return game
+
+def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_name="New Game"):
+    """Add a new game for a user with optional civilization selection"""
+    try:
+        # First create a base game
+        result = add_game(username, map_id, difficulty, game_name)
+        
+        # If no game was created or no civilization was specified, return
+        if not result or not civ_id:
+            return result
+            
+        # Get the created game
+        game = session.get('game')
+        if not game:
+            return result
+            
+        # Apply civilization bonuses
+        modified_game = apply_civilization_bonuses(game, civ_id)
+        
+        # Update the game in the session
+        session['game'] = modified_game
+        
+        # Update the game in the database
+        db = get_db()
+        db.games.update_one(
+            {"game_id": modified_game["game_id"]},
+            {"$set": modified_game}
+        )
+        
+        return result
+    except Exception as e:
+        print(f"Error adding game with civilization: {e}")
+        return None

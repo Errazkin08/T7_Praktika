@@ -50,6 +50,21 @@
     return resourceDisplay.length > 0 ? resourceDisplay.join(' ') : 'Costo no disponible';
   }
 
+  // Function to get detailed building information
+  function getBuildingDetails(building) {
+    // If building is just a string, find its details in buildingTypes
+    if (typeof building === 'string') {
+      const foundType = buildingTypes.find(type => 
+        type.name.toLowerCase() === building.toLowerCase() || 
+        type.type?.toLowerCase() === building.toLowerCase()
+      );
+      return foundType || { name: building };
+    } 
+    
+    // If building already has details
+    return building;
+  }
+
   function setActiveTab(tab) {
     activeTab = tab;
   }
@@ -647,11 +662,71 @@
             
             {#if city.buildings && city.buildings.length > 0}
               <div class="info-section buildings-grid">
-                {#each city.buildings as building}
+                {#each city.buildings as buildingItem}
+                  {@const building = getBuildingDetails(buildingItem)}
+                  {@const iconData = getBuildingIcon(building.type || building.name)}
                   <div class="building-card">
-                    <div class="building-icon">🏛️</div>
-                    <h4>{building.name || building}</h4>
-                    <p>Proporciona beneficios a la ciudad.</p>
+                    <div class="building-icon-wrapper">
+                      {#if iconData.type === 'image'}
+                        <img src={iconData.url} alt={building.name} class="building-image" />
+                      {:else}
+                        <span class="building-icon">{iconData.value}</span>
+                      {/if}
+                    </div>
+                    <h4>{building.name}</h4>
+                    
+                    {#if building.description}
+                      <p class="building-description">{building.description}</p>
+                    {:else}
+                      <p class="building-description">Edificio de la ciudad.</p>
+                    {/if}
+                    
+                    <div class="building-stats">
+                      {#if building.production_bonus !== undefined}
+                        <div class="building-stat">
+                          <span class="stat-icon">⚒️</span>
+                          <span class="stat-label">Producción:</span>
+                          <span class="stat-value">+{building.production_bonus}%</span>
+                        </div>
+                      {/if}
+                      
+                      {#if building.research_bonus !== undefined}
+                        <div class="building-stat">
+                          <span class="stat-icon">📚</span>
+                          <span class="stat-label">Investigación:</span>
+                          <span class="stat-value">+{building.research_bonus}%</span>
+                        </div>
+                      {/if}
+                      
+                      {#if building.defense_bonus !== undefined}
+                        <div class="building-stat">
+                          <span class="stat-icon">🛡️</span>
+                          <span class="stat-label">Defensa:</span>
+                          <span class="stat-value">+{building.defense_bonus}%</span>
+                        </div>
+                      {/if}
+                      
+                      {#if building.food_bonus !== undefined}
+                        <div class="building-stat">
+                          <span class="stat-icon">🌾</span>
+                          <span class="stat-label">Alimento:</span>
+                          <span class="stat-value">+{building.food_bonus}%</span>
+                        </div>
+                      {/if}
+                      
+                      {#if building.gold_bonus !== undefined}
+                        <div class="building-stat">
+                          <span class="stat-icon">💰</span>
+                          <span class="stat-label">Oro:</span>
+                          <span class="stat-value">+{building.gold_bonus}%</span>
+                        </div>
+                      {/if}
+                    </div>
+                    
+                    <div class="building-level">
+                      <span class="level-label">Nivel:</span>
+                      <span class="level-value">{building.level || 1}</span>
+                    </div>
                   </div>
                 {/each}
               </div>

@@ -683,33 +683,48 @@ export const gameAPI = {
 
   /**
    * Get a specific troop type by ID
+   * @param {string} typeId - The ID of the troop type
+   * @param {Array} position - Optional position [x, y] for the troop
    */
-  async getTroopType(typeId) {
+  async getTroopType(typeId, position = null) {
     try {
-      const token = await this.getToken();
-      const response = await fetch(`/api/troops/types/${typeId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Include position as a query parameter only if provided
+      let url = `${API_BASE_URL}/troops/types/${typeId}`;
+      
+      // If position is provided, add it as a query parameter
+      if (position && Array.isArray(position)) {
+        url += `?position=${JSON.stringify(position)}`;
+      }
+      
+      console.log(`Requesting troop type ${typeId}${position ? ' with position ' + JSON.stringify(position) : ''}`);
+      
+      const response = await fetchWithAuth(url);
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: `Failed to get troop type: ${response.status}` }));
         throw new Error(errorData.error || 'Failed to get troop type');
       }
-
-      return await response.json();
+      
+      const troopData = await response.json();
+      console.log(`Received troop data for ${typeId}:`, troopData);
+      
+      // If position was provided but not included in the response, add it
+      if (position && (!troopData.position || !Array.isArray(troopData.position))) {
+        troopData.position = position;
+      }
+      
+      return troopData;
     } catch (error) {
       console.error("Error in getTroopType:", error);
       // Provide fallback data so the game can continue
       return {
         name: `Type ${typeId}`,
+        type_id: typeId,
         movement: 2,
         health: 100,
         attack: 10,
-        defense: 10
+        defense: 10,
+        position: position // Include the position in fallback data
       };
     }
   },
@@ -719,17 +734,10 @@ export const gameAPI = {
    */
   async getBuildingType(typeId) {
     try {
-      const token = await this.getToken();
-      const response = await fetch(`/api/buildings/types/${typeId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetchWithAuth(`${API_BASE_URL}/buildings/types/${typeId}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: `Failed to get building type: ${response.status}` }));
         throw new Error(errorData.error || 'Failed to get building type');
       }
 

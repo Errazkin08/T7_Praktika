@@ -1081,6 +1081,11 @@ def get_building_types():
             "name": "Sawmill",
             "category": "production",
             "turns": 3,
+            "level": 1,
+            "level_upgrade": 10,
+            "output": {
+                "wood": 10
+            },
             "cost": {
                 "wood": 20,
                 "stone": 20
@@ -1092,6 +1097,11 @@ def get_building_types():
             "name": "Quarry",
             "category": "production",
             "turns": 5,
+            "level": 1,
+            "level_upgrade": 10,
+            "output": {
+                "stone": 10
+            },
             "cost": {
                 "wood": 30, 
                 "stone": 20
@@ -1103,6 +1113,11 @@ def get_building_types():
             "name": "Farm",
             "category": "production",
             "turns": 3,
+            "level": 1,
+            "level_upgrade": 15,
+            "output": {
+                "food": 15
+            },
             "cost": {
                 "wood": 40
             },
@@ -1113,6 +1128,11 @@ def get_building_types():
             "name": "Iron mine",
             "category": "production",
             "turns": 5,
+            "level": 1,
+            "level_upgrade": 8,
+            "output": {
+                "iron": 8
+            },
             "cost": {
                 "wood": 50,
                 "stone": 50
@@ -1124,6 +1144,11 @@ def get_building_types():
             "name": "Gold mine",
             "category": "production",
             "turns": 7,
+            "level": 1,
+            "level_upgrade": 5,
+            "output": {
+                "wood": 5
+            },
             "cost": {
                 "wood": 50,
                 "stone": 70

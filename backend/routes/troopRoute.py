@@ -1,7 +1,12 @@
 from flask import Blueprint, request, jsonify, session
+import logging
 from database import (get_troop_types, get_troop_type, add_troop_to_player, 
                      get_player_troops, update_troop_position, update_troop_status, 
                      reset_troops_status)
+
+# Set up logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create blueprint for troop routes
 troop_blueprint = Blueprint('troop', __name__)
@@ -15,10 +20,41 @@ def get_troop_types_endpoint():
 @troop_blueprint.route('/api/troops/types/<type_id>', methods=['GET'])
 def get_troop_type_endpoint(type_id):
     """Get a specific troop type by its ID"""
-    troop_type = get_troop_type(type_id)
-    if not troop_type:
-        return jsonify({"error": "Troop type not found"}), 404
-    return jsonify(troop_type), 200
+    logger.info(f"Received request for troop type with ID: {type_id}")
+    
+    # Extract position from query parameters if provided
+    position_param = request.args.get('position')
+    position = None
+    
+    if position_param:
+        try:
+            logger.info(f"Position parameter received: {position_param}")
+            import json
+            position = json.loads(position_param)
+            logger.info(f"Parsed position: {position}")
+        except Exception as e:
+            logger.error(f"Error parsing position parameter: {str(e)}")
+            position = [0, 0]  # Default position
+    else:
+        logger.info("No position parameter provided, using default [0, 0]")
+        position = [0, 0]  # Default position
+    
+    try:
+        logger.info(f"Calling database function get_troop_type with ID: {type_id} and position: {position}")
+        troop_type = get_troop_type(type_id, position)
+        
+        logger.info(f"Database returned troop_type: {troop_type}")
+        
+        if not troop_type:
+            logger.warning(f"Troop type with ID {type_id} not found in database")
+            return jsonify({"error": "Troop type not found"}), 404
+        
+        logger.info(f"Successfully returning troop type: {troop_type}")
+        return jsonify(troop_type), 200
+    
+    except Exception as e:
+        logger.error(f"Error retrieving troop type {type_id}: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 @troop_blueprint.route('/api/troops', methods=['POST'])
 def add_troop_endpoint():

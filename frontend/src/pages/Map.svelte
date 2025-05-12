@@ -96,6 +96,9 @@
     toastMessage = message;
     toastType = type;
     showToast = true;
+    
+    console.log(`[TOAST] ${type}: ${message}`);
+    
     toastTimeout = setTimeout(() => {
       showToast = false;
     }, duration);
@@ -594,14 +597,54 @@
       return;
     }
 
+    // Block turn end if there's a unit awaiting placement
+    if (awaitingUnitPlacement && newlyProducedUnit) {
+      showToastNotification("Debes colocar tu unidad antes de finalizar el turno", "warning", 5000);
+      
+      // Re-center on the producing city to help player locate where to place the unit
+      if (producingCity) {
+        const cityPos = Array.isArray(producingCity.position) ? 
+          producingCity.position : [producingCity.position.x, producingCity.position.y];
+        centerMapOnPosition(cityPos[0], cityPos[1]);
+        
+        // Recalculate city area to make it visible
+        calculateCityArea(producingCity);
+      }
+      return;
+    }
+
     console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
 
-    // Handle city production before switching to AI turn
-    await processCityProduction();
+    // Handle player city production before switching to AI turn
+    const completedProductions = await processCityProduction();
+    
+    // If we just completed a production that requires unit placement, block turn end
+    if (awaitingUnitPlacement && newlyProducedUnit) {
+      showToastNotification("Nueva unidad producida. Debes colocarla antes de finalizar el turno", "success", 5000);
+      return;
+    }
+
+    // Show notifications for completed productions (that don't require placement)
+    if (completedProductions && completedProductions.length > 0) {
+      // Show notifications sequentially with a slight delay between them
+      for (let i = 0; i < completedProductions.length; i++) {
+        const production = completedProductions[i];
+        // Use a timeout to stagger notifications
+        setTimeout(() => {
+          showToastNotification(production.message, "success", 4000);
+        }, i * 1000); // 1 second between notifications
+      }
+      
+      // Wait a moment for the player to see notifications before proceeding to AI turn
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
 
     gameData.current_player = "ia";
     currentPlayer.set(gameData.current_player);
     showToastNotification("IA's Turn - Processing...", "info");
+    
+    // Process AI city production before AI actions
+    const aiCompletedProductions = await processAICityProduction();
     
     try {
       console.log("Requesting AI action...");
@@ -609,6 +652,11 @@
       console.log("AI Response:", aiResponse);
       
       if (aiResponse && aiResponse.actions && aiResponse.actions.length > 0) {
+        // Show AI production notifications if there were any
+        if (aiCompletedProductions && aiCompletedProductions.length > 0) {
+          showToastNotification(`La IA ha completado ${aiCompletedProductions.length} producciones`, "info", 3000);
+        }
+        
         await processAIActions(aiResponse.actions, aiResponse.reasoning);
       } else {
         showToastNotification("La IA ha completado su turno (sin acciones)", "info");
@@ -668,8 +716,11 @@
 
   async function processCityProduction() {
     if (!gameData || !gameData.player || !gameData.player.cities) {
-      return;
+      return [];
     }
+    
+    // Array to track completed productions for notification purposes
+    let completedProductions = [];
     
     // Process each city's production
     for (const city of gameData.player.cities) {
@@ -690,16 +741,22 @@
             
             // Handle different item types differently
             if (itemType === "troop") {
-              // Add extra error handling around the API call
-              let troopDetails;
+              // Get complete troop info from API
+              let troopInfo = null;
               try {
-                // This is where the error occurs - wrap in a try/catch
-                troopDetails = await gameAPI.getTroopType(itemId);
-              } catch (apiError) {
-                console.error(`API Error getting troop type ${itemId}:`, apiError);
-                // Provide fallback data if the API call fails
-                troopDetails = {
-                  name: `Troop ${itemId}`,
+                // Get full troop details from API
+                const allTroopTypes = await gameAPI.getTroopTypes();
+                troopInfo = allTroopTypes.find(t => t.type_id === itemId || t.id === itemId);
+                
+                if (!troopInfo) {
+                  // Fallback to direct API call if not found in list
+                  troopInfo = await gameAPI.getTroopType(itemId);
+                }
+              } catch (e) {
+                console.warn("Could not get troop info from API, using defaults", e);
+                troopInfo = {
+                  name: itemId,
+                  type_id: itemId,
                   movement: 2,
                   health: 100,
                   attack: 10,
@@ -707,76 +764,103 @@
                 };
               }
               
-              // Create a new unit object
-              const newUnit = {
-                id: `${itemId}_${Date.now()}`,
+              // Create a unique ID for the new unit
+              const unitId = `unit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+              
+              // Create a complete unit with ALL properties from the troop type
+              const tempUnit = {
+                // Copy all properties from the API model
+                ...troopInfo,
+                // Override/add runtime-specific properties
+                id: unitId,
                 type_id: itemId,
-                position: [...cityPosition], // Initially at the city's position
-                status: 'ready',
-                movement: troopDetails.movement || 2,
-                remainingMovement: troopDetails.movement || 2,
-                health: troopDetails.health || 100,
-                attack: troopDetails.attack,
-                defense: troopDetails.defense,
                 owner: 'player',
-                name: troopDetails.name || itemId
+                status: 'ready',
+                // Ensure these critical properties exist
+                movement: troopInfo.movement || 2,
+                remainingMovement: troopInfo.movement || 2,
+                health: troopInfo.health || 100,
+                attack: troopInfo.attack || 10,
+                defense: troopInfo.defense || 5
               };
               
-              // Store the newly created unit and city for placement
-              newlyProducedUnit = newUnit;
+              // Set up the placement mode
+              newlyProducedUnit = tempUnit;
               producingCity = city;
               awaitingUnitPlacement = true;
               
-              // Calculate city area for placement
+              // Calculate city area for placement UI
               calculateCityArea(city);
               
-              // Show a notification to the player
-              showToastNotification(`${city.name} ha completado la producción de ${troopDetails.name || itemId}. Elige dónde colocar la unidad.`, "success", 5000);
+              // Show very prominent notification
+              const notificationMessage = `${city.name} ha completado la producción de ${tempUnit.name || itemId}. ¡Coloca la unidad en el mapa!`;
+              showToastNotification(notificationMessage, "success", 8000);
               
-              // Center the map on the city position
+              // Center map on city to help player see where to place unit
               centerMapOnPosition(cityPosition[0], cityPosition[1]);
               
+              // Add to completed productions for reference
+              completedProductions.push({
+                type: 'troop',
+                name: tempUnit.name || itemId,
+                city: city.name,
+                requiresPlacement: true,
+                message: notificationMessage
+              });
+              
+              // Break out of the loop - handle one production at a time
+              break;
+              
             } else if (itemType === "building") {
-              // Add extra error handling for building API call too
+              // Get complete building details
               let buildingDetails;
               try {
                 buildingDetails = await gameAPI.getBuildingType(itemId);
               } catch (apiError) {
                 console.error(`API Error getting building type ${itemId}:`, apiError);
-                // Provide fallback data
                 buildingDetails = {
+                  type_id: itemId,
                   name: `Building ${itemId}`
                 };
               }
               
-              // Create a new building object
+              // Create a new building object with ALL properties from the API
               const newBuilding = {
+                // Copy all properties from the building type
+                ...buildingDetails,
+                // Add runtime-specific properties
                 id: `${itemId}_${Date.now()}`,
                 type_id: itemId,
-                name: buildingDetails.name || itemId,
                 constructed_at: gameData.turn
               };
               
-              // Add building directly to the city (no placement needed)
+              // Add building directly to the city
               if (!city.buildings) {
                 city.buildings = [];
               }
               city.buildings.push(newBuilding);
               
-              // Show a notification to the player
-              showToastNotification(`${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`, "success");
+              // Show prominent notification for building completion
+              const notificationMessage = `${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`;
+              showToastNotification(notificationMessage, "success", 6000);
               
-              // No need for placement - update game state immediately
+              // Add to completed productions
+              completedProductions.push({
+                type: 'building',
+                name: buildingDetails.name || itemId,
+                city: city.name,
+                requiresPlacement: false,
+                message: notificationMessage
+              });
+              
+              // Update game state immediately
               await gameAPI.updateGameSession(gameData);
+              
+              // Clear the city's production
+              city.production.current_item = null;
+              city.production.turns_remaining = 0;
+              city.production.itemType = null;
             }
-            
-            // Clear the city's production
-            city.production.current_item = null;
-            city.production.turns_remaining = 0;
-            city.production.itemType = null;
-            
-            // Exit the loop after handling one completed production
-            break;
           } catch (error) {
             console.error(`Error completing production in city ${city.name}:`, error);
             // In case of error, still clear the production
@@ -787,6 +871,154 @@
         }
       }
     }
+    
+    return completedProductions;
+  }
+
+  async function processAICityProduction() {
+    if (!gameData || !gameData.ia || !gameData.ia.cities) {
+      return [];
+    }
+    
+    let completedProductions = [];
+    
+    // Process each AI city's production
+    for (const city of gameData.ia.cities) {
+      if (city.production && city.production.current_item && city.production.turns_remaining > 0) {
+        // Decrease turns remaining
+        city.production.turns_remaining--;
+        
+        // If production is complete
+        if (city.production.turns_remaining <= 0) {
+          try {
+            const itemId = city.production.current_item;
+            const itemType = city.production.itemType || "troop";
+            
+            // Get the city position
+            const cityPosition = Array.isArray(city.position) ? 
+              [...city.position] : [city.position.x, city.position.y];
+            
+            if (itemType === "troop") {
+              // Get complete troop info from API
+              let troopInfo;
+              try {
+                // Find valid position around the city for AI unit
+                const validPos = findValidPositionNearCity(cityPosition);
+                
+                // Get full details from API with position
+                troopInfo = await gameAPI.getTroopType(itemId, validPos);
+                
+                // If API call fails to return all properties, get them from troop types list
+                if (!troopInfo.abilities || !troopInfo.description) {
+                  const allTroopTypes = await gameAPI.getTroopTypes();
+                  const fullTroopType = allTroopTypes.find(t => t.type_id === itemId);
+                  if (fullTroopType) {
+                    // Merge the properties, keeping the position from the first call
+                    troopInfo = { ...fullTroopType, position: troopInfo.position || validPos };
+                  }
+                }
+              } catch (e) {
+                console.warn("AI couldn't get troop details, using defaults", e);
+                troopInfo = {
+                  name: itemId,
+                  type_id: itemId,
+                  movement: 2,
+                  health: 100,
+                  attack: 10,
+                  defense: 5
+                };
+              }
+              
+              // Create a unique ID for the new unit
+              const unitId = `ia-unit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+              
+              // Create the unit with ALL properties from the troop type
+              const newUnit = {
+                // Copy all properties from the API model
+                ...troopInfo,
+                // Override/add runtime-specific properties
+                id: unitId,
+                type_id: itemId,
+                position: troopInfo.position || findValidPositionNearCity(cityPosition),
+                owner: 'ia',
+                status: 'ready',
+                // Ensure these critical properties exist
+                movement: troopInfo.movement || 2,
+                remainingMovement: troopInfo.movement || 2,
+                health: troopInfo.health || 100,
+                attack: troopInfo.attack || 10,
+                defense: troopInfo.defense || 5
+              };
+              
+              // Add to game data and units array
+              if (!gameData.ia.units) {
+                gameData.ia.units = [];
+              }
+              
+              gameData.ia.units.push(newUnit);
+              units = [...units, newUnit];
+              
+              // Add to completed productions
+              completedProductions.push({
+                type: 'troop',
+                name: troopInfo.name || itemId,
+                city: city.name,
+                message: `La ciudad ${city.name} de la IA ha producido ${troopInfo.name || itemId}`
+              });
+              
+            } else if (itemType === "building") {
+              // Get complete building details
+              let buildingDetails;
+              try {
+                buildingDetails = await gameAPI.getBuildingType(itemId);
+              } catch (apiError) {
+                buildingDetails = {
+                  type_id: itemId,
+                  name: `Building ${itemId}`
+                };
+              }
+              
+              // Create a new building with ALL properties from the API
+              const newBuilding = {
+                // Copy all properties from the building type
+                ...buildingDetails,
+                // Add runtime-specific properties
+                id: `${itemId}_${Date.now()}`,
+                type_id: itemId,
+                constructed_at: gameData.turn
+              };
+              
+              // Add building to city
+              if (!city.buildings) {
+                city.buildings = [];
+              }
+              city.buildings.push(newBuilding);
+              
+              // Add to completed productions
+              completedProductions.push({
+                type: 'building',
+                name: buildingDetails.name || itemId,
+                city: city.name,
+                message: `La ciudad ${city.name} de la IA ha construido ${buildingDetails.name || itemId}`
+              });
+            }
+            
+            // Clear the city's production regardless of type
+            city.production.current_item = null;
+            city.production.turns_remaining = 0;
+            city.production.itemType = null;
+            
+          } catch (error) {
+            console.error(`Error completing production in AI city ${city.name}:`, error);
+            city.production.current_item = null;
+            city.production.turns_remaining = 0;
+            city.production.itemType = null;
+          }
+        }
+      }
+    }
+    
+    return completedProductions;
   }
 
   async function saveAndExit() {
@@ -1166,8 +1398,30 @@
         return;
       }
       
-      // Update the unit position
-      newlyProducedUnit.position = [x, y];
+      // Now that we have a valid position, get the FULL troop details with position
+      try {
+        // Here's where we call getTroopType with the position the player chose
+        const position = [x, y];
+        const troopDetails = await gameAPI.getTroopType(newlyProducedUnit.type_id, position);
+        
+        // Update the unit with complete details from the API
+        newlyProducedUnit.position = position;
+        newlyProducedUnit.movement = troopDetails.movement || newlyProducedUnit.movement;
+        newlyProducedUnit.remainingMovement = troopDetails.movement || newlyProducedUnit.movement;
+        newlyProducedUnit.health = troopDetails.health || newlyProducedUnit.health;
+        newlyProducedUnit.attack = troopDetails.attack || newlyProducedUnit.attack;
+        newlyProducedUnit.defense = troopDetails.defense || newlyProducedUnit.defense;
+        
+        // Set full name in case it was updated
+        if (troopDetails.name) {
+          newlyProducedUnit.name = troopDetails.name;
+        }
+      } catch (error) {
+        console.error("Error getting full troop details:", error);
+        // Still place the unit with basic details if API fails
+        newlyProducedUnit.position = [x, y];
+        newlyProducedUnit.remainingMovement = newlyProducedUnit.movement || 2;
+      }
       
       // Add the unit to the player's units
       units = [...units, newlyProducedUnit];
@@ -1178,17 +1432,28 @@
       
       gameData.player.units.push(newlyProducedUnit);
       
+      // Update fog of war around the new unit
+      updateFogOfWarAroundPosition(x, y, 2);
+      
+      // Clear the production for the city that produced this unit
+      if (producingCity && producingCity.production) {
+        producingCity.production.current_item = null;
+        producingCity.production.turns_remaining = 0;
+        producingCity.production.itemType = null;
+      }
+      
       // Update the game state
       await gameAPI.updateGameSession(gameData);
       
       // Show a success notification
-      showToastNotification(`¡${newlyProducedUnit.name} colocado con éxito!`, "success");
+      showToastNotification(`¡${newlyProducedUnit.name} colocado con éxito!`, "success", 4000);
       
       // Clear the placement mode and city area highlighting
       awaitingUnitPlacement = false;
       newlyProducedUnit = null;
       producingCity = null;
       cityAreaTiles = [];
+      
     } catch (error) {
       console.error("Error placing new unit:", error);
       showToastNotification("Error al colocar la unidad", "error");
@@ -1217,7 +1482,13 @@
       unit.position[1] === y
     );
     
-    return !isOccupied;
+    // NEW: Check if position has a city
+    const hasCityAtPosition = cities.some(city => 
+      (city.position.x === x && city.position.y === y) || 
+      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+    );
+    
+    return !isOccupied && !hasCityAtPosition;
   }
 
   onMount(async () => {

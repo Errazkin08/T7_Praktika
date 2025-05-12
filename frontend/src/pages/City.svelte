@@ -240,11 +240,13 @@
       case 'wall': return { type: 'emoji', value: '🧱' };
       case 'tower': return { type: 'emoji', value: '🗼' };
       case 'temple': return { type: 'emoji', value: '⛪' };
-      // Use the new image paths for specific buildings
+      // Use the new image paths for specific buildings and fix their type to 'image'
       case 'quarry': return { type: 'image', url: './ia_assets/quarry.jpg' };
       case 'sawmill': return { type: 'image', url: './ia_assets/sawmill.png' };
       case 'ironmine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
+      case 'iron_mine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
       case 'goldmine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
+      case 'gold_mine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       default: return { type: 'emoji', value: '🏛️' };
     }
   }
@@ -409,9 +411,13 @@
                         </span>
                       {/if}
                     {:else}
-                      <span class="production-emoji">
-                        {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
-                      </span>
+                      {#if productionType && getBuildingIcon(productionType.type || productionType.name).type === 'image'}
+                        <img src={getBuildingIcon(productionType.type || productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                      {:else}
+                        <span class="production-emoji">
+                          {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
+                        </span>
+                      {/if}
                     {/if}
                   </div>
                   <div class="production-details">
@@ -456,9 +462,13 @@
                         </span>
                       {/if}
                     {:else}
-                      <span class="production-emoji">
-                        {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
-                      </span>
+                      {#if productionType && getBuildingIcon(productionType.type || productionType.name).type === 'image'}
+                        <img src={getBuildingIcon(productionType.type || productionType.name).url} alt={productionType ? productionType.name : city.production.current_item} class="production-image" />
+                      {:else}
+                        <span class="production-emoji">
+                          {productionType ? getBuildingIcon(productionType.type || productionType.name).value : '🏗️'}
+                        </span>
+                      {/if}
                     {/if}
                   </div>
                   <div class="production-details">

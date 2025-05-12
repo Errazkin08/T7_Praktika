@@ -640,6 +640,13 @@
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
+      // Generate and distribute resources for player cities before ending player turn
+      const playerResources = await calculateAndDistributeResources('player');
+      if (playerResources && Object.values(playerResources).some(val => val > 0)) {
+        showResourceGenerationNotification(playerResources, 'player');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       gameData.current_player = "ia";
       currentPlayer.set(gameData.current_player);
       showToastNotification("IA's Turn - Processing...", "info");
@@ -667,6 +674,13 @@
         console.error("Error getting AI action:", error);
         showToastNotification("Error processing AI turn", "error");
         await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Generate and distribute resources for AI cities after AI turn
+      const aiResources = await calculateAndDistributeResources('ia');
+      if (aiResources && Object.values(aiResources).some(val => val > 0)) {
+        // Optional: Show notification about AI resources (or keep it hidden)
+        console.log("AI resources generated:", aiResources);
       }
       
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1027,6 +1041,256 @@
     }
     
     return completedProductions;
+  }
+
+  // New function to show resource generation notification
+  function showResourceGenerationNotification(resources, playerType) {
+    if (!resources) return;
+    
+    // Only show notifications for the human player
+    if (playerType !== 'player') return;
+    
+    let resourceMessage = "Recursos generados: ";
+    let hasResources = false;
+    
+    if (resources.food > 0) {
+      resourceMessage += `🌾 ${resources.food} `;
+      hasResources = true;
+    }
+    if (resources.gold > 0) {
+      resourceMessage += `💰 ${resources.gold} `;
+      hasResources = true;
+    }
+    if (resources.wood > 0) {
+      resourceMessage += `🌲 ${resources.wood} `;
+      hasResources = true;
+    }
+    if (resources.iron > 0) {
+      resourceMessage += `⚙️ ${resources.iron} `;
+      hasResources = true;
+    }
+    if (resources.stone > 0) {
+      resourceMessage += `🪨 ${resources.stone} `;
+      hasResources = true;
+    }
+    
+    if (hasResources) {
+      showToastNotification(resourceMessage, "success", 5000);
+    }
+  }
+
+  // Helper function to calculate resource generation based on buildings and resource counts
+  function calculateResourceGeneration(city, resourceCounts) {
+    const generatedResources = {
+      food: 0,
+      gold: 0,
+      wood: 0,
+      iron: 0,
+      stone: 0
+    };
+    
+    // Base resource generation for cities
+    generatedResources.food += 1; // Each city generates 1 food by default
+    
+    // If no buildings, return base generation only
+    if (!city.buildings || city.buildings.length === 0) {
+      return generatedResources;
+    }
+    
+    // Process each building
+    for (const building of city.buildings) {
+      // Get default outcome based on building type if not specified
+      const outcome = building.output || getDefaultBuildingOutcome(building.type_id);
+      
+      // Apply resource generation based on building type and available resources
+      switch (building.type_id) {
+        case "farm":
+        case "granary":
+          // Each farm/granary building multiplies its food outcome by the number of food tiles
+          if (outcome.food && resourceCounts.food > 0) {
+            const foodGenerated = outcome.food * resourceCounts.food;
+            generatedResources.food += foodGenerated;
+            console.log(`${city.name}: ${building.type_id} generated ${foodGenerated} food from ${resourceCounts.food} food tiles`);
+          }
+          break;
+        case "mine":
+        case "Gold_mine":
+          // Each mine building multiplies its gold outcome by the number of gold tiles
+          if (outcome.gold && resourceCounts.gold > 0) {
+            const goldGenerated = outcome.gold * resourceCounts.gold;
+            generatedResources.gold += goldGenerated;
+            console.log(`${city.name}: ${building.type_id} generated ${goldGenerated} gold from ${resourceCounts.gold} gold tiles`);
+          }
+          break;
+        case "Sawmill":
+        case "lumber_mill":
+          // Each sawmill building multiplies its wood outcome by the number of wood tiles
+          if (outcome.wood && resourceCounts.wood > 0) {
+            const woodGenerated = outcome.wood * resourceCounts.wood;
+            generatedResources.wood += woodGenerated;
+            console.log(`${city.name}: ${building.type_id} generated ${woodGenerated} wood from ${resourceCounts.wood} wood tiles`);
+          }
+          break;
+        case "forge":
+        case "Iron_mine":
+          // Each forge/iron mine building multiplies its iron outcome by the number of iron tiles
+          if (outcome.iron && resourceCounts.iron > 0) {
+            const ironGenerated = outcome.iron * resourceCounts.iron;
+            generatedResources.iron += ironGenerated;
+            console.log(`${city.name}: ${building.type_id} generated ${ironGenerated} iron from ${resourceCounts.iron} iron tiles`);
+          }
+          break;
+        case "Quarry":
+          // Each quarry building multiplies its stone outcome by the number of stone tiles
+          if (outcome.stone && resourceCounts.stone > 0) {
+            const stoneGenerated = outcome.stone * resourceCounts.stone;
+            generatedResources.stone += stoneGenerated;
+            console.log(`${city.name}: ${building.type_id} generated ${stoneGenerated} stone from ${resourceCounts.stone} stone tiles`);
+          }
+          break;
+        // Add other building types as needed
+      }
+    }
+    
+    return generatedResources;
+  }
+
+  // Helper function to get default outcomes for buildings when outcome property is missing
+  function getDefaultBuildingOutcome(buildingType) {
+    switch (buildingType) {
+      case "farm":
+        return { food: 2 };
+      case "granary":
+        return { food: 3 };
+      case "mine":
+      case "gold_mine":
+        return { gold: 2 };
+      case "sawmill":
+      case "lumber_mill":
+        return { wood: 2 };
+      case "forge":
+      case "iron_mine":
+        return { iron: 2 };
+      case "quarry":
+      case "stone_mine":
+        return { stone: 2 };
+      default:
+        return {}; // No outcome for unknown buildings
+    }
+  }
+
+  async function calculateAndDistributeResources(playerType) {
+    if (!gameData) return null;
+    
+    const resourcesGenerated = {
+      food: 0,
+      gold: 0,
+      wood: 0,
+      iron: 0,
+      stone: 0
+    };
+    
+    const player = playerType === 'ia' ? gameData.ia : gameData.player;
+    
+    if (!player || !player.cities || player.cities.length === 0) {
+      return null;
+    }
+    
+    console.log(`Calculating resources for ${playerType}'s cities (${player.cities.length} cities)`);
+    
+    // Process each city for the current player
+    for (const city of player.cities) {
+      console.log(`Processing city: ${city.name}`);
+      const cityResources = countResourcesInCityArea(city);
+      console.log(`${city.name} has resources in area:`, cityResources);
+      
+      const cityBuildings = city.buildings || [];
+      console.log(`${city.name} has ${cityBuildings.length} buildings`);
+      
+      const cityGeneration = calculateResourceGeneration(city, cityResources);
+      console.log(`${city.name} generated resources:`, cityGeneration);
+      
+      // Add to total generated resources
+      resourcesGenerated.food += cityGeneration.food;
+      resourcesGenerated.gold += cityGeneration.gold;
+      resourcesGenerated.wood += cityGeneration.wood;
+      resourcesGenerated.iron += cityGeneration.iron;
+      resourcesGenerated.stone += cityGeneration.stone;
+    }
+    
+    console.log(`Total resources generated for ${playerType}:`, resourcesGenerated);
+    
+    // Add resources to player
+    if (!player.resources) {
+      player.resources = { food: 0, gold: 0, wood: 0, iron: 0, stone: 0 };
+    }
+    
+    player.resources.food = (player.resources.food || 0) + resourcesGenerated.food;
+    player.resources.gold = (player.resources.gold || 0) + resourcesGenerated.gold;
+    player.resources.wood = (player.resources.wood || 0) + resourcesGenerated.wood;
+    player.resources.iron = (player.resources.iron || 0) + resourcesGenerated.iron;
+    player.resources.stone = (player.resources.stone || 0) + resourcesGenerated.stone;
+    
+    // Return the resources generated for notification
+    return resourcesGenerated;
+  }
+
+  // Helper function to count resources in a city's area
+  function countResourcesInCityArea(city) {
+    const resourceCounts = {
+      food: 0,
+      gold: 0,
+      wood: 0,
+      iron: 0,
+      stone: 0
+    };
+    
+    if (!city || !city.area) {
+      return resourceCounts;
+    }
+    
+    // Get city position
+    const cityPosX = Array.isArray(city.position) ? city.position[0] : city.position.x;
+    const cityPosY = Array.isArray(city.position) ? city.position[1] : city.position.y;
+    
+    // Calculate area radius (half the side length)
+    const radius = Math.floor(city.area / 2);
+    
+    // Calculate the starting positions (top-left corner of the square)
+    const startX = cityPosX - radius;
+    const startY = cityPosY - radius;
+    
+    // Check each tile in the city area
+    for (let y = 0; y < city.area; y++) {
+      for (let x = 0; x < city.area; x++) {
+        const tileX = startX + x;
+        const tileY = startY + y;
+        
+        // Check if the tile is within map bounds
+        if (tileX >= 0 && tileX < mapWidth && tileY >= 0 && tileY < mapHeight) {
+          // Get terrain type for this tile
+          const terrainType = terrain[tileY] && terrain[tileY][tileX];
+          
+          // Count resource based on terrain type
+          switch (terrainType) {
+            case 2: // Gold
+              resourceCounts.gold++;
+              break;
+            case 3: // Iron
+              resourceCounts.iron++;
+              break;
+            case 4: // Wood
+              resourceCounts.wood++;
+              break;
+            case 5: // Stone
+              resourceCounts.stone++;
+              break;
+          }
+        }
+      }
+    }
+    
+    return resourceCounts;
   }
 
   async function saveAndExit() {

@@ -339,6 +339,112 @@ button:disabled {
   content: none;
 }
 
+/* Resource generation notification styles */
+.resource-generation-notification {
+  background-color: rgba(76, 175, 80, 0.9);
+  border-left: 5px solid #388e3c;
+  animation: resource-notification-slide 0.3s ease-out;
+}
+
+.resource-icon-group {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 12px;
+}
+
+.resource-icon-group img {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.resource-amount {
+  font-weight: bold;
+}
+
+@keyframes resource-notification-slide {
+  from {
+    transform: translateY(-20px) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Enhancement for building resource multiplier visualization */
+.city-building-resource {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+  padding: 5px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.building-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+}
+
+.building-resource-formula {
+  font-size: 0.85rem;
+  color: #d1d1d1;
+}
+
+.building-resource-multiplier {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.resource-total {
+  margin-left: auto;
+  font-weight: bold;
+  color: #FFD700;
+}
+
+/* Resource tile highlight in city area */
+.map-tile.resource-tile {
+  position: relative;
+}
+
+.map-tile.resource-tile::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  pointer-events: none;
+  z-index: 11;
+}
+
+.map-tile.wood-resource::after {
+  border-color: rgba(139, 69, 19, 0.7);
+}
+
+.map-tile.gold-resource::after {
+  border-color: rgba(255, 215, 0, 0.7);
+}
+
+.map-tile.stone-resource::after {
+  border-color: rgba(169, 169, 169, 0.7);
+}
+
+.map-tile.iron-resource::after {
+  border-color: rgba(176, 196, 222, 0.7);
+}
+
+.map-tile.food-resource::after {
+  border-color: rgba(50, 205, 50, 0.7);
+}
+
 .right-controls button {
     display: flex;
     align-items: center;

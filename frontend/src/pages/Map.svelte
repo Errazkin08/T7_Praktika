@@ -227,9 +227,13 @@
     
     // Save current zoom level to restore later
     const previousZoomLevel = zoomLevel;
+    // Set a fixed zoom level for better visibility of AI actions
+    zoomLevel = 1.5;
     
     // Ensure AI units exist in the units array
     ensureAIUnitsExist();
+    
+    console.log(`Processing ${actions.length} AI actions`);
     
     for (let i = 0; i < aiActions.length; i++) {
       aiActionIndex = i;
@@ -244,17 +248,24 @@
           const [startX, startY] = currentAIAction.position;
           const [endX, endY] = currentAIAction.target_position;
           
-          centerMapOnPosition((startX + endX) / 2, (startY + endY) / 2);
+          // Calculate midpoint and force immediate camera update
+          const midX = (startX + endX) / 2;
+          const midY = (startY + endY) / 2;
+          console.log(`Centering camera on movement midpoint: [${midX}, ${midY}]`);
           
-          // Adjust zoom for better visibility
-          const oldZoom = zoomLevel;
-          zoomLevel = Math.max(1.5, zoomLevel);
+          offsetX = (window.innerWidth / 2) - (midX * tileSize * zoomLevel);
+          offsetY = (window.innerHeight / 2) - (midY * tileSize * zoomLevel);
         } else {
-          centerMapOnPosition(currentAIAction.position[0], currentAIAction.position[1]);
+          // For other actions, center directly on position
+          const [posX, posY] = currentAIAction.position;
+          console.log(`Centering camera on position: [${posX}, ${posY}]`);
+          
+          offsetX = (window.innerWidth / 2) - (posX * tileSize * zoomLevel);
+          offsetY = (window.innerHeight / 2) - (posY * tileSize * zoomLevel);
         }
         
         // Wait for camera to adjust
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
       
       // Display action card
@@ -275,6 +286,14 @@
     // Update game state
     updateGameStateAfterAITurn();
     
+    // Save changes to session
+    try {
+      await gameAPI.updateGameSession(gameData);
+      console.log("AI turn changes saved to session");
+    } catch (error) {
+      console.error("Error saving AI turn changes:", error);
+    }
+    
     // Restore fog of war to previous state
     showFogOfWar = previousFogState;
     
@@ -288,7 +307,7 @@
     currentAIAction = null;
     showToastNotification("La IA ha completado su turno", "success");
   }
-  
+
   async function centerOnPlayerPosition() {
     let centerPosition = null;
     
@@ -375,7 +394,7 @@
             toY: action.target_position[1]
           };
           
-          // Add moving class for animation
+          // Make sure the unit is visible
           unitToMove.moving = true;
           units = [...units]; // Update reactivity
           
@@ -567,6 +586,8 @@
     // Update gameData with the changes to cities
     const aiCities = cities.filter(c => c.owner === 'ia');
     gameData.ia.cities = aiCities || [];
+    
+    console.log(`AI state updated: ${aiUnits.length} units and ${aiCities.length} cities`);
   }
 
   function centerMapOnPosition(x, y) {
@@ -2033,19 +2054,29 @@
     <div 
       class="movement-path-indicator" 
       style="
-        left: {activeMovementPath.fromX * tileSize}px;
-        top: {activeMovementPath.fromY * tileSize}px;
-        width: {tileSize}px;
-        height: {tileSize}px;
+        left: {activeMovementPath.fromX * tileSize * zoomLevel + offsetX}px;
+        top: {activeMovementPath.fromY * tileSize * zoomLevel + offsetY}px;
+        width: {tileSize * zoomLevel}px;
+        height: {tileSize * zoomLevel}px;
       "
     ></div>
     <div 
       class="movement-path-indicator target" 
-      style=""
+      style="
+        left: {activeMovementPath.toX * tileSize * zoomLevel + offsetX}px;
+        top: {activeMovementPath.toY * tileSize * zoomLevel + offsetY}px;
+        width: {tileSize * zoomLevel}px;
+        height: {tileSize * zoomLevel}px;
+      "
     ></div>
     <div 
-      class="movement-path-line" 
-      style=""
+      class="movement-path-line"
+      style="
+        left: {Math.min(activeMovementPath.fromX, activeMovementPath.toX) * tileSize * zoomLevel + offsetX + (tileSize * zoomLevel / 2)}px;
+        top: {Math.min(activeMovementPath.fromY, activeMovementPath.toY) * tileSize * zoomLevel + offsetY + (tileSize * zoomLevel / 2)}px;
+        width: {Math.abs(activeMovementPath.toX - activeMovementPath.fromX) * tileSize * zoomLevel}px;
+        height: {Math.abs(activeMovementPath.toY - activeMovementPath.fromY) * tileSize * zoomLevel}px;
+      "
     ></div>
   {/if}
 

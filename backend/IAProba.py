@@ -229,27 +229,77 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             - 4: Terreno con madera (bosque)
             - 5: Terreno con piedra (recursos)
             - 6: Terreno con oro (recursos)
+
+            Los types de las acciones son:
+            - movement
+            - attack
+            - construction
             
-            Estructura JSON de respuesta:
-            {
-              "ai_turn_id": "[ID único para este turno]",
-              "game_id": "[ID del juego actual]",
-              "turn_number": [número del turno actual],
-              "actions": [
-                {
-                  "action_id": [número secuencial de acción],
-                  "type": "[tipo de acción/ movimiento/ataque/construcción]",
-                  "unit_id": "[ID de la unidad que realiza la acción]",
-                  "position":[
-                    [coordenada_x, coordenada_y]
-                  ],
-                  // otros campos según el tipo de acción
-                  "state_before": { /* estado resumido antes de la acción */ },
-                  "state_after": { /* estado resumido después de la acción */ }
-                }
-              ],
-              "reasoning": "[Explicación breve de tu estrategia en este turno]"
-            }
+            Estructura JSON de respuesta esto es solo un ejemplo, pero la estructura debe ser la misma:
+             Aqui tienes un ejemplo de respuesta:
+        {{
+  "ai_turn_id": "ai_turn_1684159782",
+  "game_id": "game_12345",
+  "turn_number": 5,
+  "actions": [
+    {{
+      "action_id": 1,
+      "type": "movement",
+      "unit_id": "warrior_01",
+      "position": [15, 8],
+      "target_position": [16, 9],
+      "state_before": {{
+        "position": [15, 8],
+        "remainingMovement": 2,
+        "status": "ready"
+      }},
+      "state_after": {{
+        "position": [16, 9],
+        "remainingMovement": 1,
+        "status": "moved"
+      }}
+        }},
+    {{
+      "action_id": 2,
+      "type": "attack",
+      "unit_id": "warrior_01",
+      "position": [16, 9],
+      "target_unit_id": "player_settler_03",
+      "target_position": [17, 9],
+      "state_before": {{
+        "position": [16, 9],
+        "remainingMovement": 1,
+        "status": "moved",
+        "health": 100
+      }},
+      "state_after": {{
+        "position": [16, 9],
+        "remainingMovement": 0,
+        "status": "exhausted",
+        "health": 85
+      }}
+    }},
+    {{
+      "action_id": 3,
+      "type": "construction",
+      "unit_id": "settler_02",
+      "position": [12, 5],
+      "building": "city",
+      "city_name": "New Atlantis",
+      "state_before": {{
+        "position": [12, 5],
+        "remainingMovement": 2,
+        "status": "ready"
+      }},
+      "state_after": {{
+        "position": [12, 5],
+        "remainingMovement": 0,
+        "status": "exhausted"
+      }}
+    }}
+  ],
+  "reasoning": "Advancing warrior units toward player territory to apply pressure while establishing a new city near resources to secure economic advantage."
+}}
             """
             
             # Establecer las instrucciones del sistema en el cliente

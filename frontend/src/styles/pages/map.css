@@ -1032,10 +1032,10 @@ html.city-active {
 /* AI Action visualization styles */
 .ai-action-overlay {
   position: fixed;
-  top: 100px;
+  top: 80px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 200;
+  z-index: 500; /* Increase z-index to ensure visibility */
   pointer-events: none;
   max-width: 500px;
   width: 90%;
@@ -1047,7 +1047,16 @@ html.city-active {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.7);
-  animation: slide-in-top 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: pulse-card 2s infinite alternate;
+}
+
+@keyframes pulse-card {
+  0% {
+    box-shadow: 0 5px 25px rgba(231, 76, 60, 0.5);
+  }
+  100% {
+    box-shadow: 0 5px 35px rgba(231, 76, 60, 0.9);
+  }
 }
 
 .ai-action-header {
@@ -1184,32 +1193,25 @@ html.city-active {
 .movement-path-indicator {
   position: absolute;
   pointer-events: none;
-  border: 2px solid rgba(255, 50, 50, 0.8);
-  border-radius: 3px;
-  z-index: 5;
-  animation: pulse-highlight 1s infinite alternate;
+  border: 3px solid rgba(255, 255, 0, 0.8);
+  border-radius: 4px;
+  z-index: 30;
+  box-shadow: 0 0 15px rgba(255, 255, 0, 0.6);
+  animation: pulse-highlight 1.5s infinite alternate;
 }
 
 .movement-path-indicator.target {
   border-color: rgba(50, 255, 50, 0.8);
+  box-shadow: 0 0 15px rgba(50, 255, 50, 0.6);
 }
 
 .movement-path-line {
   position: absolute;
   pointer-events: none;
-  border: 2px dashed rgba(255, 255, 50, 0.6);
-  z-index: 4;
-}
-
-@keyframes pulse-highlight {
-  0% {
-    box-shadow: 0 0 5px rgba(255, 50, 50, 0.3);
-    opacity: 0.7;
-  }
-  100% {
-    box-shadow: 0 0 15px rgba(255, 50, 50, 0.7);
-    opacity: 1;
-  }
+  border-top: 4px dashed rgba(255, 255, 0, 0.7);
+  z-index: 29;
+  transform-origin: 0 0;
+  height: 0 !important; /* Force height to be 0 */
 }
 
 .movement-path {
@@ -1324,3 +1326,25 @@ html.city-active {
     height: 24px;
     object-fit: contain;
   }
+  
+/* Enhanced AI unit visualization */
+.unit-marker.enemy.moving {
+  animation: enemy-movement 1s infinite alternate ease-in-out;
+  filter: drop-shadow(0 0 8px rgba(255, 50, 50, 0.9)) brightness(1.2);
+  z-index: 25;
+}
+
+@keyframes enemy-movement {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 5px rgba(255, 50, 50, 0.8)) brightness(1.2);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.15);
+    filter: drop-shadow(0 0 10px rgba(255, 50, 50, 0.8)) brightness(1.3);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 5px rgba(255, 50, 50, 0.8)) brightness(1.2);
+  }
+}

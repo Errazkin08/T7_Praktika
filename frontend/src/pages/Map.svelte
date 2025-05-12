@@ -79,10 +79,6 @@
   let aiActionDescription = "";
   let aiTurnReasoning = "";
 
-  // Add a variable to track and display movement paths
-  let activeMovementPath = null;
-  let debugAIMovement = true; // Enable debugging
-
   // Add this new state variables for unit placement
   let newlyProducedUnit = null;
   let awaitingUnitPlacement = false;
@@ -90,6 +86,9 @@
 
   // Add this new state variable to track city area tiles
   let cityAreaTiles = [];
+
+  // Keep the debug variable
+  let debugAIMovement = true; // Enable debugging
 
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
@@ -386,19 +385,11 @@
             break;
           }
           
-          // Show path
-          activeMovementPath = {
-            fromX: action.position[0],
-            fromY: action.position[1],
-            toX: action.target_position[0],
-            toY: action.target_position[1]
-          };
-          
-          // Make sure the unit is visible
+          // Make unit visually active
           unitToMove.moving = true;
           units = [...units]; // Update reactivity
           
-          // Wait for animation
+          // Wait for animation visibility
           await new Promise(resolve => setTimeout(resolve, 1200));
           
           // Move unit to target position
@@ -408,9 +399,8 @@
           unitToMove.moving = false;
           units = [...units]; // Update reactivity
           
-          // Clear path after a moment
+          // Wait for transition to complete
           await new Promise(resolve => setTimeout(resolve, 500));
-          activeMovementPath = null;
           
           // Update fog of war
           updateFogOfWarAroundPosition(action.target_position[0], action.target_position[1], 2);
@@ -2045,55 +2035,6 @@
       <div class="ai-reasoning-card">
         <h4>Estrategia de la IA</h4>
         <p>{aiTurnReasoning}</p>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Add movement path visualization -->
-  {#if activeMovementPath}
-    <div 
-      class="movement-path-indicator" 
-      style="
-        left: {activeMovementPath.fromX * tileSize * zoomLevel + offsetX}px;
-        top: {activeMovementPath.fromY * tileSize * zoomLevel + offsetY}px;
-        width: {tileSize * zoomLevel}px;
-        height: {tileSize * zoomLevel}px;
-      "
-    ></div>
-    <div 
-      class="movement-path-indicator target" 
-      style="
-        left: {activeMovementPath.toX * tileSize * zoomLevel + offsetX}px;
-        top: {activeMovementPath.toY * tileSize * zoomLevel + offsetY}px;
-        width: {tileSize * zoomLevel}px;
-        height: {tileSize * zoomLevel}px;
-      "
-    ></div>
-    <div 
-      class="movement-path-line"
-      style="
-        left: {Math.min(activeMovementPath.fromX, activeMovementPath.toX) * tileSize * zoomLevel + offsetX + (tileSize * zoomLevel / 2)}px;
-        top: {Math.min(activeMovementPath.fromY, activeMovementPath.toY) * tileSize * zoomLevel + offsetY + (tileSize * zoomLevel / 2)}px;
-        width: {Math.abs(activeMovementPath.toX - activeMovementPath.fromX) * tileSize * zoomLevel}px;
-        height: {Math.abs(activeMovementPath.toY - activeMovementPath.fromY) * tileSize * zoomLevel}px;
-      "
-    ></div>
-  {/if}
-
-  <!-- Add a UI indicator for unit placement mode -->
-  {#if awaitingUnitPlacement && newlyProducedUnit}
-    <div class="unit-placement-overlay">
-      <div class="unit-placement-card">
-        <h3>Colocar Unidad</h3>
-        <p>Selecciona una casilla para colocar tu nueva unidad: {newlyProducedUnit.name}</p>
-        <div class="unit-preview">
-          {#if getUnitImageUrl(newlyProducedUnit.type_id)}
-            <img src={getUnitImageUrl(newlyProducedUnit.type_id)} alt={newlyProducedUnit.name} class="unit-placement-image" />
-          {:else}
-            <span class="unit-placement-icon">{getUnitIcon(newlyProducedUnit.type_id)}</span>
-          {/if}
-        </div>
-        <p class="placement-instruction">Haz clic en una casilla adyacente a la ciudad para colocar la unidad.</p>
       </div>
     </div>
   {/if}

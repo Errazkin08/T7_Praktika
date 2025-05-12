@@ -1,12 +1,15 @@
 from flask import Flask, jsonify, request, session
 from flask_cors import CORS
-from routes.userRoute import user_blueprint
-from routes.gameRoute import game_blueprint
-from routes.mapRoute import map_blueprint
-from routes.iaRoute import ia_blueprint
-from routes.troopRoute import troop_blueprint
-from routes.buildingRoute import building_blueprint
-from routes.civilizationRoute import civilization_blueprint
+# Import all blueprints directly from the routes package
+from routes import (
+    user_blueprint, 
+    game_blueprint,
+    map_blueprint,
+    ia_blueprint,
+    troop_blueprint,
+    building_blueprint,
+    civilization_blueprint
+)
 from database import init_db, close_db
 import os
 from bson import ObjectId

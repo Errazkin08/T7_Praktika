@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy all application files
-COPY app.py database.py routes.py IAProba.py ./
+# Copy application files - copy the entire directory structure instead of individual files
+COPY . .
 
 # Install all necessary dependencies (added flask-session)
 RUN pip install flask pymongo groq requests flask-cors flask-session python-dotenv

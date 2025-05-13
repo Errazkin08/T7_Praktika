@@ -26,11 +26,16 @@ def ai_action():
     prompt = data.get('prompt', '')
     game_state = data.get('game_state')
     
-    # Extraer solo los campos necesarios para la IA
+    # Extraer los campos necesarios para la IA incluyendo fog of war
     simplified_game_state = {
         "ia": game_state.get("ia", {}),
+        "player": {
+            "units": game_state.get("player", {}).get("units", [])
+        },
         "difficulty": game_state.get("difficulty", ""),
-        "map_data": game_state.get("map_data", {})
+        "map_data": game_state.get("map_data", {}),
+        "map_size": game_state.get("map_size", {}),
+        "turn": game_state.get("turn", 1)
     }
     
     # Opcional: añadir identificador de juego para manejar múltiples conversaciones

@@ -296,8 +296,8 @@
       console.error("Error saving AI turn changes:", error);
     }
     
-    // Restore fog of war to previous state
-    showFogOfWar = previousFogState;
+    // Restore fog of war to previous state - IMPORTANT: Always ensure it's restored
+    showFogOfWar = previousFogState; 
     
     // Find a player unit or city to center on
     await centerOnPlayerPosition();
@@ -347,11 +347,16 @@
     try {
       switch (action.type) {
         case "movement": {
-          // Find the unit to move
-          let unitIndex = units.findIndex(u => u.id === action.unit_id);
+          // Find the unit to move - first try by ID, then by position if ID is missing
+          let unitIndex = -1;
           
-          if (unitIndex === -1) {
-            // If not found by ID, try by position
+          if (action.unit_id) {
+            // Find by ID if available
+            unitIndex = units.findIndex(u => u.id === action.unit_id);
+          }
+          
+          if (unitIndex === -1 && action.position && Array.isArray(action.position)) {
+            // If not found by ID or ID is null/undefined, try by position
             const [posX, posY] = action.position;
             unitIndex = units.findIndex(u => 
               u.position && 
@@ -360,14 +365,20 @@
               u.position[1] === posY &&
               u.owner === 'ia'
             );
+            
+            // If found by position but unit has no ID, assign one
+            if (unitIndex !== -1 && (!units[unitIndex].id || units[unitIndex].id === null)) {
+              units[unitIndex].id = `unit-${posX}-${posY}`;
+              console.log(`Assigned ID ${units[unitIndex].id} to unit at position [${posX},${posY}]`);
+            }
           }
           
           if (unitIndex === -1) {
-            console.warn(`Unit for movement not found: ${action.unit_id}. Creating temporary unit for visualization.`);
+            console.warn(`Unit for movement not found: ${action.unit_id || JSON.stringify(action.position)}. Creating temporary unit for visualization.`);
             
             // Create a temporary unit if none exists
             const tempUnit = {
-              id: action.unit_id,
+              id: action.unit_id || `unit-${action.position[0]}-${action.position[1]}`,
               position: [...action.position],
               type_id: action.unit_type || "warrior",
               owner: 'ia',
@@ -379,6 +390,7 @@
             unitIndex = units.length - 1;
           }
           
+          // Rest of the movement logic remains unchanged
           const unitToMove = units[unitIndex];
           
           // Check if target position is water (invalid move)
@@ -410,12 +422,17 @@
           break;
         }
         
+        // Attack and construction cases - similar changes for looking up units by position
         case "attack": {
-          // Find attacking unit
-          let attackerIndex = units.findIndex(u => u.id === action.unit_id);
+          // Find attacking unit - first by ID, then by position
+          let attackerIndex = -1;
           
-          if (attackerIndex === -1) {
-            // If not found by ID, try by position
+          if (action.unit_id) {
+            attackerIndex = units.findIndex(u => u.id === action.unit_id);
+          }
+          
+          if (attackerIndex === -1 && action.position && Array.isArray(action.position)) {
+            // If not found by ID or ID is null, try by position
             const [posX, posY] = action.position;
             attackerIndex = units.findIndex(u => 
               u.position && 
@@ -424,12 +441,21 @@
               u.position[1] === posY &&
               u.owner === 'ia'
             );
+            
+            // Assign ID if found but missing
+            if (attackerIndex !== -1 && (!units[attackerIndex].id || units[attackerIndex].id === null)) {
+              units[attackerIndex].id = `unit-${posX}-${posY}`;
+            }
           }
           
           // Find target unit
-          let targetIndex = units.findIndex(u => u.id === action.target_unit_id);
+          let targetIndex = -1;
           
-          if (targetIndex === -1) {
+          if (action.target_unit_id) {
+            targetIndex = units.findIndex(u => u.id === action.target_unit_id);
+          }
+          
+          if (targetIndex === -1 && action.target_position && Array.isArray(action.target_position)) {
             // Try to find by position if ID fails
             const [targetX, targetY] = action.target_position;
             targetIndex = units.findIndex(u => 
@@ -441,6 +467,7 @@
             );
           }
           
+          // Rest of the attack logic remains the same
           if (attackerIndex !== -1) {
             // Animate attack
             const attacker = units[attackerIndex];
@@ -475,10 +502,14 @@
         }
         
         case "construction": {
-          // Find the unit
-          let builderIndex = units.findIndex(u => u.id === action.unit_id);
+          // Find the unit - first by ID, then by position
+          let builderIndex = -1;
           
-          if (builderIndex === -1) {
+          if (action.unit_id) {
+            builderIndex = units.findIndex(u => u.id === action.unit_id);
+          }
+          
+          if (builderIndex === -1 && action.position && Array.isArray(action.position)) {
             // If not found by ID, try by position
             const [posX, posY] = action.position;
             builderIndex = units.findIndex(u => 
@@ -488,8 +519,14 @@
               u.position[1] === posY &&
               u.owner === 'ia'
             );
+            
+            // Assign ID if found but missing
+            if (builderIndex !== -1 && (!units[builderIndex].id || units[builderIndex].id === null)) {
+              units[builderIndex].id = `unit-${posX}-${posY}`;
+            }
           }
           
+          // Rest of the construction logic remains the same
           if (builderIndex !== -1) {
             const builder = units[builderIndex];
             
@@ -497,7 +534,7 @@
               // Create new city
               const newCity = {
                 id: `city_${Date.now()}`,
-                name: action.city_name,
+                name: action.city_name || `IA City ${Date.now()}`,
                 position: [...action.position],
                 owner: 'ia',
                 population: 1
@@ -533,16 +570,65 @@
   }
 
   function getActionDescription(action) {
+    // Get a unit description based on type, id, or position
+    function getUnitDescription(unitId, position) {
+      // If we have a valid ID that's not position-based, use it
+      if (unitId && 
+          unitId !== "null" && 
+          unitId !== "undefined" && 
+          !unitId.startsWith("unit-")) {
+        return unitId.replace(/_/g, ' ');
+      }
+      
+      // Otherwise, try to find what unit is at this position and use its type
+      if (position && Array.isArray(position) && position.length >= 2) {
+        const unitAtPosition = units.find(u => 
+          u.position && 
+          Array.isArray(u.position) && 
+          u.position[0] === position[0] && 
+          u.position[1] === position[1] &&
+          u.owner === 'ia'
+        );
+        
+        if (unitAtPosition) {
+          // Prioritize showing the unit type in the UI
+          const unitType = unitAtPosition.type_id || "desconocida";
+          
+          // Return a user-friendly name based on unit type
+          switch(unitType.toLowerCase()) {
+            case "warrior": return "guerrero";
+            case "archer": return "arquero";
+            case "settler": return "colono";
+            case "cavalry": return "caballería";
+            case "builder": return "constructor";
+            default: return unitType;
+          }
+        }
+        
+        // Fallback to generic description without showing coordinates
+        return "unidad";
+      }
+      
+      return "unidad desconocida";
+    }
+    
     switch (action.type) {
       case "movement":
-        return `La unidad ${action.unit_id.replace(/_/g, ' ')} se mueve de [${action.position[0]},${action.position[1]}] a [${action.target_position[0]},${action.target_position[1]}]`;
+        const unitName = getUnitDescription(action.unit_id, action.position);
+        return `La ${unitName} se mueve de [${action.position[0]},${action.position[1]}] a [${action.target_position[0]},${action.target_position[1]}]`;
+        
       case "attack":
-        return `La unidad ${action.unit_id.replace(/_/g, ' ')} ataca a tu unidad ${action.target_unit_id.replace(/_/g, ' ')}`;
+        const attackerName = getUnitDescription(action.unit_id, action.position);
+        const targetName = getUnitDescription(action.target_unit_id, action.target_position);
+        return `La ${attackerName} ataca a tu unidad ${targetName}`;
+        
       case "construction":
         if (action.building === "city") {
-          return `La IA funda una nueva ciudad: ${action.city_name}`;
+          const builderName = getUnitDescription(action.unit_id, action.position);
+          return `El colono funda una nueva ciudad${action.city_name ? ': ' + action.city_name : ''}`;
         }
-        return `La IA construye ${action.building}`;
+        return `La IA construye ${action.building || "una estructura"}`;
+        
       default:
         return `La IA realiza una acción: ${action.type}`;
     }

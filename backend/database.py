@@ -631,6 +631,20 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
         
         # Create AI warrior
         ai_warrior = get_troop_type("warrior", ai_warrior_position[:])  # Create a copy of the position list
+        
+        # Initialize player fog of war grid (0=hidden, 1=visible)
+        player_fog_grid = [[0 for _ in range(map_size["width"])] for _ in range(map_size["height"])]
+        
+        # Initialize AI fog of war grid
+        ai_fog_grid = [[0 for _ in range(map_size["width"])] for _ in range(map_size["height"])]
+        
+        # Set visibility around player starting units - 3 tile radius
+        updateFogOfWar(player_fog_grid, map_data["startPoint"], 3, map_size)
+        updateFogOfWar(player_fog_grid, warrior["position"], 2, map_size)
+        
+        # Set visibility around AI starting units - 2 tile radius for 4x4 visible area
+        updateFogOfWar(ai_fog_grid, ai_start_position, 2, map_size)
+        updateFogOfWar(ai_fog_grid, ai_warrior_position, 2, map_size)
             
         # Create a timestamp-based game ID
         game_id = str(int(datetime.datetime.now().timestamp() * 1000) + 1)
@@ -658,6 +672,7 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                     "stone": 20,
                     "iron": 10
                 },
+                "fog_grid": player_fog_grid  # Add player fog of war grid
             },
             "ia": {
                 "units": [ai_settler, ai_warrior],
@@ -669,6 +684,7 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
                     "stone": 20,
                     "iron": 10
                 },
+                "fog_grid": ai_fog_grid  # Add AI fog of war grid
             },
             "created_at": datetime.datetime.now(),
             "last_saved": datetime.datetime.now()
@@ -682,6 +698,32 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
     except Exception as e:
         print(f"Error adding game: {e}")
         return None
+
+# Add a helper function to update fog of war
+def updateFogOfWar(fog_grid, position, visibility_radius, map_size):
+    """
+    Update fog of war grid around a given position
+    
+    Args:
+        fog_grid: The grid to update (0=hidden, 1=visible)
+        position: [x, y] position to update around
+        visibility_radius: How far units can see
+        map_size: Map dimensions
+    """
+    x, y = position
+    width = map_size["width"]
+    height = map_size["height"]
+    
+    # Calculate bounds for a square around position (creates a (radius*2+1) x (radius*2+1) square)
+    min_x = max(0, x - visibility_radius)
+    max_x = min(width - 1, x + visibility_radius)
+    min_y = max(0, y - visibility_radius)
+    max_y = min(height - 1, y + visibility_radius)
+    
+    # Update visibility in a square area around the position
+    for ny in range(min_y, max_y + 1):
+        for nx in range(min_x, max_x + 1):
+            fog_grid[ny][nx] = 1
 
 def save_game():
     """

@@ -304,7 +304,7 @@
       if (manhattanDistance <= attackRange) {
         // Check if enemy is visible (not in fog of war)
         if (showFogOfWar) {
-          if (grid[enemyY] && grid[enemyY][enemyX] === FOG_OF_WAR.VISIBLE) {
+          if (grid[enemyY] && grid[enemyX] === FOG_OF_WAR.VISIBLE) {
             return true;
           }
         } else {
@@ -1059,6 +1059,9 @@
               break;
               
             } else if (itemType === "building") {
+              // Get the production type to determine if we're building or upgrading
+              const productionType = city.production.production_type || 'build';
+              
               // Get complete building details
               let buildingDetails;
               try {
@@ -1071,34 +1074,98 @@
                 };
               }
               
-              // Create a new building object with ALL properties from the API
-              const newBuilding = {
-                // Copy all properties from the building type
-                ...buildingDetails,
-                // Add runtime-specific properties
-                id: `${itemId}_${Date.now()}`,
-                type_id: itemId,
-                constructed_at: gameData.turn
-              };
-              
-              // Add building directly to the city
-              if (!city.buildings) {
-                city.buildings = [];
+              if (productionType === 'build' || productionType === 1) {
+                // Create a new building object with ALL properties from the API
+                const newBuilding = {
+                  // Copy all properties from the building type
+                  ...buildingDetails,
+                  // Add runtime-specific properties
+                  id: `${itemId}_${Date.now()}`,
+                  type_id: itemId,
+                  constructed_at: gameData.turn,
+                  level: 1 // Ensure new buildings start at level 1
+                };
+                
+                // Add building directly to the city
+                if (!city.buildings) {
+                  city.buildings = [];
+                }
+                city.buildings.push(newBuilding);
+                
+                // Show prominent notification for building completion
+                const notificationMessage = `${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`;
+                showToastNotification(notificationMessage, "success", 6000);
+                
+                // Add to completed productions
+                completedProductions.push({
+                  type: 'building',
+                  name: buildingDetails.name || itemId,
+                  city: city.name,
+                  requiresPlacement: false,
+                  message: notificationMessage
+                });
+                
+              } else if (productionType === 'upgrade' || productionType === 2) {
+                // UPGRADE EXISTING BUILDING
+                
+                // Find the existing building in the city
+                let existingBuilding = null;
+                let buildingIndex = -1;
+                
+                if (city.buildings && city.buildings.length > 0) {
+                  buildingIndex = city.buildings.findIndex(building => 
+                    building.type_id === itemId || 
+                    building.id === itemId ||
+                    building.name?.toLowerCase() === buildingDetails.name?.toLowerCase() ||
+                    building.type?.toLowerCase() === buildingDetails.type?.toLowerCase()
+                  );
+                  
+                  if (buildingIndex !== -1) {
+                    existingBuilding = city.buildings[buildingIndex];
+                  }
+                }
+                
+                if (!existingBuilding) {
+                  console.error(`Could not find a building of type ${itemId} to upgrade in city ${city.name}`);
+                  showToastNotification(`Error: No se encontró un edificio para mejorar en ${city.name}`, "error");
+                } else {
+                  // Make a copy of the building to ensure reactivity
+                  const upgradedBuilding = { ...existingBuilding };
+                  
+                  // Increment the level
+                  upgradedBuilding.level = (upgradedBuilding.level || 1) + 1;
+                  
+                  // Get the level_upgrade amount
+                  const levelUpgradeAmount = buildingDetails.level_upgrade || 1;
+                  
+                  // Update output resources if they exist
+                  if (upgradedBuilding.output) {
+                    for (const resource in upgradedBuilding.output) {
+                      upgradedBuilding.output[resource] += levelUpgradeAmount;
+                    }
+                  } else if (buildingDetails.output) {
+                    // Initialize output if it doesn't exist
+                    upgradedBuilding.output = { ...buildingDetails.output };
+                  }
+                  
+                  // Update the building in the city
+                  city.buildings[buildingIndex] = upgradedBuilding;
+                  
+                  // Show upgrade notification
+                  const notificationMessage = `${city.name} ha mejorado ${buildingDetails.name || itemId} al nivel ${upgradedBuilding.level}.`;
+                  showToastNotification(notificationMessage, "success", 6000);
+                  
+                  // Add to completed productions
+                  completedProductions.push({
+                    type: 'building_upgrade',
+                    name: buildingDetails.name || itemId,
+                    city: city.name,
+                    level: upgradedBuilding.level,
+                    requiresPlacement: false, 
+                    message: notificationMessage
+                  });
+                }
               }
-              city.buildings.push(newBuilding);
-              
-              // Show prominent notification for building completion
-              const notificationMessage = `${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`;
-              showToastNotification(notificationMessage, "success", 6000);
-              
-              // Add to completed productions
-              completedProductions.push({
-                type: 'building',
-                name: buildingDetails.name || itemId,
-                city: city.name,
-                requiresPlacement: false,
-                message: notificationMessage
-              });
               
               // Update game state immediately
               await gameAPI.updateGameSession(gameData);
@@ -1107,6 +1174,7 @@
               city.production.current_item = null;
               city.production.turns_remaining = 0;
               city.production.itemType = null;
+              city.production.production_type = null;
             }
           } catch (error) {
             console.error(`Error completing production in city ${city.name}:`, error);
@@ -1114,6 +1182,7 @@
             city.production.current_item = null;
             city.production.turns_remaining = 0;
             city.production.itemType = null;
+            city.production.production_type = null;
           }
         }
       }

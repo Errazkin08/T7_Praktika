@@ -981,6 +981,11 @@
     color: white;
   }
 
+  .production-type-badge.upgrade {
+    background-color: #9C27B0;
+    color: white;
+  }
+
   .resource-bar-icon {
     width: 24px;
     height: 24px;
@@ -1010,6 +1015,50 @@
     display: inline-flex;
     align-items: center;
     margin-right: 4px;
+  }
+
+  /* Styles for the building status indicators */
+  .building-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+
+  .building-level {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border: 1px solid rgba(76, 175, 80, 0.4);
+  }
+
+  .production-button.existing-building {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-left: 3px solid #4CAF50;
+  }
+
+  .production-button.existing-building:hover {
+    background-color: rgba(76, 175, 80, 0.2);
+  }
+
+  /* Upgrade button styling */
+  .building-action .upgrade-button {
+    background-color: #9C27B0;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+
+  .building-action .upgrade-button:hover {
+    background-color: #7B1FA2;
   }
 
   /* Confirmation dialog styles */

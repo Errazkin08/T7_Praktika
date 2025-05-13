@@ -63,6 +63,23 @@ html.city-active {
     border-left: 5px solid #138496;
 }
 
+/* Building upgrade notification styles */
+.toast-notification.building-upgrade {
+  background-color: #9C27B0;
+  border-left: 5px solid #7B1FA2;
+}
+
+.toast-notification .upgrade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-right: 8px;
+  font-weight: bold;
+}
+
 .toast-message {
     margin: 0;
     padding: 0;
@@ -1718,4 +1735,23 @@ button:disabled {
   0% { border-color: rgba(220, 53, 69, 0.4); }
   50% { border-color: rgba(220, 53, 69, 0.9); }
   100% { border-color: rgba(220, 53, 69, 0.4); }
+}
+
+/* Add style for building_upgrade completed production indicator */
+.production-item.building-upgrade .production-icon {
+  background-color: rgba(156, 39, 176, 0.3);
+}
+
+.level-indicator {
+  display: inline-flex;
+  align-items: center;
+  background-color: #9C27B0;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-left: 5px;
 }

@@ -129,6 +129,37 @@
     }
   }
 
+  // Add function to check if a building type already exists in the city
+  function buildingTypeExists(buildingType) {
+    if (!city || !city.buildings || !buildingType) return false;
+    
+    const normalizedSearchType = (buildingType.type || buildingType.name).toLowerCase();
+    
+    return city.buildings.some(building => {
+      // Handle both string and object building representations
+      const buildingTypeToCheck = typeof building === 'string' 
+        ? building.toLowerCase() 
+        : (building.type || building.name).toLowerCase();
+      
+      return buildingTypeToCheck === normalizedSearchType;
+    });
+  }
+  
+  // Get the existing building of a specific type if it exists
+  function getExistingBuilding(buildingType) {
+    if (!city || !city.buildings || !buildingType) return null;
+    
+    const normalizedSearchType = (buildingType.type || buildingType.name).toLowerCase();
+    
+    return city.buildings.find(building => {
+      const buildingTypeToCheck = typeof building === 'string' 
+        ? building.toLowerCase() 
+        : (building.type || building.name).toLowerCase();
+      
+      return buildingTypeToCheck === normalizedSearchType;
+    });
+  }
+
   async function startProduction(item, itemType) {
     try {
       if (!city) {
@@ -155,11 +186,20 @@
       
       console.log(`Setting ${itemType} for production:`, itemId);
       
-      // Create the production object with the proper values including itemType
+      // Determine the production_type (build, upgrade, train)
+      let production_type = itemType === 'troop' ? 'train' : 'build';
+      
+      // Check if it's a building upgrade
+      if (itemType === 'building' && buildingTypeExists(item)) {
+        production_type = 'upgrade';
+      }
+      
+      // Create the production object with the proper values
       city.production = {
         current_item: itemId,
         turns_remaining: turnsToComplete,
-        itemType: itemType // Add new itemType attribute
+        itemType: itemType, // Keep for backward compatibility
+        production_type: production_type // Add new production_type attribute
       };
       
       console.log("Setting production:", city.production);
@@ -180,8 +220,14 @@
             selectedBuildingType = null;
           }
           
-          // Show feedback messages
-          showToastNotification(`¡Iniciada producción de ${item.name}!`, "success");
+          // Show feedback messages based on production type
+          if (production_type === 'upgrade') {
+            showToastNotification(`¡Iniciada mejora de ${item.name}!`, "success");
+          } else if (production_type === 'build') {
+            showToastNotification(`¡Iniciada construcción de ${item.name}!`, "success");
+          } else {
+            showToastNotification(`¡Iniciado entrenamiento de ${item.name}!`, "success");
+          }
           
           // Switch to the summary tab to show the production info
           setActiveTab('summary');
@@ -217,7 +263,8 @@
       itemToCancel = itemName;
       
       // Show the confirmation dialog instead of using browser confirm()
-      confirmationMessage = `¿Estás seguro de que quieres cancelar la producción de ${itemName}? No recuperarás ningún recurso.`;
+      confirmationMessage = `¿Estás seguro de que quieres cancelar la ${city.production.production_type === 'upgrade' ? 'mejora' : 
+        city.production.production_type === 'build' ? 'construcción' : 'producción'} de ${itemName}? No recuperarás ningún recurso.`;
       confirmationCallback = confirmCancelProduction;
       showConfirmationDialog = true;
     } catch (error) {
@@ -233,7 +280,8 @@
       city.production = {
         current_item: null,
         turns_remaining: 0,
-        itemType: null
+        itemType: null,
+        production_type: null
       };
       
       // Update the city in gameData
@@ -595,7 +643,25 @@
                 ? troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item)
                 : buildingTypes.find(b => b.id === city.production.current_item || b.type_id === city.production.current_item)}
               <div class="info-section production-status-section">
-                <h4>Producción Actual</h4>
+                <h4>
+                  {#if city.production.production_type === 'upgrade'}
+                    Mejora en Curso
+                  {:else if city.production.production_type === 'build' || !city.production.production_type && !isProducingTroop}
+                    Construcción en Curso
+                  {:else}
+                    Producción Actual
+                  {/if}
+                </h4>
+                <div class="production-type-badge {isProducingTroop ? 'troop' : 
+                  city.production.production_type === 'upgrade' ? 'upgrade' : 'building'}">
+                  {#if city.production.production_type === 'upgrade'}
+                    Mejora
+                  {:else if city.production.production_type === 'build' || !city.production.production_type && !isProducingTroop}
+                    Construcción
+                  {:else}
+                    Entrenamiento
+                  {/if}
+                </div>
                 <div class="production-item">
                   <div class="production-icon">
                     {#if isProducingTroop}
@@ -795,9 +861,10 @@
                     {#each buildingTypes as buildingType, index}
                       {@const uniqueKey = buildingType.id || `building-type-${index}`}
                       {@const iconData = getBuildingIcon(buildingType.type || buildingType.name)}
+                      {@const existingBuilding = getExistingBuilding(buildingType)}
                       <div class="building-container">
                         <button 
-                          class="production-button building-button" 
+                          class="production-button building-button {existingBuilding ? 'existing-building' : ''}" 
                           class:expanded={selectedBuildingType && (selectedBuildingType._uniqueId === (buildingType.id || `building-${index}`))}
                           on:click={() => toggleBuildingSelection(buildingType, index)}
                         >
@@ -812,7 +879,17 @@
                             
                             <div class="building-details">
                               <span class="building-name">{buildingType.name}</span>
-                              <span class="building-cost">{@html getResourceCostString(buildingType.cost)}</span>
+                              <span class="building-status">
+                                {#if existingBuilding}
+                                  {#if typeof existingBuilding === 'string'}
+                                    <span class="building-level">Construido</span>
+                                  {:else}
+                                    <span class="building-level">Nivel {existingBuilding.level || 1}</span>
+                                  {/if}
+                                {:else}
+                                  <span class="building-cost">{@html getResourceCostString(buildingType.cost)}</span>
+                                {/if}
+                              </span>
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
@@ -823,6 +900,7 @@
                         </button>
                         
                         {#if selectedBuildingType && (selectedBuildingType._uniqueId === (buildingType.id || `building-${index}`))}
+                          {@const existingBuilding = getExistingBuilding(buildingType)}
                           <div class="building-details-expanded">
                             <div class="building-attributes">
                               {#if buildingType.description}
@@ -907,9 +985,15 @@
                               </div>
                               
                               <div class="building-action">
-                                <button class="construct-button" on:click={() => startProduction(buildingType, 'building')}>
-                                  Construir {buildingType.name}
-                                </button>
+                                {#if existingBuilding}
+                                  <button class="upgrade-button" on:click={() => startProduction(buildingType, 'building')}>
+                                    Mejorar {buildingType.name}
+                                  </button>
+                                {:else}
+                                  <button class="construct-button" on:click={() => startProduction(buildingType, 'building')}>
+                                    Construir {buildingType.name}
+                                  </button>
+                                {/if}
                               </div>
                             </div>
                           </div>

@@ -190,6 +190,31 @@ class GroqAPIClient:
             print(f"Error en la llamada #{str(e)}") 
             return ""
 
+def filter_game_state(game_state: dict) -> dict:
+    """
+    Filtra el estado del juego para incluir solo los campos necesarios,
+    reduciendo así el número de tokens enviados a la API.
+    
+    Args:
+        game_state: Estado completo del juego.
+        
+    Returns:
+        Estado filtrado del juego con solo los campos necesarios.
+    """
+    if not game_state:
+        return {}
+        
+    filtered_state = {
+        "difficulty": game_state.get("difficulty"),
+        "turn": game_state.get("turn"),
+        "map_size": game_state.get("map_data", {}).get("map_size"),
+        "terrain": game_state.get("map_data", {}).get("terrain"),
+        "player_units": game_state.get("player", {}).get("units"),
+        "ia_info": game_state.get("ia", {})
+    }
+    
+    return filtered_state
+
 def iaDeitu(prompt: str, game_state: dict = None) -> str:
     """
     Función para interactuar con la IA de juego.
@@ -235,92 +260,41 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             - attack
             - construction
             
-            Estructura JSON de respuesta esto es solo un ejemplo, pero la estructura debe ser la misma:
-             Aqui tienes un ejemplo de respuesta:
-        {{
-  "ai_turn_id": "ai_turn_1684159782",
-  "game_id": "game_12345",
-  "turn_number": 5,
-  "actions": [
-    {{
-      "action_id": 1,
-      "type": "movement",
-      "unit_id": "warrior_01",
-      "position": [15, 8],
-      "target_position": [16, 9],
-      "state_before": {{
-        "position": [15, 8],
-        "remainingMovement": 2,
-        "status": "ready"
-      }},
-      "state_after": {{
-        "position": [16, 9],
-        "remainingMovement": 1,
-        "status": "moved"
-      }}
-        }},
-    {{
-      "action_id": 2,
-      "type": "attack",
-      "unit_id": "warrior_01",
-      "position": [16, 9],
-      "target_unit_id": "player_settler_03",
-      "target_position": [17, 9],
-      "state_before": {{
-        "position": [16, 9],
-        "remainingMovement": 1,
-        "status": "moved",
-        "health": 100
-      }},
-      "state_after": {{
-        "position": [16, 9],
-        "remainingMovement": 0,
-        "status": "exhausted",
-        "health": 85
-      }}
-    }},
-    {{
-      "action_id": 3,
-      "type": "construction",
-      "unit_id": "settler_02",
-      "position": [12, 5],
-      "building": "city",
-      "city_name": "New Atlantis",
-      "state_before": {{
-        "position": [12, 5],
-        "remainingMovement": 2,
-        "status": "ready"
-      }},
-      "state_after": {{
-        "position": [12, 5],
-        "remainingMovement": 0,
-        "status": "exhausted"
-      }}
-    }}
-  ],
-  "reasoning": "Advancing warrior units toward player territory to apply pressure while establishing a new city near resources to secure economic advantage."
-}}
+            Tu respuesta debe seguir este formato JSON:
+            {
+              "ai_turn_id": "ai_turn_ID",
+              "game_id": "game_ID",
+              "turn_number": NUMBER,
+              "actions": [
+                {
+                  "action_id": NUMBER,
+                  "type": "TYPE",
+                  "unit_id": "ID",
+                  "position": [X, Y],
+                  "target_position": [X, Y],
+                  "state_before": { "position": [X, Y], "remainingMovement": NUMBER, "status": "STATUS" },
+                  "state_after": { "position": [X, Y], "remainingMovement": NUMBER, "status": "STATUS" }
+                }
+              ],
+              "reasoning": "BRIEF_EXPLANATION"
+            }
             """
             
             # Establecer las instrucciones del sistema en el cliente
             iaDeitu._client.set_system_instructions(system_instructions)
-            
-        # Construir el mensaje actual con el estado del juego y prompt específico
+        
+        # Filtrar el estado del juego para incluir solo los campos necesarios
+        filtered_game_state = filter_game_state(game_state)
+        
+        # Construir el mensaje actual con el estado filtrado del juego y prompt específico
         game_prompt = f"""
-        Basado en el estado actual del juego y tus objetivos, genera tu siguiente turno de acciones.
+        Genera tu siguiente turno de acciones basado en este estado de juego filtrado:
         
-        IMPORTANTE: NO puedes usar directamente los elementos map_data.startPoint, grid y visibleObjects del JSON 
-        del estado del juego. Estos son datos internos del motor de juego.
-        
-        Tamaño del mapa: {game_state.get('map_data').get('map_size') if game_state else {'width': 30, 'height': 15}}
-        
-        Estado actual del juego:
-        {json.dumps(game_state) if game_state else 'No hay estado de juego disponible.'}
+        {json.dumps(filtered_game_state)}
         
         {prompt}
         
-        Recuerda que el JSON debe ser válido y no debe contener comillas al principio o al final.
-        Si no puedes realizar ninguna acción, responde con un JSON vacío.
+        Responde SOLO con un JSON válido siguiendo el formato especificado en las instrucciones.
         """
         
         # Ejecutar la llamada a la API con el prompt específico del juego

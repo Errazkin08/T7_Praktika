@@ -592,6 +592,12 @@
   }
 
   async function endTurn() {
+    // Block if processing is already in progress
+    if (processingAITurn) {
+      console.log("Turn processing already in progress, ignoring request");
+      return;
+    }
+
     if (!gameData) {
       console.error("Cannot end turn, game data is not loaded.");
       return;
@@ -613,15 +619,19 @@
       return;
     }
 
-    console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
+    // Set processing flag to true at the beginning of the turn
+    processingAITurn = true;
+    
+    try {
+      console.log(`Player ${gameData.current_player} ending turn ${gameData.turn}.`);
 
-    try {  // Add the missing try statement here
       // Handle player city production before switching to AI turn
       const completedProductions = await processCityProduction();
       
       // If we just completed a production that requires unit placement, block turn end
       if (awaitingUnitPlacement && newlyProducedUnit) {
         showToastNotification("Nueva unidad producida. Debes colocarla antes de finalizar el turno", "success", 5000);
+        processingAITurn = false; // Reset processing flag
         return;
       }
 
@@ -1381,6 +1391,15 @@
         // Skip if occupied
         if (occupyingUnit) continue;
         
+        // Check if the tile has a city
+        const cityAtPosition = cities.find(city => 
+          (city.position.x === x && city.position.y === y) || 
+          (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
+        );
+        
+        // Skip if there's a city
+        if (cityAtPosition) continue;
+        
         // Check if we have enough movement points to reach this tile
         if (movementPoints >= steps) {
           // Add valid target with remaining movement after this move
@@ -1407,6 +1426,17 @@
     
     if (occupyingUnit) {
       showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`, "error");
+      return;
+    }
+    
+    // Add check for city at target position
+    const cityAtPosition = cities.find(city => 
+      (city.position.x === targetX && city.position.y === targetY) || 
+      (Array.isArray(city.position) && city.position[0] === targetX && city.position[1] === targetY)
+    );
+    
+    if (cityAtPosition) {
+      showToastNotification(`No puedes mover a la casilla (${targetX}, ${targetY}). Hay una ciudad en esa posición.`, "error");
       return;
     }
     

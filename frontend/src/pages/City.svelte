@@ -20,6 +20,12 @@
   let loadingBuildingTypes = false;
   let selectedBuildingType = null;
 
+  // Add state variables for the confirmation dialog
+  let showConfirmationDialog = false;
+  let confirmationMessage = "";
+  let confirmationCallback = null;
+  let itemToCancel = null;
+
   // Add a helper function to render costs dynamically based on what's in the cost object
   function getResourceCostString(costObject) {
     if (!costObject) return 'Costo no disponible';
@@ -187,6 +193,79 @@
     }
   }
 
+  // Replace the direct confirm() call with our custom dialog
+  async function cancelProduction() {
+    try {
+      if (!city || !city.production || !city.production.current_item) {
+        showToastNotification("No hay producción activa que cancelar", "warning");
+        return;
+      }
+      
+      // Get name of item being canceled for better notification
+      let itemName = city.production.current_item;
+      
+      // Find more detailed name if available
+      if (city.production.itemType === 'troop') {
+        const troopType = troopTypes.find(t => t.id === city.production.current_item || t.type_id === city.production.current_item);
+        if (troopType) itemName = troopType.name;
+      } else if (city.production.itemType === 'building') {
+        const buildingType = buildingTypes.find(b => b.id === city.production.current_item || b.type_id === city.production.current_item);
+        if (buildingType) itemName = buildingType.name;
+      }
+      
+      // Store the item name for the confirmation dialog
+      itemToCancel = itemName;
+      
+      // Show the confirmation dialog instead of using browser confirm()
+      confirmationMessage = `¿Estás seguro de que quieres cancelar la producción de ${itemName}? No recuperarás ningún recurso.`;
+      confirmationCallback = confirmCancelProduction;
+      showConfirmationDialog = true;
+    } catch (error) {
+      console.error("Error al cancelar la producción:", error);
+      showToastNotification("Error al cancelar la producción", "error");
+    }
+  }
+
+  // The function to be called when cancellation is confirmed
+  async function confirmCancelProduction() {
+    try {
+      // Clear the production object
+      city.production = {
+        current_item: null,
+        turns_remaining: 0,
+        itemType: null
+      };
+      
+      // Update the city in gameData
+      if (gameData && gameData.player && gameData.player.cities) {
+        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
+        if (cityIndex !== -1) {
+          gameData.player.cities[cityIndex].production = city.production;
+          
+          // Save to backend
+          await gameAPI.updateGameSession(gameData);
+          
+          // Show confirmation
+          showToastNotification(`Producción de ${itemToCancel} cancelada`, "info");
+        }
+      }
+    } catch (error) {
+      console.error("Error al cancelar la producción:", error);
+      showToastNotification("Error al cancelar la producción", "error");
+    } finally {
+      // Reset the confirmation dialog state
+      closeConfirmationDialog();
+    }
+  }
+
+  // Helper function to close the confirmation dialog
+  function closeConfirmationDialog() {
+    showConfirmationDialog = false;
+    confirmationMessage = "";
+    confirmationCallback = null;
+    itemToCancel = null;
+  }
+
   function showToastNotification(message, type = "info") {
     console.log(`[${type}] ${message}`);
     
@@ -248,6 +327,123 @@
       case 'goldmine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       case 'gold_mine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       default: return { type: 'emoji', value: '🏛️' };
+    }
+  }
+
+  async function upgradeBuilding(building) {
+    try {
+      if (!city || !city.buildings) {
+        showToastNotification("Error: No hay edificios en esta ciudad", "error");
+        return;
+      }
+      
+      // Find the building in the city's buildings array
+      const buildingIndex = city.buildings.findIndex(b => 
+        b.id === building.id || 
+        (b.name === building.name && b.type === building.type)
+      );
+      
+      if (buildingIndex === -1) {
+        showToastNotification("Error: No se encontró el edificio para mejorar", "error");
+        return;
+      }
+      
+      // Define upgrade cost based on building level
+      const upgradeCost = {
+        gold: 50 * (building.level || 1),
+        stone: 30 * (building.level || 1),
+        wood: 20 * (building.level || 1)
+      };
+      
+      // Check if player has enough resources
+      if (gameData && gameData.player && gameData.player.resources) {
+        const playerResources = gameData.player.resources;
+        
+        if (playerResources.gold < upgradeCost.gold || 
+            playerResources.stone < upgradeCost.stone || 
+            playerResources.wood < upgradeCost.wood) {
+          showToastNotification(`Recursos insuficientes para mejorar. Necesitas: ${upgradeCost.gold} oro, ${upgradeCost.stone} piedra, ${upgradeCost.wood} madera`, "error");
+          return;
+        }
+        
+        // Deduct resources
+        playerResources.gold -= upgradeCost.gold;
+        playerResources.stone -= upgradeCost.stone;
+        playerResources.wood -= upgradeCost.wood;
+      } else {
+        showToastNotification("Error: No se pueden obtener los recursos del jugador", "error");
+        return;
+      }
+      
+      // Get a copy of the building to modify (to ensure reactivity)
+      const buildingToUpgrade = { ...city.buildings[buildingIndex] };
+      
+      // Increase the building's level
+      buildingToUpgrade.level = (buildingToUpgrade.level || 1) + 1;
+      
+      // Get the level_upgrade value 
+      const levelUpgradeValue = building.level_upgrade || 1;
+      
+      // Initialize output if it doesn't exist
+      if (!buildingToUpgrade.output) {
+        buildingToUpgrade.output = {};
+      }
+      
+      // For each resource in the output, increase by level_upgrade
+      for (const resource in buildingToUpgrade.output) {
+        buildingToUpgrade.output[resource] += levelUpgradeValue;
+      }
+      
+      // If there are no resources in output but the building should produce something,
+      // add a default resource based on building type
+      if (Object.keys(buildingToUpgrade.output).length === 0) {
+        const defaultOutput = getDefaultBuildingOutput(buildingToUpgrade.type || buildingToUpgrade.name);
+        buildingToUpgrade.output = defaultOutput;
+      }
+      
+      // Update the city's buildings array
+      city.buildings[buildingIndex] = buildingToUpgrade;
+      
+      // Ensure reactivity by creating a new array
+      city.buildings = [...city.buildings];
+      
+      // Update the game data
+      if (gameData && gameData.player && gameData.player.cities) {
+        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
+        if (cityIndex !== -1) {
+          gameData.player.cities[cityIndex].buildings = city.buildings;
+          
+          // Save changes to backend
+          await gameAPI.updateGameSession(gameData);
+          
+          // Show confirmation
+          showToastNotification(`Edificio ${buildingToUpgrade.name} mejorado al nivel ${buildingToUpgrade.level}`, "success");
+        }
+      }
+    } catch (error) {
+      console.error("Error al mejorar el edificio:", error);
+      showToastNotification("Error al mejorar el edificio", "error");
+    }
+  }
+
+  // Helper function to get default building output based on type
+  function getDefaultBuildingOutput(buildingType) {
+    if (!buildingType) return { food: 1 };
+    
+    const type = buildingType.toLowerCase();
+    
+    if (type.includes('farm')) {
+      return { food: 2 };
+    } else if (type.includes('mine') || type.includes('gold')) {
+      return { gold: 2 };
+    } else if (type.includes('wood') || type.includes('lumber') || type.includes('sawmill')) {
+      return { wood: 2 };
+    } else if (type.includes('stone') || type.includes('quarry')) {
+      return { stone: 2 };
+    } else if (type.includes('iron') || type.includes('forge')) {
+      return { iron: 2 };
+    } else {
+      return { food: 1 }; // Default to food if type is unknown
     }
   }
 
@@ -428,6 +624,7 @@
                       <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
                       <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
                     </div>
+                    <button class="cancel-production-button" on:click={cancelProduction}>Cancelar Producción</button>
                   </div>
                 </div>
               </div>
@@ -479,7 +676,7 @@
                       <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
                       <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
                     </div>
-                    <button class="cancel-production-button">Cancelar Producción</button>
+                    <button class="cancel-production-button" on:click={cancelProduction}>Cancelar Producción</button>
                   </div>
                 </div>
               {:else}
@@ -837,7 +1034,7 @@
                     <!-- Upgrade Building Button -->
                     {#if building.level !== undefined && building.level_upgrade !== undefined}
                       <div class="building-upgrade">
-                        <button class="upgrade-button">Mejorar a Nivel {building.level + 1}</button>
+                        <button class="upgrade-button" on:click={() => upgradeBuilding(building)}>Mejorar a Nivel {building.level + 1}</button>
                       </div>
                     {/if}
                   </div>
@@ -922,6 +1119,20 @@
           <img src="./ia_assets/harria.png" alt="Stone" class="resource-bar-icon" />
         </div>
         <div class="resource-value">{gameData.player.resources.stone || 0}</div>
+      </div>
+    </div>
+  {/if}
+
+  {#if showConfirmationDialog}
+    <div class="modal-overlay">
+      <div class="confirmation-dialog">
+        <h3>Confirmar Acción</h3>
+        <p>{confirmationMessage}</p>
+        
+        <div class="confirmation-actions">
+          <button class="cancel-button" on:click={closeConfirmationDialog}>Cancelar</button>
+          <button class="confirm-button" on:click={confirmationCallback}>Confirmar</button>
+        </div>
       </div>
     </div>
   {/if}

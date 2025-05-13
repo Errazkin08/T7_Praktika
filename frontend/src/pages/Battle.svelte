@@ -39,8 +39,8 @@
         `¡Batalla entre ${attacker.name || attacker.type_id} y ${defender.name || defender.type_id}!`
       ];
 
-      // Start battle after a short delay
-      setTimeout(() => startBattle(), 1500);
+      // Start battle after a shorter delay (reduced from 1500ms to 500ms)
+      setTimeout(() => startBattle(), 500);
     } catch (error) {
       console.error('Error initializing battle:', error);
       battleLog = [...battleLog, `Error: ${error.message}`];
@@ -98,8 +98,8 @@
         attacker.health -= damage;
       }
 
-      // Wait for animation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for animation (reduced from 1000ms to 400ms)
+      await new Promise(resolve => setTimeout(resolve, 400));
       
       // Reset animations
       attackerAnimating = false;
@@ -109,8 +109,8 @@
       // Switch turns
       isAttackerTurn = !isAttackerTurn;
       
-      // Add a delay between turns
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Add a shorter delay between turns (reduced from 800ms to 300ms)
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Check if battle has ended
       if (attacker.health <= 0 || defender.health <= 0) {
@@ -132,10 +132,10 @@
     // Update game state
     await updateGameState();
     
-    // Return to map after delay
+    // Return to map after shorter delay (reduced from 2000ms to 1000ms)
     setTimeout(() => {
       navigate('/map');
-    }, 2000);
+    }, 1000);
   }
 
   async function updateGameState() {

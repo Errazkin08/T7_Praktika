@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import routes from './routes.js';
 
 // Create a store for the current route
 export const currentRoute = writable(window.location.pathname);

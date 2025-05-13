@@ -90,6 +90,12 @@
   // Keep the debug variable
   let debugAIMovement = true; // Enable debugging
 
+  // Add enemy detection state
+  let nearbyEnemies = [];
+  let showAttackOptions = false;
+  let attackTargets = [];
+  let attackingUnit = null;
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -211,6 +217,129 @@
       console.error("Error founding city:", error);
       showToastNotification("Error al fundar la ciudad: " + error.message, "error");
     }
+  }
+
+  function checkForAttackTargets(unit) {
+    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+      attackTargets = [];
+      return;
+    }
+    
+    attackTargets = [];
+    attackingUnit = unit;
+    
+    // Get unit position
+    const [unitX, unitY] = unit.position;
+    
+    // Check for enemies within attack range (default is 3 tiles for all units)
+    let attackRange = 3;
+    
+    // Check each potential target within range
+    for (let y = Math.max(0, unitY - attackRange); y <= Math.min(mapHeight - 1, unitY + attackRange); y++) {
+      for (let x = Math.max(0, unitX - attackRange); x <= Math.min(mapWidth - 1, unitX + attackRange); x++) {
+        // Skip water tiles
+        if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) continue;
+        
+        // Skip the current tile
+        if (x === unitX && y === unitY) continue;
+        
+        // Check if this tile is visible (not in fog of war)
+        // If fog of war is enabled, we can only attack visible enemies
+        if (showFogOfWar && (!grid[y] || grid[y][x] !== FOG_OF_WAR.VISIBLE)) {
+          continue; // Skip tiles that are in the fog of war
+        }
+        
+        // Calculate Manhattan distance (number of steps)
+        const manhattanDistance = Math.abs(x - unitX) + Math.abs(y - unitY);
+        
+        // If beyond attack range, skip
+        if (manhattanDistance > attackRange) continue;
+        
+        // Check if there's an enemy unit at this position
+        const enemyUnit = units.find(u => 
+          u.owner === 'ia' && 
+          u.position && 
+          Array.isArray(u.position) && 
+          u.position[0] === x && 
+          u.position[1] === y
+        );
+        
+        if (enemyUnit) {
+          console.log(`Found enemy target at [${x},${y}]: ${enemyUnit.type_id}`);
+          attackTargets.push(enemyUnit);
+        }
+      }
+    }
+    
+    console.log(`Found ${attackTargets.length} potential attack targets`);
+    showAttackOptions = attackTargets.length > 0;
+    
+    // If we have attack targets, show a notification
+    if (attackTargets.length > 0) {
+      showToastNotification(`${attackTargets.length} unidades enemigas al alcance`, "info", 2000);
+    }
+  }
+
+  function canAttack(unit) {
+    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+      return false;
+    }
+    
+    // Get unit position
+    const [unitX, unitY] = unit.position;
+    
+    // Check for enemies within attack range (3 tiles)
+    const attackRange = 3;
+    
+    // Quick check for nearby enemies
+    for (const enemy of units) {
+      if (enemy.owner !== 'ia' || !enemy.position || !Array.isArray(enemy.position)) continue;
+      
+      const [enemyX, enemyY] = enemy.position;
+      
+      // Calculate Manhattan distance (number of steps)
+      const manhattanDistance = Math.abs(enemyX - unitX) + Math.abs(enemyY - unitY);
+      
+      // Check if the enemy is within attack range
+      if (manhattanDistance <= attackRange) {
+        // Check if enemy is visible (not in fog of war)
+        if (showFogOfWar) {
+          if (grid[enemyY] && grid[enemyY][enemyX] === FOG_OF_WAR.VISIBLE) {
+            return true;
+          }
+        } else {
+          // If fog of war is disabled, all enemies in range can be attacked
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  function initiateAttack(defender) {
+    if (!attackingUnit || !defender) return;
+    
+    // Make a copy of the attacking unit to avoid reference issues
+    const attackerCopy = { ...attackingUnit };
+    const defenderCopy = { ...defender };
+    
+    // Make sure health is a number
+    attackerCopy.health = attackerCopy.health || 100;
+    defenderCopy.health = defenderCopy.health || 100;
+    
+    // Set up battle data
+    const battleData = {
+      attacker: attackerCopy,
+      defender: defenderCopy,
+      gameData: gameData
+    };
+    
+    // Store battle data for the battle page
+    gameAPI.storeTemporaryData('battleData', battleData);
+    
+    // Navigate to battle page
+    navigate('/battle');
   }
 
   async function processAIActions(actions, reasoning) {
@@ -1365,7 +1494,7 @@
         // Check if the tile is within map bounds
         if (tileX >= 0 && tileX < mapWidth && tileY >= 0 && tileY < mapHeight) {
           // Get terrain type for this tile
-          const terrainType = terrain[tileY] && terrain[tileY][tileX];
+          const terrainType = terrain[tileY] && terrain[tileX];
           
           // Count resource based on terrain type
           switch (terrainType) {
@@ -1655,6 +1784,22 @@
     if (awaitingUnitPlacement && newlyProducedUnit) {
       placeNewUnit(x, y);
       return;
+    }
+    
+    // Check if the clicked position is an attack target
+    if (attackingUnit && showAttackOptions) {
+      const targetUnit = units.find(u => 
+        u.owner === 'ia' && 
+        u.position && 
+        Array.isArray(u.position) && 
+        u.position[0] === x && 
+        u.position[1] === y
+      );
+      
+      if (targetUnit && attackTargets.some(target => target === targetUnit)) {
+        initiateAttack(targetUnit);
+        return;
+      }
     }
     
     if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
@@ -2169,6 +2314,31 @@
     
     const [unitX, unitY] = unit.position;
     calculateValidMoveTargets(unitX, unitY, remainingMovement);
+    
+    // Check for attack targets
+    checkForAttackTargets(unit);
+  }
+
+  function handleUnitClick(unit) {
+    if (unit.owner !== 'player') {
+      showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
+      return;
+    }
+    
+    selectedUnitInfo = unit;
+    
+    // If the unit can attack, highlight this information
+    if (canAttack(unit)) {
+      showToastNotification("¡Esta unidad puede atacar a enemigos cercanos!", "info");
+    }
+    
+    if (unit.status === 'exhausted') {
+      showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
+      selectedUnit = null;
+      validMoveTargets = [];
+    } else {
+      selectUnit(unit);
+    }
   }
 
   // Update the enterCity function to be more reliable
@@ -2441,11 +2611,6 @@
           </div>
           
           <div class="unit-details">
-            <h4>{selectedUnitInfo.name || selectedUnitInfo.type_id || 'Unidad'}</h4>
-            <button class="close-button" on:click={() => { selectedUnitInfo = null; }}>×</button>
-          </div>
-          
-          <div class="unit-details">
             <div class="unit-image-container">
               {#if selectedUnitInfo.type_id && getUnitImageUrl(selectedUnitInfo.type_id)}
                 <img src={getUnitImageUrl(selectedUnitInfo.type_id)} alt={selectedUnitInfo.type_id} class="unit-portrait" />
@@ -2484,6 +2649,13 @@
               {#if selectedUnitInfo.type_id === 'settler'}
                 <button class="action-button found-city-button" on:click={() => showFoundCityDialog(selectedUnitInfo)}>
                   Fundar Ciudad
+                </button>
+              {/if}
+              
+              <!-- New attack button that only shows when there are enemies nearby -->
+              {#if attackTargets.length > 0}
+                <button class="action-button attack-button" on:click={() => showAttackOptions = true}>
+                  Atacar
                 </button>
               {/if}
             </div>
@@ -2700,6 +2872,38 @@
       <div class="ai-reasoning-card">
         <h4>Estrategia de la IA</h4>
         <p>{aiTurnReasoning}</p>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Add attack targets overlay -->
+  {#if showAttackOptions && attackTargets.length > 0 && !showPauseMenu}
+    <div class="attack-targets-overlay">
+      <div class="attack-targets-card">
+        <div class="attack-targets-header">
+          <h4>Selecciona objetivo a atacar</h4>
+          <button class="close-button" on:click={() => showAttackOptions = false}>×</button>
+        </div>
+        
+        <div class="attack-targets-list">
+          {#each attackTargets as target}
+            <div class="attack-target" on:click={() => initiateAttack(target)}>
+              <div class="target-icon">
+                {#if getUnitImageUrl(target.type_id)}
+                  <img src={getUnitImageUrl(target.type_id)} alt={target.type_id} />
+                {:else}
+                  <span class="unit-icon">{getUnitIcon(target.type_id)}</span>
+                {/if}
+              </div>
+              <div class="target-info">
+                <h5>{target.name || target.type_id}</h5>
+                <p>Salud: {target.health || 100}</p>
+                <p>Posición: [{target.position[0]}, {target.position[1]}]</p>
+              </div>
+              <button class="attack-button">Atacar</button>
+            </div>
+          {/each}
+        </div>
       </div>
     </div>
   {/if}

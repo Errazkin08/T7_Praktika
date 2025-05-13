@@ -9,6 +9,7 @@ import NewGame from './pages/NewGame.svelte';
 import LoadGame from './pages/LoadGame.svelte';
 import Maps from './pages/Maps.svelte';
 import City from './pages/City.svelte';
+import Battle from './pages/Battle.svelte';
 
 // Define routes
 const routes = {
@@ -22,6 +23,7 @@ const routes = {
   '/load-game': LoadGame,
   '/maps': Maps,
   '/city': City,
+  '/battle': Battle,
   '*': NotFound
 };
 

@@ -102,6 +102,9 @@
   let cheatResult = null;
   let cheatResultType = "info"; // can be "success", "error", "info"
 
+  // Add this variable to track if unlimited movements cheat is active
+  let unlimitedMovementsActive = false;
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -1049,6 +1052,14 @@
       selectedUnitInfo = null;
       validMoveTargets = [];
 
+      // If unlimited movements cheat is active, refresh all player units' movement at the end of AI turn
+      if (unlimitedMovementsActive && gameData && gameData.player && Array.isArray(gameData.player.units)) {
+        gameData.player.units.forEach((unit, index) => {
+          unit.status = "ready";
+          unit.remainingMovement = unit.movement || 2;
+        });
+      }
+
       try {
         await gameAPI.updateGameSession(gameData);
         console.log(`Game session updated for Turn ${gameData.turn}.`);
@@ -1751,7 +1762,11 @@
 
   function calculateValidMoveTargets(startX, startY, movementPoints) {
     validMoveTargets = [];
-    const movementRange = Math.min(movementPoints, 2); // Limit movement range to 2 tiles per turn
+    
+    // If unlimited movements cheat is active, use a high movement range
+    const movementRange = unlimitedMovementsActive ? 
+                          8 : // Large value but not too large to avoid performance issues
+                          Math.min(movementPoints, 2); // Normal limited movement
     
     // Check each tile within the movement range
     for (let y = Math.max(0, startY - movementRange); y <= Math.min(mapHeight - 1, startY + movementRange); y++) {
@@ -1789,13 +1804,13 @@
         // Skip if there's a city
         if (cityAtPosition) continue;
         
-        // Check if we have enough movement points to reach this tile
-        if (movementPoints >= steps) {
-          // Add valid target with remaining movement after this move
+        // For unlimited movements, we don't need to check points
+        if (unlimitedMovementsActive || movementPoints >= steps) {
+          // Add valid target with special handling for unlimited movements
           validMoveTargets.push({ 
             x, 
             y, 
-            remainingMovement: movementPoints - steps 
+            remainingMovement: unlimitedMovementsActive ? movementPoints : movementPoints - steps 
           });
         }
       }
@@ -1878,7 +1893,7 @@
           unitToMove.remainingMovement = unitToMove.movement || 2;
         }
         
-        if (unitToMove.remainingMovement < movementCost) {
+        if (!unlimitedMovementsActive && unitToMove.remainingMovement < movementCost) {
           showToastNotification("Movimiento ilegal: no hay suficientes puntos de movimiento", "error");
           movementInProgress = false;
           return;
@@ -1889,10 +1904,14 @@
         
         // Update unit position and movement points
         updatedUnit.position = [targetX, targetY];
-        updatedUnit.remainingMovement -= movementCost;
         
-        // Update unit status based on remaining movement
-        if (updatedUnit.remainingMovement <= 0) {
+        // Only decrease remaining movement if unlimited movements is not active
+        if (!unlimitedMovementsActive) {
+          updatedUnit.remainingMovement -= movementCost;
+        }
+        
+        // Update unit status based on remaining movement or unlimited movement cheat
+        if (!unlimitedMovementsActive && updatedUnit.remainingMovement <= 0) {
           updatedUnit.status = 'exhausted';
         } else {
           updatedUnit.status = 'moved';
@@ -2264,8 +2283,9 @@
       togglePauseMenu();
     }
     
-    // Check for Ctrl+T key combo to open cheat console
-    if (event.key.toLowerCase() === 't') {
+    // Fix: Check for Ctrl+T key combo to open cheat console
+    // Check if we're NOT inside the cheat console already
+    if (event.key.toLowerCase() === 't' && !showCheatConsole) {
       event.preventDefault(); // Prevent browser's default action
       toggleCheatConsole();
     }
@@ -2273,7 +2293,7 @@
 
   // Function to toggle the cheat console visibility
   function toggleCheatConsole() {
-    showCheatConsole = !showCheatConsole;
+    showCheatConsole = true;
     if (showCheatConsole) {
       // Focus on the input field when opening the console
       setTimeout(() => {
@@ -2313,6 +2333,46 @@
           cheatResult = "La niebla de guerra ya está desactivada";
           cheatResultType = "info";
         }
+      } else if (command === "unlimitedMovements") {
+        // Enable unlimited movements cheat
+        unlimitedMovementsActive = true;
+        
+        // Make sure the cheats_used array exists
+        if (!gameData.cheats_used) {
+          gameData.cheats_used = [];
+        }
+        
+        // Add to cheats_used array if not already there
+        if (!gameData.cheats_used.includes("unlimitedMovements")) {
+          gameData.cheats_used.push("unlimitedMovements");
+        }
+        
+        // Restore all player units' movement points
+        if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
+          gameData.player.units.forEach(unit => {
+            unit.status = "ready";
+            unit.remainingMovement = unit.movement || 2;
+          });
+          
+          // Update units array to match gameData
+          units = units.map(unit => {
+            if (unit.owner === 'player') {
+              return {
+                ...unit,
+                status: "ready",
+                remainingMovement: unit.movement || 2
+              };
+            }
+            return unit;
+          });
+        }
+        
+        // Save changes to session
+        await gameAPI.updateGameSession(gameData);
+        
+        cheatResult = "¡Movimientos ilimitados activados! Tus tropas pueden moverse sin restricciones";
+        cheatResultType = "success";
+        
       } else {
         // Invalid command
         cheatResult = `Comando inválido: ${command}`;
@@ -2389,6 +2449,11 @@
           // Apply any previously used cheats
           if (gameData.cheats_used.includes("fogOfWar_Off")) {
             showFogOfWar = false;
+          }
+          
+          // Check if unlimitedMovements cheat was previously used
+          if (gameData.cheats_used.includes("unlimitedMovements")) {
+            unlimitedMovementsActive = true;
           }
         }
       } catch (apiError) {
@@ -2575,14 +2640,17 @@
                               unit.remainingMovement : 
                               totalMovement;
     
-    if (remainingMovement <= 0) {
+    // Skip the remaining movement check if unlimited movements cheat is active
+    if (!unlimitedMovementsActive && remainingMovement <= 0) {
       showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
       selectedUnit = null;
       return;
     }
     
     const [unitX, unitY] = unit.position;
-    calculateValidMoveTargets(unitX, unitY, remainingMovement);
+    // Use either the unit's remaining movement or a high value for unlimited movement
+    const movementPoints = unlimitedMovementsActive ? 20 : remainingMovement;
+    calculateValidMoveTargets(unitX, unitY, movementPoints);
   }
 
   function handleUnitClick(unit) {
@@ -2728,9 +2796,6 @@
           class:processing={processingAITurn}
         >
           {processingAITurn ? 'IA pensando...' : 'Terminar Turno'}
-        </button>
-        <button on:click={toggleFogOfWar} title="{showFogOfWar ? 'Desactivar' : 'Activar'} Niebla de Guerra" class:active={showFogOfWar}>
-          {showFogOfWar ? '👁️' : '🌫️'} Niebla
         </button>
         <button on:click={zoomIn} title="Aumentar zoom">+</button>
         <button on:click={zoomOut} title="Reducir zoom">-</button>

@@ -31,7 +31,7 @@
 <div class="cheat-console-overlay" class:visible on:keydown={handleKeyDown}>
   <div class="cheat-console">
     <div class="cheat-console-header">
-      <h3>Consola de Comandos</h3>
+      <h3>Komando Kontsola</h3>
       <button class="close-button" on:click={closeConsole}>×</button>
     </div>
     
@@ -42,10 +42,10 @@
             id="cheat-input" 
             type="text" 
             bind:value={command} 
-            placeholder="Ingrese comando..."
+            placeholder="Idatzi komandoa hemen..."
             autocomplete="off"
           />
-          <button type="submit">Ejecutar</button>
+          <button type="submit">Exekutatu</button>
         </div>
       </form>
       
@@ -56,9 +56,10 @@
       {/if}
       
       <div class="cheat-help">
-        <p>Comandos disponibles:</p>
+        <p>Komando erabilgarriak:</p>
         <ul>
-          <li><code>fogOfWar_Off</code> - Desactiva la niebla de guerra</li>
+          <li><code>fogOfWar_Off</code> - Gerra-lainoa desaktibatu</li>
+          <li><code>unlimitedMovements</code> - Mugimendu mugagabeak zure tropentzat</li>
         </ul>
       </div>
     </div>

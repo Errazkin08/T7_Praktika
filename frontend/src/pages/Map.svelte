@@ -340,6 +340,22 @@
     navigate('/battle');
   }
 
+  function tryAttackFromCard(unit) {
+    // Solo permite atacar si la unidad es del jugador y no está exhausta
+    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+      showToastNotification("Esta unidad no puede atacar ahora.", "warning");
+      return;
+    }
+    // Buscar enemigos en rango
+    checkForAttackTargets(unit);
+    if (attackTargets.length === 0) {
+      showToastNotification("No hay enemigos al alcance para atacar.", "info");
+      showAttackOptions = false;
+    } else {
+      showAttackOptions = true;
+    }
+  }
+
   async function processAIActions(actions, reasoning) {
     if (!actions || actions.length === 0) return;
     
@@ -541,6 +557,15 @@
           
           // Update fog of war
           updateFogOfWarAroundPosition(action.target_position[0], action.target_position[1], 2);
+          
+          // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem('game', JSON.stringify(gameData));
+          }
+          // --- FIN NUEVO ---
+          // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
+          refreshSelectedUnitInfo();
+          // --- FIN NUEVO ---
           break;
         }
         
@@ -658,6 +683,8 @@
               targetFound: targetIndex !== -1
             });
           }
+          // Después de cualquier cambio de vida/estado de unidades, refresca la tarjeta
+          refreshSelectedUnitInfo();
           break;
         }
         
@@ -1867,6 +1894,15 @@
           selectedUnit = null;
           validMoveTargets = [];
         }
+        
+        // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem('game', JSON.stringify(gameData));
+        }
+        // --- FIN NUEVO ---
+        // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
+        refreshSelectedUnitInfo();
+        // --- FIN NUEVO ---
       } else {
         console.error("Could not find unit to move in the units array");
         showToastNotification("Error al mover la unidad: unidad no encontrada", "error");
@@ -1885,69 +1921,72 @@
       placeNewUnit(x, y);
       return;
     }
-    
-    // Check if the clicked position is an attack target
+
+    // --- MODIFICADO: NO mostrar el popup de ataque al hacer click en la unidad ---
+    // El popup de ataque solo se muestra al pulsar el botón "Atacar" de la tarjeta
+
+    // Check if the clicked position is an attack target (solo si showAttackOptions es true)
     if (attackingUnit && showAttackOptions) {
-      const targetUnit = units.find(u => 
-        u.owner === 'ia' && 
-        u.position && 
-        Array.isArray(u.position) && 
-        u.position[0] === x && 
+      const targetUnit = units.find(u =>
+        u.owner === 'ia' &&
+        u.position &&
+        Array.isArray(u.position) &&
+        u.position[0] === x &&
         u.position[1] === y
       );
-      
+
       if (targetUnit && attackTargets.some(target => target === targetUnit)) {
         initiateAttack(targetUnit);
         return;
       }
     }
-    
+
     if (selectedUnit && validMoveTargets.some(target => target.x === x && target.y === y)) {
       moveUnitToPosition(selectedUnit, x, y);
       return;
     }
-    
+
     // Check if there's a city at the clicked position
-    const cityAtPosition = cities.find(city => 
-      (city.position.x === x && city.position.y === y) || 
+    const cityAtPosition = cities.find(city =>
+      (city.position.x === x && city.position.y === y) ||
       (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)
     );
-    
+
     if (cityAtPosition) {
       selectedCityInfo = cityAtPosition;
       selectedTile = null;
       selectedUnit = null;
       selectedUnitInfo = null;
       validMoveTargets = [];
-      
+
       // Calculate and display the city area
       calculateCityArea(cityAtPosition);
       return;
     }
-    
+
     // When clicking somewhere else, clear the city area
     cityAreaTiles = [];
-    
-    const unitAtPosition = units.find(unit => 
-      unit && 
-      unit.position && 
-      Array.isArray(unit.position) && 
-      unit.position[0] === x && 
+
+    const unitAtPosition = units.find(unit =>
+      unit &&
+      unit.position &&
+      Array.isArray(unit.position) &&
+      unit.position[0] === x &&
       unit.position[1] === y
     );
-    
+
     if (unitAtPosition) {
       selectedCityInfo = null; // Clear selected city
       selectedUnitInfo = unitAtPosition;
       selectedTile = null;
-      
+
       if (unitAtPosition.owner === 'ia') {
         showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
         selectedUnit = null;
         validMoveTargets = [];
         return;
       }
-      
+
       if (unitAtPosition.status === 'exhausted') {
         showToastNotification("Esta unidad ya ha agotado sus movimientos este turno.", "warning");
         selectedUnit = null;
@@ -1955,6 +1994,7 @@
       } else {
         selectUnit(unitAtPosition);
       }
+      // --- NO mostrar popup de ataque aquí ---
       return;
     } else {
       selectedUnit = null;
@@ -1962,7 +2002,7 @@
       selectedCityInfo = null; // Clear selected city
       validMoveTargets = [];
     }
-    
+
     if (showFogOfWar && grid[y] && grid[y][x] === FOG_OF_WAR.HIDDEN) {
       selectedTile = {
         x, y,
@@ -2140,6 +2180,9 @@
       console.log("Selected map ID:", selectedMapId);
 
       await initializeGame();
+
+      // Refresca la tarjeta de información de la tropa al cargar el mapa
+      refreshSelectedUnitInfo();
 
       return () => {
         document.body.classList.remove('map-active');
@@ -2414,9 +2457,6 @@
     
     const [unitX, unitY] = unit.position;
     calculateValidMoveTargets(unitX, unitY, remainingMovement);
-    
-    // Check for attack targets
-    checkForAttackTargets(unit);
   }
 
   function handleUnitClick(unit) {
@@ -2511,6 +2551,16 @@
       case "cavalry": return './ia_assets/cavalry.png';
       case "archer": return './ia_assets/archer.png'; // Add this case for archer image
       default: return null;
+    }
+  }
+
+  // Actualiza la tarjeta de información de la tropa si hay cambios en el JSON del juego
+  function refreshSelectedUnitInfo() {
+    if (!selectedUnitInfo || !selectedUnitInfo.id) return;
+    // Buscar la tropa actualizada en units (que siempre refleja el JSON)
+    const updated = units.find(u => u.id === selectedUnitInfo.id);
+    if (updated) {
+      selectedUnitInfo = updated;
     }
   }
 </script>
@@ -2624,10 +2674,6 @@
               class:selected={selectedTile && selectedTile.x === x && selectedTile.y === y}
               aria-label="Map tile at position {x},{y}"
             >
-              {#if x % 10 === 0 && y % 10 === 0 && isVisible}
-                <div class="coord-marker">{x},{y}</div>
-              {/if}
-              
               {#if hasResource && isVisible}
                 <div class="resource-marker" title="{getTerrainName(terrainType)}">
                   {#if getResourceIcon(terrainType).type === "emoji"}
@@ -2762,12 +2808,10 @@
                 </button>
               {/if}
               
-              <!-- New attack button that only shows when there are enemies nearby -->
-              {#if attackTargets.length > 0}
-                <button class="action-button attack-button" on:click={() => showAttackOptions = true}>
-                  Atacar
-                </button>
-              {/if}
+              <!-- Botón de atacar siempre visible -->
+              <button class="action-button attack-button" on:click={() => tryAttackFromCard(selectedUnitInfo)}>
+                Atacar
+              </button>
             </div>
           {:else if selectedUnitInfo.owner === 'ia'}
             <div class="unit-enemy-message">

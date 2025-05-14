@@ -256,6 +256,12 @@
       }
       // --- FIN NUEVO ---
 
+      // --- NUEVO: Guardar el gameData actualizado en sessionStorage para que Map.svelte lo lea ---
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem('game', JSON.stringify(gameData));
+      }
+      // --- FIN NUEVO ---
+
       // Update game session - Explicitly save the updated game state to the session
       await gameAPI.updateGameSession(gameData);
       

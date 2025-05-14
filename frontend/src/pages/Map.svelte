@@ -148,11 +148,12 @@
         return;
       }
 
-      const requiredResources = { food: 100, gold: 50 };
+      // MODIFICADO: Nuevos requisitos de recursos
+      const requiredResources = { wood: 20, stone: 15 };
       const playerResources = gameData?.player?.resources || {};
       
-      if (playerResources.food < requiredResources.food || playerResources.gold < requiredResources.gold) {
-        showToastNotification(`Recursos insuficientes. Se necesita: ${requiredResources.food} comida, ${requiredResources.gold} oro`, "error");
+      if (playerResources.wood < requiredResources.wood || playerResources.stone < requiredResources.stone) {
+        showToastNotification(`Recursos insuficientes. Se necesita: ${requiredResources.wood} madera, ${requiredResources.stone} piedra`, "error");
         return;
       }
 
@@ -178,8 +179,9 @@
         }
         gameData.player.cities.push(newCity);
 
-        gameData.player.resources.food -= requiredResources.food;
-        gameData.player.resources.gold -= requiredResources.gold;
+        // MODIFICADO: Actualizar los recursos correctos
+        gameData.player.resources.wood -= requiredResources.wood;
+        gameData.player.resources.stone -= requiredResources.stone;
 
         const settlerIndex = units.findIndex(u => u === settlerToFoundCity);
         if (settlerIndex !== -1) {
@@ -2920,40 +2922,44 @@
     {/if}
     
     {#if showCityFoundingModal}
-      <div class="modal-overlay">
-        <div class="modal-content">
-          <h3>Fundar Nueva Ciudad</h3>
-          <p>Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].</p>
-          
-          <div class="form-group">
-            <label for="city-name">Nombre de la Ciudad:</label>
-            <input 
-              type="text" 
-              id="city-name" 
-              bind:value={newCityName} 
-              placeholder="Introduce un nombre para tu ciudad"
-            />
+  <div class="modal-overlay">
+    <div class="modal-content">
+      <h3>Fundar Nueva Ciudad</h3>
+      <p>Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].</p>
+      
+      <div class="form-group">
+        <label for="city-name">Nombre de la Ciudad:</label>
+        <input 
+          type="text" 
+          id="city-name" 
+          bind:value={newCityName} 
+          placeholder="Introduce un nombre para tu ciudad"
+        />
+      </div>
+      
+      <div class="resource-requirements">
+        <h4>Recursos necesarios:</h4>
+        <div class="resource wood">
+          <div class="resource-icon">
+            <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-icon-img" />
           </div>
-          
-          <div class="resource-requirements">
-            <h4>Recursos necesarios:</h4>
-            <div class="resource food">
-              <div class="resource-icon">🌾</div>
-              <div class="resource-value">100</div>
-            </div>
-            <div class="resource gold">
-              <div class="resource-icon">💰</div>
-              <div class="resource-value">50</div>
-            </div>
+          <div class="resource-value">20</div>
+        </div>
+        <div class="resource stone">
+          <div class="resource-icon">
+            <img src="./ia_assets/harria.png" alt="Stone" class="resource-icon-img" />
           </div>
-          
-          <div class="modal-actions">
-            <button class="cancel-button" on:click={cancelCityFounding}>Cancelar</button>
-            <button class="confirm-button" on:click={foundCity}>Fundar Ciudad</button>
-          </div>
+          <div class="resource-value">15</div>
         </div>
       </div>
-    {/if}
+      
+      <div class="modal-actions">
+        <button class="cancel-button" on:click={cancelCityFounding}>Cancelar</button>
+        <button class="confirm-button" on:click={foundCity}>Fundar Ciudad</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
     {#if showPauseMenu}
       <div class="pause-menu-overlay">

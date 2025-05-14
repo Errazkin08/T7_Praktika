@@ -7,6 +7,7 @@ const API_BASE_URL = '/api'; // Adjust this to match your backend URL
 // Helper function for making authenticated API requests
 async function fetchWithAuth(url, options = {}) {
   // Ensure credentials are included in all requests
+  debugger
   const fetchOptions = {
     ...options,
     credentials: 'include', // This ensures cookies are sent with the request
@@ -15,17 +16,17 @@ async function fetchWithAuth(url, options = {}) {
       ...options.headers,
     }
   };
-  
+
   try {
     const response = await fetch(url, fetchOptions);
-    
+
     if (response.status === 401) {
       console.error('Authentication error - user not logged in');
       // Optionally redirect to login page
       // window.location.href = '/login';
       throw new Error('User not logged in. Please log in to continue.');
     }
-    
+
     return response;
   } catch (error) {
     console.error(`Error in fetchWithAuth for ${url}:`, error);
@@ -54,7 +55,7 @@ export function getTemporaryData(key) {
   if (temporaryDataStore[key] !== undefined) {
     return temporaryDataStore[key];
   }
-  
+
   // Then try localStorage as backup
   try {
     const value = localStorage.getItem(`temp_${key}`);
@@ -66,7 +67,7 @@ export function getTemporaryData(key) {
   } catch (e) {
     console.warn("Could not retrieve temporary data from localStorage", e);
   }
-  
+
   return null;
 }
 
@@ -98,11 +99,11 @@ async function getTroopTypes() {
         'Content-Type': 'application/json',
       }
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch troop types');
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error fetching troop types:', error);
@@ -120,16 +121,16 @@ async function getTechnologyTypes() {
       method: 'GET',
       credentials: 'include'
     });
-    
+
     // Add more detailed debugging to help identify the issue
     console.log(`Fetching technology types from: ${API_BASE_URL}/technology/types`);
     console.log(`Response status: ${response.status}`);
-    
+
     if (!response.ok) {
       console.error(`Error fetching technology types: ${response.status} ${response.statusText}`);
       return [];
     }
-    
+
     const data = await response.json();
     console.log("Technology types loaded:", data);
     return data;
@@ -139,7 +140,33 @@ async function getTechnologyTypes() {
   }
 }
 
+/**
+   * Get a specific technology type by ID
+   */
+
+
 export const gameAPI = {
+
+  async getTechnologyType(typeId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/technologies/types/${typeId}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get technology type: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get technology type');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getTechnologyType:", error);
+      // Provide fallback data
+      return {
+        name: `Technology ${typeId}`,
+        production_bonus: 10,
+        defense_bonus: 10
+      };
+    }
+  },
   /**
    * Get all available scenarios
    */
@@ -182,11 +209,11 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(gameData),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to save game: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error saving game:", error);
@@ -203,11 +230,11 @@ export const gameAPI = {
         method: 'PUT',
         body: JSON.stringify(gameData),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to update game: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error(`Error updating game ${gameId}:`, error);
@@ -222,11 +249,11 @@ export const gameAPI = {
     try {
       console.log(`Requesting game data for ID: ${gameId}`);
       const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `Failed to load game: ${response.status}`;
-        
+
         try {
           // Try to parse the error response as JSON
           const errorData = JSON.parse(errorText);
@@ -237,10 +264,10 @@ export const gameAPI = {
         } catch (parseError) {
           console.error(`Error response (${response.status}):`, errorText);
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       const data = await response.json();
       console.log("Successfully loaded game data:", data);
       return data;
@@ -275,11 +302,11 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(gameData),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to create game: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error creating game:", error);
@@ -295,11 +322,11 @@ export const gameAPI = {
       const response = await fetchWithAuth(`${API_BASE_URL}/games/${gameId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to delete game: ${response.status}`);
       }
-      
+
       return true;
     } catch (error) {
       console.error(`Error deleting game ${gameId}:`, error);
@@ -332,11 +359,11 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(mapData),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to save map data: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error saving map data:", error);
@@ -375,24 +402,24 @@ export const gameAPI = {
         }
         throw new Error(`Failed to fetch maps: ${response.status}`);
       }
-      
+
       // Parse response - handle empty responses
       const responseText = await response.text();
       if (!responseText || responseText.trim() === '') {
         console.log("Empty response when fetching maps - returning empty array");
         return [];
       }
-      
+
       // Parse the JSON response
       const maps = JSON.parse(responseText);
       console.log("Fetched maps:", maps);
-      
+
       // If response is not an array, return empty array
       if (!Array.isArray(maps)) {
         console.warn("Maps response is not an array, returning empty array instead");
         return [];
       }
-      
+
       // Normalize map data to ensure consistent property names
       return maps.map(map => {
         // Preserve the original ID from the database when possible
@@ -406,7 +433,7 @@ export const gameAPI = {
           mapId = `map-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
           console.warn(`Generated fallback ID for map: ${mapId}`);
         }
-        
+
         return {
           map_id: mapId,
           width: map.width || 30,
@@ -449,11 +476,11 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(mapData),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to create map: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error creating map:", error);
@@ -470,12 +497,12 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(gameData),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.error || `Failed to create game: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error creating game with map:", error);
@@ -501,12 +528,12 @@ export const gameAPI = {
           ai_civ_id: gameData.ai_civ_id
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error creating game with civilization:", error);
@@ -522,11 +549,11 @@ export const gameAPI = {
       const response = await fetchWithAuth(`${API_BASE_URL}/maps/${mapId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to delete map: ${response.status}`);
       }
-      
+
       return true;
     } catch (error) {
       console.error(`Error deleting map ${mapId}:`, error);
@@ -544,7 +571,7 @@ export const gameAPI = {
         throw new Error(`Failed to fetch user games: ${response.status}`);
       }
       const games = await response.json();
-      
+
       // Process games to ensure they have all required fields
       return games.map(game => ({
         ...game,
@@ -569,11 +596,11 @@ export const gameAPI = {
       const response = await fetchWithAuth(`${API_BASE_URL}/user/games/${gameId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to delete game: ${response.status}`);
       }
-      
+
       return true;
     } catch (error) {
       console.error(`Error deleting game ${gameId}:`, error);
@@ -606,12 +633,12 @@ export const gameAPI = {
         method: 'POST',
         body: JSON.stringify(gameData),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `Failed to update game session: ${response.status}` }));
         throw new Error(errorData.error || `Failed to update game session: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error updating game session:", error);
@@ -628,17 +655,17 @@ export const gameAPI = {
       const response = await fetchWithAuth(`${API_BASE_URL}/current-game/save`, { // Endpoint
         method: 'POST',
       });
-      
+
       console.log("Response status from saveCurrentGameSession:", response.status);
-      
+
       // Try to get the response text for better error reporting
       const responseText = await response.text();
       console.log("Response text:", responseText);
-      
+
       // If not OK, try to parse the error or use the text
       if (!response.ok) {
         let errorMessage = `Failed to save current game session: ${response.status}`;
-        
+
         try {
           // Try to parse as JSON if possible
           const errorData = JSON.parse(responseText);
@@ -651,10 +678,10 @@ export const gameAPI = {
             errorMessage = responseText;
           }
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       // Try to parse the response JSON
       try {
         return JSON.parse(responseText);
@@ -684,11 +711,11 @@ export const gameAPI = {
           rules: rules
         }),
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `Failed to get AI action: ${response.status}`;
-        
+
         try {
           // Try to parse the error response as JSON
           const errorData = JSON.parse(errorText);
@@ -699,10 +726,10 @@ export const gameAPI = {
           // If can't parse as JSON, use the raw text
           errorMessage = errorText || errorMessage;
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Error getting AI action:", error);
@@ -719,29 +746,29 @@ export const gameAPI = {
     try {
       // Include position as a query parameter only if provided
       let url = `${API_BASE_URL}/troops/types/${typeId}`;
-      
+
       // If position is provided, add it as a query parameter
       if (position && Array.isArray(position)) {
         url += `?position=${JSON.stringify(position)}`;
       }
-      
+
       console.log(`Requesting troop type ${typeId}${position ? ' with position ' + JSON.stringify(position) : ''}`);
-      
+
       const response = await fetchWithAuth(url);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `Failed to get troop type: ${response.status}` }));
         throw new Error(errorData.error || 'Failed to get troop type');
       }
-      
+
       const troopData = await response.json();
       console.log(`Received troop data for ${typeId}:`, troopData);
-      
+
       // If position was provided but not included in the response, add it
       if (position && (!troopData.position || !Array.isArray(troopData.position))) {
         troopData.position = position;
       }
-      
+
       return troopData;
     } catch (error) {
       console.error("Error in getTroopType:", error);
@@ -792,12 +819,12 @@ export const gameAPI = {
         method: 'GET',
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         console.error(`Error fetching building types: ${response.status} ${response.statusText}`);
         return [];
       }
-      
+
       const data = await response.json();
       console.log("Building types loaded:", data);
       return data;

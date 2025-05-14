@@ -5,6 +5,7 @@
   import { gameState, pauseGame, endGame, currentTurn, currentPlayer } from '../stores/gameState.js';
   import { user } from '../stores/auth.js';
   import '../styles/pages/map.css'; 
+  import CheatConsole from '../components/CheatConsole.svelte';
 
   let showPauseMenu = false;
   let isLoading = true;
@@ -95,6 +96,11 @@
   let showAttackOptions = false;
   let attackTargets = [];
   let attackingUnit = null;
+
+  // Add these variables for cheat console
+  let showCheatConsole = false;
+  let cheatResult = null;
+  let cheatResultType = "info"; // can be "success", "error", "info"
 
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
@@ -2211,6 +2217,10 @@
     
     return !isOccupied && !hasCityAtPosition;
   }
+   function togglePauseMenu() {
+    showPauseMenu = !showPauseMenu;
+    pauseGame(showPauseMenu);
+   }
 
   onMount(async () => {
     try {
@@ -2253,11 +2263,69 @@
     if (event.key === 'Escape') {
       togglePauseMenu();
     }
+    
+    // Check for Ctrl+T key combo to open cheat console
+    if (event.key.toLowerCase() === 't') {
+      event.preventDefault(); // Prevent browser's default action
+      toggleCheatConsole();
+    }
   }
 
-  function togglePauseMenu() {
-    showPauseMenu = !showPauseMenu;
-    pauseGame(showPauseMenu);
+  // Function to toggle the cheat console visibility
+  function toggleCheatConsole() {
+    showCheatConsole = !showCheatConsole;
+    if (showCheatConsole) {
+      // Focus on the input field when opening the console
+      setTimeout(() => {
+        document.getElementById('cheat-input')?.focus();
+      }, 100);
+    }
+    cheatResult = null; // Clear previous result
+  }
+
+  // Function to process cheat commands
+  async function processCheat(event) {
+    const command = event.detail.command;
+    
+    try {
+      // Process the different cheat commands
+      if (command === "fogOfWar_Off") {
+        if (showFogOfWar) {
+          // Disable fog of war
+          showFogOfWar = false;
+          
+          // Make sure the cheats_used array exists
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used.includes("fogOfWar_Off")) {
+            gameData.cheats_used.push("fogOfWar_Off");
+          }
+          
+          // Save changes to session
+          await gameAPI.updateGameSession(gameData);
+          
+          cheatResult = "Niebla de guerra desactivada";
+          cheatResultType = "success";
+        } else {
+          cheatResult = "La niebla de guerra ya está desactivada";
+          cheatResultType = "info";
+        }
+      } else {
+        // Invalid command
+        cheatResult = `Comando inválido: ${command}`;
+        cheatResultType = "error";
+      }
+      
+      console.log(`Cheat processed: ${command} - Result: ${cheatResult}`);
+      
+    } catch (error) {
+      console.error("Error processing cheat:", error);
+      cheatResult = `Error: ${error.message}`;
+      cheatResultType = "error";
+    }
   }
 
   async function initializeGame() {
@@ -2311,6 +2379,16 @@
             console.log("Loaded cities:", cities.length);
           } else {
             cities = [];
+          }
+
+          // Initialize cheats_used array if it doesn't exist
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          
+          // Apply any previously used cheats
+          if (gameData.cheats_used.includes("fogOfWar_Off")) {
+            showFogOfWar = false;
           }
         }
       } catch (apiError) {
@@ -3114,5 +3192,14 @@
     </div>
   {/if}
 </div>
+
+<!-- Add CheatConsole component near the end of the template -->
+<CheatConsole 
+  visible={showCheatConsole} 
+  result={cheatResult}
+  resultType={cheatResultType}
+  on:close={() => showCheatConsole = false}
+  on:execute={processCheat}
+/>
 
 

@@ -665,7 +665,18 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "player": {
                 "units": [settler, warrior],
                 "cities": [],
-                "technologies":[],
+                "technologies":[
+                    {
+                        "id": "basic",
+                        "name": "basic Technology",
+                        "description": "Unlock basic level units and buildings",
+                        "turns": 0,
+                        "min_civilians": 0,
+                        "prerequisites": [],
+                        "unlocks": ["basic units", "basic buildings"],
+                        "icon": ""
+                        }
+                    ],
                 "resources": {
                     "food": 100,
                     "gold": 50,
@@ -678,7 +689,18 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "ia": {
                 "units": [ai_settler, ai_warrior],
                 "cities": [],
-                "technologies":[],
+                "technologies":[
+                    
+                    {
+                        "id": "basic",
+                        "name": "basic Technology",
+                        "description": "Unlock basic level units and buildings",
+                        "turns": 0,
+                        "min_civilians": 0,
+                        "prerequisites": [],
+                        "unlocks": ["basic units", "basic buildings"],
+                        "icon": ""
+                        }],
                 "resources": {
                     "food": 100,
                     "gold": 50,
@@ -1226,6 +1248,20 @@ def get_building_types():
                 "stone": 70
             },
             "description": "Produces gold over time"
+        },
+        {
+            "type_id": "library",
+            "name": "Library",
+            "category": "learing",
+            "turns": 5,
+            "technology": "basic",
+            "level": 1,
+            "learning": [],
+            "cost": {
+                "wood": 70,
+                "stone": 50
+            },
+            "description": "Increases the knowledge of the civilization"
         }
 
     ]
@@ -1529,3 +1565,111 @@ def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_n
     except Exception as e:
         print(f"Error adding game with civilization: {e}")
         return None
+
+def get_technology_types():
+    """
+    Get all available technology types
+    """
+    technology_types = [
+        {
+            "id": "basic",
+            "name": "basic Technology",
+            "description": "Unlock basic level units and buildings",
+            "turns": 0,
+            "min_civilians": 0,
+            "prerequisites": [],
+            "unlocks": ["basic units", "basic buildings"],
+            "icon": "🔬"
+        },
+        {
+            "id": "medium",
+            "name": "Medium Technology",
+            "description": "Unlock intermediate level units and buildings",
+            "turns": 10,
+            "min_civilians": 0,
+            "prerequisites": ["basic"],
+            "unlocks": ["cavalry", "iron_mine", "gold_mine"],
+            "icon": "🔬"
+        },
+        {
+            "id": "advanced",
+            "name": "Advanced Technology",
+            "description": "Unlock advanced level units and buildings",
+            "turns": 20,
+            "min_civilians": 100,
+            "prerequisites": ["medium"],
+            "unlocks": ["tank", "advanced_buildings"],
+            "icon": "🚀"
+        }
+    ]
+    return technology_types
+
+def get_technology_type(tech_id):
+    """
+    Get a specific technology type by its ID
+    """
+    technology_types = get_technology_types()
+    for tech_type in technology_types:
+        if tech_type["id"] == tech_id:
+            return tech_type
+    return None
+
+def add_technology_to_city(city_id, tech_id):
+    """
+    Add a new technology to a city for research
+    """
+    game = session.get('game')
+    if not game or "player" not in game or "cities" not in game["player"]:
+        return False, "No cities found"
+
+    # Find the city in the player's cities
+    city = None
+    for c in game["player"]["cities"]:
+        if c["id"] == city_id:
+            city = c
+            break
+            
+    if not city:
+        return False, "City not found"
+
+    tech_type = get_technology_type(tech_id)
+    if not tech_type:
+        return False, "Invalid technology type"
+
+    # Check if the city has a research field, if not, create one
+    if "research" not in city:
+        city["research"] = {
+            "current_technology": None,
+            "turns_remaining": 0
+        }
+
+    # Check if city has a library
+    has_library = False
+    if "buildings" in city:
+        for building in city["buildings"]:
+            if isinstance(building, dict) and building.get("type_id") == "library":
+                has_library = True
+                break
+            elif isinstance(building, str) and building.lower() == "library":
+                has_library = True
+                break
+    
+    if not has_library:
+        return False, "City needs a library to research technologies"
+
+    # Check if population is enough
+    if "population" not in city or city["population"] < tech_type["min_civilians"]:
+        return False, f"Not enough population. Need {tech_type['min_civilians']} civilians."
+
+    # Check prerequisites
+    if "prerequisites" in tech_type:
+        for prereq in tech_type["prerequisites"]:
+            if "technologies" not in game["player"] or prereq not in game["player"]["technologies"]:
+                return False, f"Missing prerequisite technology: {prereq}"
+
+    # Set the new research
+    city["research"]["current_technology"] = tech_id
+    city["research"]["turns_remaining"] = tech_type["turns"]
+    
+    session['game'] = game
+    return True, "Technology research started"

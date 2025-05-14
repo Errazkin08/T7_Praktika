@@ -19,6 +19,95 @@ def convert_bson_types(obj):
         return obj.isoformat()
     return obj
 
+def process_research(game):
+    """Process technology research for both player and AI"""
+    players = ['player', 'ia']
+    
+    for player_type in players:
+        if player_type not in game:
+            continue
+            
+        # Check each city for research in progress
+        for city in game[player_type].get('cities', []):
+            research_completed = False
+            tech_id = None
+            tech_name = None
+            
+            # Check city's research field (for backwards compatibility)
+            if 'research' in city and city['research'].get('current_technology'):
+                city['research']['turns_remaining'] -= 1
+                
+                # Check if research is complete
+                if city['research']['turns_remaining'] <= 0:
+                    tech_id = city['research']['current_technology']
+                    research_completed = True
+                    
+                    # Reset the research
+                    city['research']['current_technology'] = None
+                    city['research']['turns_remaining'] = 0
+            
+            # Check library building for research
+            if 'buildings' in city:
+                for building in city['buildings']:
+                    # Skip string-type buildings
+                    if isinstance(building, str):
+                        continue
+                        
+                    # Check if it's a library with research
+                    if (building.get('type_id') == 'library' or building.get('name', '').lower() == 'library') and \
+                       'production' in building and building['production'] and building['production'].get('current_technology'):
+                        
+                        # Decrease turns remaining
+                        building['production']['turns_remaining'] -= 1
+                        
+                        # Check if research is complete
+                        if building['production']['turns_remaining'] <= 0:
+                            tech_id = building['production']['current_technology']
+                            tech_name = building['production'].get('technology_name', tech_id)
+                            research_completed = True
+                            
+                            # Reset the production
+                            building['production'] = None
+                            
+                            # Also reset city research for backwards compatibility
+                            if 'research' in city:
+                                city['research']['current_technology'] = None
+                                city['research']['turns_remaining'] = 0
+            
+            # If research was completed, add the technology to the player's technologies
+            if research_completed and tech_id:
+                # Initialize technologies array if it doesn't exist
+                if 'technologies' not in game[player_type]:
+                    game[player_type]['technologies'] = []
+                
+                # Check if the technology is already researched
+                already_researched = False
+                for tech in game[player_type]['technologies']:
+                    if (isinstance(tech, str) and tech == tech_id) or \
+                       (isinstance(tech, dict) and tech.get('id') == tech_id):
+                        already_researched = True
+                        break
+                
+                # Add the technology if not already researched
+                if not already_researched:
+                    # Get the full technology type from the database
+                    from database import get_technology_type
+                    tech_data = get_technology_type(tech_id)
+                    
+                    if tech_data:
+                        game[player_type]['technologies'].append(tech_data)
+                    else:
+                        # Fallback to just the ID if tech data not found
+                        game[player_type]['technologies'].append(tech_id)
+    
+    return game
+
+def end_turn(game):
+    # Process research progress
+    game = process_research(game)
+    
+    return game
+
 @game_blueprint.route('/api/game', methods=['POST'])
 def create_game():
     try:

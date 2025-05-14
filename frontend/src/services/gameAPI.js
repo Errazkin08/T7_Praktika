@@ -110,6 +110,35 @@ async function getTroopTypes() {
   }
 }
 
+/**
+ * Get technology types
+ */
+async function getTechnologyTypes() {
+  try {
+    // Fix the URL path to correctly match the endpoint defined in the blueprint
+    const response = await fetch(`${API_BASE_URL}/technology/types`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+    
+    // Add more detailed debugging to help identify the issue
+    console.log(`Fetching technology types from: ${API_BASE_URL}/technology/types`);
+    console.log(`Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      console.error(`Error fetching technology types: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log("Technology types loaded:", data);
+    return data;
+  } catch (error) {
+    console.error("Error in getTechnologyTypes:", error);
+    return [];
+  }
+}
+
 export const gameAPI = {
   /**
    * Get all available scenarios
@@ -779,6 +808,8 @@ export const gameAPI = {
   },
 
   getTroopTypes,
+
+  getTechnologyTypes,
 
   storeTemporaryData,
   getTemporaryData,

@@ -1155,3 +1155,218 @@
     filter: grayscale(100%);
     position: relative;
   }
+
+  /* Library/Technology styles */
+  .research-status-section {
+    background-color: rgba(138, 43, 226, 0.1);
+    border-left: 4px solid #8a2be2;
+    position: relative;
+  }
+
+  .production-type-badge.research {
+    background-color: #8a2be2;
+    color: white;
+  }
+
+  .technologies-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .technology-container {
+    margin-bottom: 15px;
+  }
+
+  .technology-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .technology-card:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .technology-card.researched {
+    background-color: rgba(76, 175, 80, 0.15);
+    border-left: 4px solid #4CAF50;
+  }
+
+  .technology-card.researching {
+    background-color: rgba(138, 43, 226, 0.15);
+    border-left: 4px solid #8a2be2;
+  }
+
+  .technology-card.disabled {
+    opacity: 0.6;
+    filter: grayscale(30%);
+    cursor: not-allowed;
+  }
+
+  .technology-icon {
+    font-size: 2.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 60px;
+    height: 60px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+
+  .technology-details {
+    flex: 1;
+  }
+
+  .technology-name {
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+  }
+
+  .technology-description {
+    margin: 0 0 15px 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+
+  .technology-status {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border-radius: 12px;
+    margin-top: 5px;
+  }
+
+  .technology-card.researched .technology-status {
+    background-color: rgba(76, 175, 80, 0.7);
+    color: white;
+  }
+
+  .technology-card.researching .technology-status {
+    background-color: rgba(138, 43, 226, 0.7);
+    color: white;
+  }
+
+  .technology-requirements {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+  }
+
+  .technology-req {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .technology-req.met {
+    color: #4CAF50;
+  }
+
+  .req-icon {
+    flex-shrink: 0;
+  }
+
+  .req-label {
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
+
+  .req-value {
+    margin-left: auto;
+    font-weight: bold;
+  }
+
+  .technology-prereqs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .prereq-item {
+    margin-right: 5px;
+    padding: 2px 5px;
+    background-color: rgba(255, 87, 34, 0.3);
+    border-radius: 3px;
+  }
+
+  .prereq-item.met {
+    background-color: rgba(76, 175, 80, 0.3);
+  }
+
+  .technology-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .research-button {
+    background-color: #8a2be2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+
+  .research-button:hover:not(:disabled) {
+    background-color: #9b59b6;
+  }
+
+  .research-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .technology-unlocks {
+    background-color: rgba(0, 0, 0, 0.2);
+    margin-top: 5px;
+    margin-left: 20px;
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 2px dashed rgba(255, 255, 255, 0.3);
+  }
+
+  .technology-unlocks h5 {
+    margin: 0 0 5px 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+
+  .unlocks-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .unlock-item {
+    padding: 3px 6px;
+    background-color: rgba(255, 193, 7, 0.2);
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }

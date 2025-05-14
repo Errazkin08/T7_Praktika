@@ -26,6 +26,11 @@
   let confirmationCallback = null;
   let itemToCancel = null;
 
+  // Add new state variables for technology types
+  let technologyTypes = [];
+  let loadingTechnologyTypes = false;
+  let selectedTechnology = null;
+
   // Add a helper function to render costs dynamically based on what's in the cost object
   function getResourceCostString(costObject) {
     if (!costObject) return 'Costo no disponible';
@@ -119,6 +124,230 @@
       console.error("Error loading building types:", err);
     } finally {
       loadingBuildingTypes = false;
+    }
+  }
+
+  // Function to fetch technology types
+  async function fetchTechnologyTypes() {
+    loadingTechnologyTypes = true;
+    try {
+      const types = await gameAPI.getTechnologyTypes();
+      technologyTypes = types;
+      console.log("Technology types loaded:", technologyTypes);
+    } catch (err) {
+      console.error("Error loading technology types:", err);
+    } finally {
+      loadingTechnologyTypes = false;
+    }
+  }
+
+  // Function to check if the city has a library
+  function cityHasLibrary() {
+    if (!city || !city.buildings) return false;
+    
+    return city.buildings.some(building => {
+      if (typeof building === 'string') {
+        return building.toLowerCase() === 'library';
+      } else {
+        return (building.type_id === 'library' || 
+                building.name?.toLowerCase() === 'library');
+      }
+    });
+  }
+
+  // Function to check if a technology is already researched
+  function isTechnologyResearched(techId) {
+    if (!gameData || !gameData.player || !gameData.player.technologies) {
+      return false;
+    }
+    
+    return gameData.player.technologies.some(tech => {
+      if (typeof tech === 'string') {
+        return tech === techId;
+      } else {
+        return tech.id === techId || tech.technology === techId;
+      }
+    });
+  }
+
+  // Function to find the library building in the city
+  function findLibraryBuilding() {
+    if (!city || !city.buildings) return null;
+    
+    for (let i = 0; i < city.buildings.length; i++) {
+      const building = city.buildings[i];
+      // Check if it's a library (either as string or object)
+      if (typeof building === 'string') {
+        if (building.toLowerCase() === 'library') {
+          // Convert string to object if needed
+          city.buildings[i] = {
+            id: `library-${Date.now()}`,
+            type_id: 'library',
+            name: 'Library',
+            production: null
+          };
+          return city.buildings[i];
+        }
+      } else if (building.type_id === 'library' || building.name?.toLowerCase() === 'library') {
+        // Initialize production field if it doesn't exist
+        if (!building.production) {
+          building.production = null;
+        }
+        return building;
+      }
+    }
+    return null;
+  }
+
+  // Updated start research function to use library production
+  async function startResearch(technology) {
+    try {
+      if (!city) {
+        showToastNotification("Error: No hay ciudad seleccionada", "error");
+        return;
+      }
+      
+      // Find the library building
+      const library = findLibraryBuilding();
+      if (!library) {
+        showToastNotification("La ciudad necesita una biblioteca para investigar tecnologías", "error");
+        return;
+      }
+      
+      // Check if there's already research in progress
+      if ((library.production && library.production.current_technology) || 
+          (city.research && city.research.current_technology)) {
+        showToastNotification("Ya hay una investigación en curso", "error");
+        return;
+      }
+      
+      // Check if population meets minimum requirement
+      if (city.population < technology.min_civilians) {
+        showToastNotification(`Se requieren al menos ${technology.min_civilians} ciudadanos para investigar esta tecnología`, "error");
+        return;
+      }
+      
+      // Check prerequisites
+      if (technology.prerequisites && technology.prerequisites.length > 0) {
+        const missingPrereqs = technology.prerequisites.filter(prereq => 
+          !gameData.player.technologies || !gameData.player.technologies.some(tech => 
+            (typeof tech === 'string' && tech === prereq) || 
+            (typeof tech === 'object' && (tech.id === prereq || tech.technology === prereq))
+          )
+        );
+        
+        if (missingPrereqs.length > 0) {
+          showToastNotification(`Faltan tecnologías previas: ${missingPrereqs.join(", ")}`, "error");
+          return;
+        }
+      }
+      
+      // Set the new research on the library building's production
+      library.production = {
+        current_technology: technology.id,
+        turns_remaining: technology.turns,
+        technology_name: technology.name,
+        itemType: 'technology',
+        production_type: 'research'
+      };
+      
+      console.log("Setting research on library:", library.production);
+      
+      // Also set city.research for backward compatibility
+      city.research = {
+        current_technology: technology.id,
+        turns_remaining: technology.turns
+      };
+      
+      // Update the game data with the new research
+      if (gameData && gameData.player && gameData.player.cities) {
+        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
+        if (cityIndex !== -1) {
+          // Update the city with the modified library
+          gameData.player.cities[cityIndex].buildings = city.buildings;
+          gameData.player.cities[cityIndex].research = city.research;
+          
+          // Save changes to game session
+          await gameAPI.updateGameSession(gameData);
+          
+          // Show confirmation
+          showToastNotification(`¡Iniciada investigación de ${technology.name}!`, "success");
+          
+          // Switch to the summary tab to show the research info
+          setActiveTab('summary');
+        }
+      }
+    } catch (err) {
+      console.error("Error starting research:", err);
+      showToastNotification("Error al iniciar la investigación", "error");
+    }
+  }
+
+  // Updated cancel research function to clear from library
+  async function cancelResearch() {
+    try {
+      const library = findLibraryBuilding();
+      const hasLibraryResearch = library && library.production && library.production.current_technology;
+      const hasCityResearch = city && city.research && city.research.current_technology;
+      
+      if (!hasLibraryResearch && !hasCityResearch) {
+        showToastNotification("No hay investigación activa que cancelar", "warning");
+        return;
+      }
+
+      // Get a more readable name if available
+      const techId = hasLibraryResearch ? library.production.current_technology : city.research.current_technology;
+      const techName = hasLibraryResearch ? library.production.technology_name : null;
+      const techType = technologyTypes.find(t => t.id === techId);
+      const displayName = techName || (techType ? techType.name : techId);
+      
+      // Show the confirmation dialog
+      confirmationMessage = `¿Estás seguro de que quieres cancelar la investigación de ${displayName}? No recuperarás ningún progreso.`;
+      confirmationCallback = confirmCancelResearch;
+      showConfirmationDialog = true;
+    } catch (error) {
+      console.error("Error al cancelar la investigación:", error);
+      showToastNotification("Error al cancelar la investigación", "error");
+    }
+  }
+
+  // Updated confirm cancel research function to clear from library
+  async function confirmCancelResearch() {
+    try {
+      // Clear research from library if it exists
+      const library = findLibraryBuilding();
+      if (library && library.production) {
+        library.production = null;
+      }
+      
+      // Also clear the city.research for backward compatibility
+      if (city.research) {
+        city.research = {
+          current_technology: null,
+          turns_remaining: 0
+        };
+      }
+      
+      // Update the city in gameData
+      if (gameData && gameData.player && gameData.player.cities) {
+        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
+        if (cityIndex !== -1) {
+          gameData.player.cities[cityIndex].buildings = city.buildings;
+          gameData.player.cities[cityIndex].research = city.research;
+          
+          // Save to backend
+          await gameAPI.updateGameSession(gameData);
+          
+          // Show confirmation
+          showToastNotification("Investigación cancelada", "info");
+        }
+      }
+    } catch (error) {
+      console.error("Error al cancelar la investigación:", error);
+      showToastNotification("Error al cancelar la investigación", "error");
+    } finally {
+      // Reset the confirmation dialog state
+      closeConfirmationDialog();
     }
   }
 
@@ -574,6 +803,7 @@
       // Only fetch these if we have a valid city
       await fetchTroopTypes();
       await fetchBuildingTypes();
+      await fetchTechnologyTypes();
       
       isLoading = false;
     } catch (err) {
@@ -641,6 +871,13 @@
             on:click={() => setActiveTab('buildings')}
           >
             Edificios
+          </button>
+          <button 
+            class="tab-button" 
+            class:active={activeTab === 'library'} 
+            on:click={() => setActiveTab('library')}
+          >
+            Biblioteca
           </button>
         </div>
         
@@ -1183,6 +1420,123 @@
               <div class="info-section">
                 <p>No hay edificios construidos en esta ciudad.</p>
                 <button class="action-button" on:click={() => setActiveTab('production')}>Construir Edificios</button>
+              </div>
+            {/if}
+          </div>
+
+          <div class="tab-content" class:active={activeTab === 'library'}>
+            <h3>Biblioteca y Tecnologías</h3>
+            {#if cityHasLibrary()}
+              <p>Investiga nuevas tecnologías para mejorar tu civilización.</p>
+              
+              {#if city.research && city.research.current_technology}
+                {@const researchTech = technologyTypes.find(t => t.id === city.research.current_technology)}
+                <div class="info-section research-status-section">
+                  <h4>Investigación en Curso</h4>
+                  <div class="production-type-badge research">Investigación</div>
+                  <div class="production-item">
+                    <div class="production-icon">
+                      <span class="production-emoji">
+                        {researchTech ? researchTech.icon : '📚'}
+                      </span>
+                    </div>
+                    <div class="production-details">
+                      <span class="production-name">
+                        {researchTech ? researchTech.name : city.research.current_technology}
+                      </span>
+                      <div class="production-progress">
+                        <div class="progress-bar" style="width: {100 - (city.research.turns_remaining * 100 / (researchTech?.turns || 10))}%;"></div>
+                        <span class="progress-text">{city.research.turns_remaining} turnos restantes</span>
+                      </div>
+                      <button class="cancel-production-button" on:click={cancelResearch}>Cancelar Investigación</button>
+                    </div>
+                  </div>
+                </div>
+              {/if}
+              
+              <div class="info-section">
+                <h4>Tecnologías Disponibles</h4>
+                {#if loadingTechnologyTypes}
+                  <p>Cargando tecnologías...</p>
+                {:else if technologyTypes.length === 0}
+                  <p>No hay tecnologías disponibles.</p>
+                {:else}
+                  <div class="technologies-list">
+                    {#each technologyTypes as technology}
+                      {@const isResearched = isTechnologyResearched(technology.id)}
+                      {@const isResearching = city.research && city.research.current_technology === technology.id}
+                      {@const canResearch = !isResearched && !isResearching && city.population >= technology.min_civilians}
+                      {@const hasMissingPrereqs = technology.prerequisites && technology.prerequisites.some(prereq => !isTechnologyResearched(prereq))}
+                      
+                      <div class="technology-container">
+                        <div class="technology-card {isResearched ? 'researched' : ''} {isResearching ? 'researching' : ''} {!canResearch || hasMissingPrereqs ? 'disabled' : ''}">
+                          <div class="technology-icon">{technology.icon}</div>
+                          <div class="technology-details">
+                            <h4 class="technology-name">{technology.name}</h4>
+                            <p class="technology-description">{technology.description}</p>
+                            
+                            {#if isResearched}
+                              <div class="technology-status">Investigada</div>
+                            {:else if isResearching}
+                              <div class="technology-status">En progreso ({city.research.turns_remaining} turnos)</div>
+                            {:else}
+                              <div class="technology-requirements">
+                                <div class="technology-req {city.population >= technology.min_civilians ? 'met' : ''}">
+                                  <span class="req-icon">👥</span>
+                                  <span class="req-label">Población:</span>
+                                  <span class="req-value">{city.population}/{technology.min_civilians}</span>
+                                </div>
+                                
+                                {#if technology.prerequisites && technology.prerequisites.length > 0}
+                                  <div class="technology-prereqs">
+                                    <span class="req-icon">📋</span>
+                                    <span class="req-label">Requisitos:</span>
+                                    <span class="req-value">
+                                      {#each technology.prerequisites as prereq}
+                                        {@const prereqName = technologyTypes.find(t => t.id === prereq)?.name || prereq}
+                                        <span class="prereq-item {isTechnologyResearched(prereq) ? 'met' : ''}">{prereqName}</span>
+                                      {/each}
+                                    </span>
+                                  </div>
+                                {/if}
+                                
+                                <div class="technology-time">
+                                  <span class="req-icon">⏳</span>
+                                  <span class="req-label">Tiempo:</span>
+                                  <span class="req-value">{technology.turns} turnos</span>
+                                </div>
+                              </div>
+                              
+                              <button 
+                                class="research-button" 
+                                disabled={!canResearch || hasMissingPrereqs || (city.research && city.research.current_technology)}
+                                on:click={() => startResearch(technology)}
+                              >
+                                Investigar
+                              </button>
+                            {/if}
+                          </div>
+                        </div>
+                        
+                        {#if technology.unlocks && technology.unlocks.length > 0}
+                          <div class="technology-unlocks">
+                            <h5>Desbloquea:</h5>
+                            <div class="unlocks-list">
+                              {#each technology.unlocks as unlock}
+                                <span class="unlock-item">{unlock}</span>
+                              {/each}
+                            </div>
+                          </div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <div class="info-section">
+                <p>Para investigar tecnologías, primero debes construir una Biblioteca en esta ciudad.</p>
+                <button class="action-button" on:click={() => setActiveTab('production')}>Construir Biblioteca</button>
               </div>
             {/if}
           </div>

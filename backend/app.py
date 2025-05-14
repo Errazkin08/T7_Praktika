@@ -10,6 +10,8 @@ from routes import (
     building_blueprint,
     civilization_blueprint
 )
+# Import your technology blueprint
+from routes.technologyRoute import technology_blueprint
 from database import init_db, close_db
 import os
 from bson import ObjectId
@@ -75,6 +77,7 @@ app.register_blueprint(ia_blueprint)
 app.register_blueprint(troop_blueprint)
 app.register_blueprint(building_blueprint)
 app.register_blueprint(civilization_blueprint)
+app.register_blueprint(technology_blueprint)
 
 # Error handling
 @app.errorhandler(500)

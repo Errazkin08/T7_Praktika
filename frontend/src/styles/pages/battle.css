@@ -5,4 +5,52 @@
   background-color: #1a1a1a;
   color: white;
 }
-```
+
+/* Hide navigation when in battle */
+body.in-battle nav,
+body.in-battle header,
+body.in-battle .nav-container {
+  display: none !important;
+}
+
+/* Make battle page take full height without navigation */
+body.in-battle .battle-page {
+  height: 100vh;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Owner labels */
+.owner-label {
+  position: absolute;
+  top: -25px;
+  left: 0;
+  right: 0;
+  padding: 5px 10px;
+  text-align: center;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 5;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.player-label {
+  background-color: #2980b9;
+  color: white;
+}
+
+.ai-label {
+  background-color: #c0392b;
+  color: white;
+}
+
+/* Battle log entries - newest first */
+.log-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.log-content p:first-child {
+  font-weight: bold;
+}

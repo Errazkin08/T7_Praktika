@@ -21,6 +21,9 @@
 
   onMount(async () => {
     try {
+      // Hide navigation bar when in battle
+      document.body.classList.add('in-battle');
+      
       // Get battle data from temporary storage
       const battleData = gameAPI.getTemporaryData('battleData');
       
@@ -41,6 +44,11 @@
 
       // Start battle after a shorter delay (reduced from 1500ms to 500ms)
       setTimeout(() => startBattle(), 500);
+      
+      // Clean up when component unmounts
+      return () => {
+        document.body.classList.remove('in-battle');
+      };
     } catch (error) {
       console.error('Error initializing battle:', error);
       battleLog = [...battleLog, `Error: ${error.message}`];
@@ -53,12 +61,18 @@
       return;
     }
 
+    // Modify the way battle log entries are added
+    // Instead of appending, prepend to show newest first
+    const addToBattleLog = (entry) => {
+      battleLog = [entry, ...battleLog];
+    };
+
     let currentTurn = 0;
     let isAttackerTurn = true;
 
     while (attacker.health > 0 && defender.health > 0) {
       currentTurn++;
-      battleLog = [...battleLog, `--- Turno ${currentTurn} ---`];
+      addToBattleLog(`--- Turno ${currentTurn} ---`);
 
       // Determine who attacks this turn
       const currentAttacker = isAttackerTurn ? attacker : defender;
@@ -86,10 +100,10 @@
       damagePosition = isAttackerTurn ? 'defender' : 'attacker';
       showDamageNumber = true;
 
-      // Log the attack
-      battleLog = [...battleLog, 
+      // Log the attack - prepend instead of append
+      addToBattleLog(
         `${currentAttacker.name || currentAttacker.type_id} ataca y causa ${damage} puntos de daño a ${currentDefender.name || currentDefender.type_id}`
-      ];
+      );
 
       // Apply damage
       if (isAttackerTurn) {
@@ -121,10 +135,10 @@
     // Determine winner
     if (attacker.health <= 0) {
       winner = defender;
-      battleLog = [...battleLog, `¡${defender.name || defender.type_id} ha vencido!`];
+      addToBattleLog(`¡${defender.name || defender.type_id} ha vencido!`);
     } else {
       winner = attacker;
-      battleLog = [...battleLog, `¡${attacker.name || attacker.type_id} ha vencido!`];
+      addToBattleLog(`¡${attacker.name || attacker.type_id} ha vencido!`);
     }
 
     battleEnded = true;
@@ -208,12 +222,54 @@
           gameData.ia.units[aiUnitIndex].remainingMovement = 0;
         }
       }
-      
-      // Update game session
+
+      // --- NUEVO: Actualizar la vida del sobreviviente aunque no sea el ganador (por si ambos sobreviven) ---
+      // Actualiza la vida del atacante si sigue vivo y está en gameData
+      if (attacker && attacker.health > 0) {
+        let arr = attacker.owner === 'player' ? gameData.player.units : gameData.ia.units;
+        if (arr && Array.isArray(arr)) {
+          const idx = arr.findIndex(unit =>
+            unit.id === attacker.id ||
+            (Array.isArray(unit.position) && Array.isArray(attacker.position) &&
+              unit.position[0] === attacker.position[0] &&
+              unit.position[1] === attacker.position[1])
+          );
+          if (idx !== -1) {
+            arr[idx].health = attacker.health;
+          }
+        }
+      }
+      // Actualiza la vida del defensor si sigue vivo y está en gameData
+      if (defender && defender.health > 0) {
+        let arr = defender.owner === 'player' ? gameData.player.units : gameData.ia.units;
+        if (arr && Array.isArray(arr)) {
+          const idx = arr.findIndex(unit =>
+            unit.id === defender.id ||
+            (Array.isArray(unit.position) && Array.isArray(defender.position) &&
+              unit.position[0] === defender.position[0] &&
+              unit.position[1] === defender.position[1])
+          );
+          if (idx !== -1) {
+            arr[idx].health = defender.health;
+          }
+        }
+      }
+      // --- FIN NUEVO ---
+
+      // Update game session - Explicitly save the updated game state to the session
       await gameAPI.updateGameSession(gameData);
       
       // Store updated game data for Map.svelte to use
       gameAPI.storeTemporaryData('updatedGameData', gameData);
+      
+      console.log('Battle result saved to game session:', { 
+        winner: winner.type_id, 
+        loser: loser.type_id,
+        remainingUnits: {
+          player: gameData.player.units.length,
+          ia: gameData.ia?.units?.length || 0
+        }
+      });
       
     } catch (error) {
       console.error('Error updating game state after battle:', error);
@@ -247,6 +303,11 @@
       {#if attacker && defender}
         <!-- Attacker -->
         <div class="unit attacker" class:animating={attackerAnimating}>
+          <!-- Add owner label -->
+          <div class="owner-label {attacker.owner === 'player' ? 'player-label' : 'ai-label'}">
+            {attacker.owner === 'player' ? '🧑 TU UNIDAD' : '🤖 UNIDAD IA'}
+          </div>
+          
           <div class="unit-portrait">
             {#if getUnitIcon(attacker.type_id)}
               <img src={getUnitIcon(attacker.type_id)} alt={attacker.type_id} />
@@ -283,6 +344,11 @@
         
         <!-- Defender -->
         <div class="unit defender" class:animating={defenderAnimating}>
+          <!-- Add owner label -->
+          <div class="owner-label {defender.owner === 'player' ? 'player-label' : 'ai-label'}">
+            {defender.owner === 'player' ? '🧑 TU UNIDAD' : '🤖 UNIDAD IA'}
+          </div>
+          
           <div class="unit-portrait">
             {#if getUnitIcon(defender.type_id)}
               <img src={getUnitIcon(defender.type_id)} alt={defender.type_id} />
@@ -391,6 +457,7 @@
   }
 
   .unit {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -589,5 +656,30 @@
       transform: none;
       margin: 10px 0;
     }
+  }
+
+  /* Add new owner label styles */
+  .owner-label {
+    position: absolute;
+    top: -25px;
+    left: 0;
+    right: 0;
+    padding: 5px 10px;
+    text-align: center;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 5;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  }
+
+  .player-label {
+    background-color: #2980b9;
+    color: white;
+  }
+
+  .ai-label {
+    background-color: #c0392b;
+    color: white;
   }
 </style>

@@ -265,13 +265,11 @@
         );
         
         if (enemyUnit) {
-          console.log(`Found enemy target at [${x},${y}]: ${enemyUnit.type_id}`);
           attackTargets.push(enemyUnit);
         }
       }
     }
     
-    console.log(`Found ${attackTargets.length} potential attack targets`);
     showAttackOptions = attackTargets.length > 0;
     
     // If we have attack targets, show a notification
@@ -421,6 +419,11 @@
     try {
       await gameAPI.updateGameSession(gameData);
       console.log("AI turn changes saved to session");
+      // --- NUEVO: Guardar el JSON del game en la sesión bajo la clave 'game' ---
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem('game', JSON.stringify(gameData));
+      }
+      // --- FIN NUEVO ---
     } catch (error) {
       console.error("Error saving AI turn changes:", error);
     }
@@ -502,21 +505,11 @@
             }
           }
           
+          // If unit still not found, skip this action instead of creating a temporary unit
           if (unitIndex === -1) {
-            console.warn(`Unit for movement not found: ${action.unit_id || JSON.stringify(action.position)}. Creating temporary unit for visualization.`);
-            
-            // Create a temporary unit if none exists
-            const tempUnit = {
-              id: action.unit_id || `unit-${action.position[0]}-${action.position[1]}`,
-              position: [...action.position],
-              type_id: action.unit_type || "warrior",
-              owner: 'ia',
-              status: 'ready',
-              remainingMovement: 2
-            };
-            
-            units = [...units, tempUnit];
-            unitIndex = units.length - 1;
+            console.warn(`Unit for movement not found: ${action.unit_id || JSON.stringify(action.position)}. Skipping this action.`);
+            showToastNotification("La IA intentó mover una unidad que no existe", "info", 1500);
+            break;
           }
           
           // Rest of the movement logic remains unchanged
@@ -551,7 +544,6 @@
           break;
         }
         
-        // Attack and construction cases - similar changes for looking up units by position
         case "attack": {
           // Find attacking unit - first by ID, then by position
           let attackerIndex = -1;
@@ -596,36 +588,75 @@
             );
           }
           
-          // Rest of the attack logic remains the same
-          if (attackerIndex !== -1) {
-            // Animate attack
+          // AI Attack logic
+          if (attackerIndex !== -1 && targetIndex !== -1) {
+            // Get attacker and defender units
             const attacker = units[attackerIndex];
+            const defender = units[targetIndex];
+            
+            // Animate attack
             attacker.attacking = true;
             units = [...units]; // Update reactivity
             
             await new Promise(resolve => setTimeout(resolve, 800));
             
-            // Update attacker state
-            attacker.status = action.state_after.status;
-            attacker.remainingMovement = action.state_after.remainingMovement;
-            attacker.health = action.state_after.health;
+            // Create copies to avoid reference issues
+            const attackerCopy = { ...attacker };
+            const defenderCopy = { ...defender };
+            
+            // Make sure health is a number
+            attackerCopy.health = attackerCopy.health || 100;
+            defenderCopy.health = defenderCopy.health || 100;
+            
+            // Set up battle data
+            const battleData = {
+              attacker: attackerCopy,
+              defender: defenderCopy,
+              gameData: gameData,
+              aiInitiated: true // Flag to indicate AI initiated the attack
+            };
+            
+            // Update attacker state before battle
+            attacker.status = action.state_after?.status || 'exhausted';
+            attacker.remainingMovement = action.state_after?.remainingMovement || 0;
+            attacker.health = action.state_after?.health || attacker.health;
             attacker.attacking = false;
             
-            // Update target health if target exists
-            if (targetIndex !== -1) {
-              const target = units[targetIndex];
+            // Store battle data and navigate to battle page
+            try {
+              await gameAPI.storeTemporaryData('battleData', battleData);
+              showToastNotification("¡La IA inicia un ataque contra tu unidad!", "warning", 2000);
+              
+              // Short pause to see the notification
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
+              // Navigate to battle view
+              navigate('/battle');
+            } catch (error) {
+              console.error("Error setting up battle:", error);
+              
+              // Fallback: direct health update without battle screen
               if (action.target_state_after) {
-                target.health = action.target_state_after.health;
+                defender.health = action.target_state_after.health;
                 
                 // Check if target is destroyed
                 if (action.target_state_after.health <= 0) {
                   // Remove destroyed unit
                   units.splice(targetIndex, 1);
+                  showToastNotification("¡Tu unidad ha sido destruida!", "error");
+                } else {
+                  showToastNotification(`¡Tu unidad ha sido atacada! Salud restante: ${defender.health}`, "warning");
                 }
               }
+              
+              units = [...units]; // Update reactivity
             }
-            
-            units = [...units]; // Update reactivity
+          } else {
+            // If either attacker or target wasn't found, just log it
+            console.warn("Could not find attacker or target for battle:", {
+              attackerFound: attackerIndex !== -1,
+              targetFound: targetIndex !== -1
+            });
           }
           break;
         }
@@ -2392,6 +2423,16 @@
     if (unit.owner !== 'player') {
       showToastNotification("Esta es una unidad enemiga. No puedes controlarla.", "warning");
       return;
+    }
+    
+    selectedUnitInfo = unit;
+    
+    // If the unit can attack, highlight this information
+    if (canAttack(unit)) {
+      showToastNotification("¡Esta unidad puede atacar a enemigos cercanos!", "info");
+    }
+    
+    if (unit.status === 'exhausted') {
     }
     
     selectedUnitInfo = unit;

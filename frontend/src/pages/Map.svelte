@@ -5,6 +5,7 @@
   import { gameState, pauseGame, endGame, currentTurn, currentPlayer } from '../stores/gameState.js';
   import { user } from '../stores/auth.js';
   import '../styles/pages/map.css'; 
+  import CheatConsole from '../components/CheatConsole.svelte';
 
   let showPauseMenu = false;
   let isLoading = true;
@@ -96,6 +97,11 @@
   let attackTargets = [];
   let attackingUnit = null;
 
+  // Add these variables for cheat console
+  let showCheatConsole = false;
+  let cheatResult = null;
+  let cheatResultType = "info"; // can be "success", "error", "info"
+
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -148,11 +154,12 @@
         return;
       }
 
-      const requiredResources = { food: 100, gold: 50 };
+      // MODIFICADO: Nuevos requisitos de recursos
+      const requiredResources = { wood: 20, stone: 15 };
       const playerResources = gameData?.player?.resources || {};
       
-      if (playerResources.food < requiredResources.food || playerResources.gold < requiredResources.gold) {
-        showToastNotification(`Recursos insuficientes. Se necesita: ${requiredResources.food} comida, ${requiredResources.gold} oro`, "error");
+      if (playerResources.wood < requiredResources.wood || playerResources.stone < requiredResources.stone) {
+        showToastNotification(`Recursos insuficientes. Se necesita: ${requiredResources.wood} madera, ${requiredResources.stone} piedra`, "error");
         return;
       }
 
@@ -178,8 +185,9 @@
         }
         gameData.player.cities.push(newCity);
 
-        gameData.player.resources.food -= requiredResources.food;
-        gameData.player.resources.gold -= requiredResources.gold;
+        // MODIFICADO: Actualizar los recursos correctos
+        gameData.player.resources.wood -= requiredResources.wood;
+        gameData.player.resources.stone -= requiredResources.stone;
 
         const settlerIndex = units.findIndex(u => u === settlerToFoundCity);
         if (settlerIndex !== -1) {
@@ -2209,6 +2217,10 @@
     
     return !isOccupied && !hasCityAtPosition;
   }
+   function togglePauseMenu() {
+    showPauseMenu = !showPauseMenu;
+    pauseGame(showPauseMenu);
+   }
 
   onMount(async () => {
     try {
@@ -2251,11 +2263,69 @@
     if (event.key === 'Escape') {
       togglePauseMenu();
     }
+    
+    // Check for Ctrl+T key combo to open cheat console
+    if (event.key.toLowerCase() === 't') {
+      event.preventDefault(); // Prevent browser's default action
+      toggleCheatConsole();
+    }
   }
 
-  function togglePauseMenu() {
-    showPauseMenu = !showPauseMenu;
-    pauseGame(showPauseMenu);
+  // Function to toggle the cheat console visibility
+  function toggleCheatConsole() {
+    showCheatConsole = !showCheatConsole;
+    if (showCheatConsole) {
+      // Focus on the input field when opening the console
+      setTimeout(() => {
+        document.getElementById('cheat-input')?.focus();
+      }, 100);
+    }
+    cheatResult = null; // Clear previous result
+  }
+
+  // Function to process cheat commands
+  async function processCheat(event) {
+    const command = event.detail.command;
+    
+    try {
+      // Process the different cheat commands
+      if (command === "fogOfWar_Off") {
+        if (showFogOfWar) {
+          // Disable fog of war
+          showFogOfWar = false;
+          
+          // Make sure the cheats_used array exists
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used.includes("fogOfWar_Off")) {
+            gameData.cheats_used.push("fogOfWar_Off");
+          }
+          
+          // Save changes to session
+          await gameAPI.updateGameSession(gameData);
+          
+          cheatResult = "Niebla de guerra desactivada";
+          cheatResultType = "success";
+        } else {
+          cheatResult = "La niebla de guerra ya está desactivada";
+          cheatResultType = "info";
+        }
+      } else {
+        // Invalid command
+        cheatResult = `Comando inválido: ${command}`;
+        cheatResultType = "error";
+      }
+      
+      console.log(`Cheat processed: ${command} - Result: ${cheatResult}`);
+      
+    } catch (error) {
+      console.error("Error processing cheat:", error);
+      cheatResult = `Error: ${error.message}`;
+      cheatResultType = "error";
+    }
   }
 
   async function initializeGame() {
@@ -2309,6 +2379,16 @@
             console.log("Loaded cities:", cities.length);
           } else {
             cities = [];
+          }
+
+          // Initialize cheats_used array if it doesn't exist
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          
+          // Apply any previously used cheats
+          if (gameData.cheats_used.includes("fogOfWar_Off")) {
+            showFogOfWar = false;
           }
         }
       } catch (apiError) {
@@ -2920,40 +3000,44 @@
     {/if}
     
     {#if showCityFoundingModal}
-      <div class="modal-overlay">
-        <div class="modal-content">
-          <h3>Fundar Nueva Ciudad</h3>
-          <p>Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].</p>
-          
-          <div class="form-group">
-            <label for="city-name">Nombre de la Ciudad:</label>
-            <input 
-              type="text" 
-              id="city-name" 
-              bind:value={newCityName} 
-              placeholder="Introduce un nombre para tu ciudad"
-            />
+  <div class="modal-overlay">
+    <div class="modal-content">
+      <h3>Fundar Nueva Ciudad</h3>
+      <p>Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].</p>
+      
+      <div class="form-group">
+        <label for="city-name">Nombre de la Ciudad:</label>
+        <input 
+          type="text" 
+          id="city-name" 
+          bind:value={newCityName} 
+          placeholder="Introduce un nombre para tu ciudad"
+        />
+      </div>
+      
+      <div class="resource-requirements">
+        <h4>Recursos necesarios:</h4>
+        <div class="resource wood">
+          <div class="resource-icon">
+            <img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-icon-img" />
           </div>
-          
-          <div class="resource-requirements">
-            <h4>Recursos necesarios:</h4>
-            <div class="resource food">
-              <div class="resource-icon">🌾</div>
-              <div class="resource-value">100</div>
-            </div>
-            <div class="resource gold">
-              <div class="resource-icon">💰</div>
-              <div class="resource-value">50</div>
-            </div>
+          <div class="resource-value">20</div>
+        </div>
+        <div class="resource stone">
+          <div class="resource-icon">
+            <img src="./ia_assets/harria.png" alt="Stone" class="resource-icon-img" />
           </div>
-          
-          <div class="modal-actions">
-            <button class="cancel-button" on:click={cancelCityFounding}>Cancelar</button>
-            <button class="confirm-button" on:click={foundCity}>Fundar Ciudad</button>
-          </div>
+          <div class="resource-value">15</div>
         </div>
       </div>
-    {/if}
+      
+      <div class="modal-actions">
+        <button class="cancel-button" on:click={cancelCityFounding}>Cancelar</button>
+        <button class="confirm-button" on:click={foundCity}>Fundar Ciudad</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
     {#if showPauseMenu}
       <div class="pause-menu-overlay">
@@ -3108,5 +3192,14 @@
     </div>
   {/if}
 </div>
+
+<!-- Add CheatConsole component near the end of the template -->
+<CheatConsole 
+  visible={showCheatConsole} 
+  result={cheatResult}
+  resultType={cheatResultType}
+  on:close={() => showCheatConsole = false}
+  on:execute={processCheat}
+/>
 
 

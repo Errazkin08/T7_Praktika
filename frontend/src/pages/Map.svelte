@@ -220,7 +220,13 @@
   }
 
   function checkForAttackTargets(unit) {
-    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+    if (!unit || unit.owner !== 'player') {
+      attackTargets = [];
+      return;
+    }
+    
+    // Modificación: permitir atacar si tiene movimientos restantes
+    if (unit.status === 'exhausted' || (unit.remainingMovement !== undefined && unit.remainingMovement <= 0)) {
       attackTargets = [];
       return;
     }
@@ -279,7 +285,12 @@
   }
 
   function canAttack(unit) {
-    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+    if (!unit || unit.owner !== 'player') {
+      return false;
+    }
+    
+    // Cambio: permitir atacar si la unidad tiene movimientos restantes
+    if (unit.status === 'exhausted' || (unit.remainingMovement !== undefined && unit.remainingMovement <= 0)) {
       return false;
     }
     
@@ -326,6 +337,27 @@
     attackerCopy.health = attackerCopy.health || 100;
     defenderCopy.health = defenderCopy.health || 100;
     
+    // Marcar la unidad como agotada después de atacar
+    attackerCopy.status = 'exhausted';
+    attackerCopy.remainingMovement = 0;
+    
+    // Actualizar la unidad original en el arreglo units
+    const unitIndex = units.findIndex(u => u.id === attackingUnit.id);
+    if (unitIndex !== -1) {
+      units[unitIndex].status = 'exhausted';
+      units[unitIndex].remainingMovement = 0;
+      units = [...units]; // Actualizar para reactividad
+    }
+    
+    // Actualizar en gameData
+    if (gameData && gameData.player && gameData.player.units) {
+      const gameDataUnitIndex = gameData.player.units.findIndex(u => u.id === attackingUnit.id);
+      if (gameDataUnitIndex !== -1) {
+        gameData.player.units[gameDataUnitIndex].status = 'exhausted';
+        gameData.player.units[gameDataUnitIndex].remainingMovement = 0;
+      }
+    }
+    
     // Set up battle data
     const battleData = {
       attacker: attackerCopy,
@@ -341,11 +373,18 @@
   }
 
   function tryAttackFromCard(unit) {
-    // Solo permite atacar si la unidad es del jugador y no está exhausta
-    if (!unit || unit.owner !== 'player' || unit.status === 'exhausted') {
+    // Modificación: permitir atacar si no está exhausta y tiene movimientos
+    if (!unit || unit.owner !== 'player') {
       showToastNotification("Esta unidad no puede atacar ahora.", "warning");
       return;
     }
+    
+    // Verificar si tiene movimientos restantes
+    if (unit.status === 'exhausted' || (unit.remainingMovement !== undefined && unit.remainingMovement <= 0)) {
+      showToastNotification("Esta unidad no tiene suficientes puntos de movimiento para atacar.", "warning");
+      return;
+    }
+    
     // Buscar enemigos en rango
     checkForAttackTargets(unit);
     if (attackTargets.length === 0) {
@@ -1886,6 +1925,22 @@
         // Update selected unit reference to the updated unit
         selectedUnit = updatedUnit;
         
+        // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
+        if (typeof sessionStorage !== "undefined") {
+          // Actualiza las unidades de jugador en gameData antes de guardar
+          if (gameData && gameData.player) {
+            gameData.player.units = units.filter(u => u.owner === 'player');
+          }
+          if (gameData && gameData.ia) {
+            gameData.ia.units = units.filter(u => u.owner === 'ia');
+          }
+          sessionStorage.setItem('game', JSON.stringify(gameData));
+        }
+        // --- FIN NUEVO ---
+        // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
+        refreshSelectedUnitInfo();
+        // --- FIN NUEVO ---
+        
         // If unit has remaining movement, show updated valid moves
         if (updatedUnit.remainingMovement > 0) {
           selectUnit(updatedUnit);
@@ -1894,15 +1949,6 @@
           selectedUnit = null;
           validMoveTargets = [];
         }
-        
-        // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem('game', JSON.stringify(gameData));
-        }
-        // --- FIN NUEVO ---
-        // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
-        refreshSelectedUnitInfo();
-        // --- FIN NUEVO ---
       } else {
         console.error("Could not find unit to move in the units array");
         showToastNotification("Error al mover la unidad: unidad no encontrada", "error");

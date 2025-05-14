@@ -56,6 +56,27 @@
     return resourceDisplay.length > 0 ? resourceDisplay.join(' ') : 'Costo no disponible';
   }
 
+  // Add a helper function to check if player has the required technology
+  function hasTechnology(requiredTech) {
+    // If no technology is required or it's "basic", always return true
+    if (!requiredTech || requiredTech === "basic") {
+      return true;
+    }
+    
+    // Check if player has the required technology
+    if (gameData && gameData.player && gameData.player.technologies) {
+      return gameData.player.technologies.some(tech => {
+        // Handle tech as object or string
+        const techName = typeof tech === 'string' ? tech.toLowerCase() : 
+          (tech.name || tech.id || "").toLowerCase();
+        
+        return techName === requiredTech.toLowerCase();
+      });
+    }
+    
+    return false;
+  }
+
   // Function to get detailed building information
   function getBuildingDetails(building) {
     // If building is just a string, find its details in buildingTypes
@@ -101,8 +122,15 @@
     }
   }
 
+  // Update toggleTroopSelection to prevent selecting locked items
   function toggleTroopSelection(troopType, index) {
     const troopId = troopType.id || `troop-${index}`;
+    
+    // Check if troop is locked due to technology requirements
+    if (!hasTechnology(troopType.technology)) {
+      showToastNotification(`Se requiere la tecnología "${troopType.technology}" para ${troopType.name}`, "warning");
+      return;
+    }
     
     if (selectedTroopType && selectedTroopType._uniqueId === troopId) {
       selectedTroopType = null;
@@ -115,8 +143,15 @@
     }
   }
 
+  // Update toggleBuildingSelection to prevent selecting locked items
   function toggleBuildingSelection(buildingType, index) {
     const buildingId = buildingType.id || `building-${index}`;
+    
+    // Check if building is locked due to technology requirements
+    if (!hasTechnology(buildingType.technology)) {
+      showToastNotification(`Se requiere la tecnología "${buildingType.technology}" para ${buildingType.name}`, "warning");
+      return;
+    }
     
     if (selectedBuildingType && selectedBuildingType._uniqueId === buildingId) {
       selectedBuildingType = null;
@@ -160,10 +195,17 @@
     });
   }
 
+  // Update startProduction to double-check technology requirement
   async function startProduction(item, itemType) {
     try {
       if (!city) {
         showToastNotification("Error: No hay ciudad seleccionada", "error");
+        return;
+      }
+      
+      // Check technology requirement again as a security measure
+      if (!hasTechnology(item.technology)) {
+        showToastNotification(`Se requiere la tecnología "${item.technology}" para producir ${item.name}`, "error");
         return;
       }
       
@@ -600,13 +642,6 @@
           >
             Edificios
           </button>
-          <button 
-            class="tab-button" 
-            class:active={activeTab === 'citizens'} 
-            on:click={() => setActiveTab('citizens')}
-          >
-            Ciudadanos
-          </button>
         </div>
         
         <div class="city-content">
@@ -763,24 +798,34 @@
                     {#each troopTypes as troopType, index}
                       {@const uniqueKey = troopType.id || `troop-type-${index}`}
                       {@const iconData = getDefaultTroopIcon(troopType.name)}
+                      {@const isLocked = !hasTechnology(troopType.technology)}
                       <div class="troop-container">
                         <button 
-                          class="production-button troop-button" 
+                          class="production-button troop-button {isLocked ? 'locked' : ''}" 
                           class:expanded={selectedTroopType && (selectedTroopType._uniqueId === (troopType.id || `troop-${index}`))}
                           on:click={() => toggleTroopSelection(troopType, index)}
                         >
                           <div class="troop-info">
                             {#if iconData.type === 'image'}
-                              <div class="troop-image-container">
+                              <div class="troop-image-container {isLocked ? 'locked' : ''}">
                                 <img src={iconData.url} alt={troopType.name} class="troop-image" />
+                                {#if isLocked}
+                                  <div class="lock-overlay">🔒</div>
+                                {/if}
                               </div>
                             {:else}
-                              <span class="troop-icon">{iconData.value}</span>
+                              <span class="troop-icon {isLocked ? 'locked' : ''}">{iconData.value}</span>
+                              {#if isLocked}
+                                <span class="lock-icon">🔒</span>
+                              {/if}
                             {/if}
                             
                             <div class="troop-details">
                               <span class="troop-name">{troopType.name}</span>
                               <span class="troop-cost">{@html getResourceCostString(troopType.cost)}</span>
+                              {#if isLocked && troopType.technology}
+                                <span class="tech-requirement">Requiere: {troopType.technology}</span>
+                              {/if}
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
@@ -862,19 +907,26 @@
                       {@const uniqueKey = buildingType.id || `building-type-${index}`}
                       {@const iconData = getBuildingIcon(buildingType.type || buildingType.name)}
                       {@const existingBuilding = getExistingBuilding(buildingType)}
+                      {@const isLocked = !hasTechnology(buildingType.technology)}
                       <div class="building-container">
                         <button 
-                          class="production-button building-button {existingBuilding ? 'existing-building' : ''}" 
+                          class="production-button building-button {existingBuilding ? 'existing-building' : ''} {isLocked ? 'locked' : ''}" 
                           class:expanded={selectedBuildingType && (selectedBuildingType._uniqueId === (buildingType.id || `building-${index}`))}
                           on:click={() => toggleBuildingSelection(buildingType, index)}
                         >
                           <div class="building-info">
                             {#if iconData.type === 'image'}
-                              <div class="building-image-container">
+                              <div class="building-image-container {isLocked ? 'locked' : ''}">
                                 <img src={iconData.url} alt={buildingType.name} class="building-image" />
+                                {#if isLocked}
+                                  <div class="lock-overlay">🔒</div>
+                                {/if}
                               </div>
                             {:else}
-                              <span class="building-icon">{iconData.value}</span>
+                              <span class="building-icon {isLocked ? 'locked' : ''}">{iconData.value}</span>
+                              {#if isLocked}
+                                <span class="lock-icon">🔒</span>
+                              {/if}
                             {/if}
                             
                             <div class="building-details">
@@ -890,6 +942,9 @@
                                   <span class="building-cost">{@html getResourceCostString(buildingType.cost)}</span>
                                 {/if}
                               </span>
+                              {#if isLocked && buildingType.technology}
+                                <span class="tech-requirement">Requiere: {buildingType.technology}</span>
+                              {/if}
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
@@ -1131,42 +1186,6 @@
               </div>
             {/if}
           </div>
-          
-          <div class="tab-content" class:active={activeTab === 'citizens'}>
-            <h3>Ciudadanos</h3>
-            <p>Administra a los ciudadanos de tu ciudad.</p>
-            
-            <div class="info-section">
-              <h4>Población Total: {city.population || 0}</h4>
-              <div class="population-breakdown">
-                <div class="citizen-group">
-                  <span class="citizen-icon">👨‍🌾</span>
-                  <span class="citizen-label">Agricultores:</span>
-                  <span class="citizen-count">0</span>
-                </div>
-                <div class="citizen-group">
-                  <span class="citizen-icon">⛏️</span>
-                  <span class="citizen-label">Mineros:</span>
-                  <span class="citizen-count">0</span>
-                </div>
-                <div class="citizen-group">
-                  <span class="citizen-icon">🔨</span>
-                  <span class="citizen-label">Artesanos:</span>
-                  <span class="citizen-count">0</span>
-                </div>
-                <div class="citizen-group">
-                  <span class="citizen-icon">📚</span>
-                  <span class="citizen-label">Científicos:</span>
-                  <span class="citizen-count">0</span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="info-section">
-              <h4>Asignación de Trabajadores</h4>
-              <p>Próximamente podrás asignar ciudadanos a diferentes tareas.</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1221,4 +1240,3 @@
     </div>
   {/if}
 </div>
-

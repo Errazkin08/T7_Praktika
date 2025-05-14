@@ -665,6 +665,7 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "player": {
                 "units": [settler, warrior],
                 "cities": [],
+                "technologies":[],
                 "resources": {
                     "food": 100,
                     "gold": 50,
@@ -677,6 +678,7 @@ def add_game(username, map_id, difficulty, game_name="New Game"):
             "ia": {
                 "units": [ai_settler, ai_warrior],
                 "cities": [],
+                "technologies":[],
                 "resources": {
                     "food": 100,
                     "gold": 50,
@@ -889,6 +891,7 @@ def get_troop_types():
             "attack": 10,
             "defense": 10,
             "turns": 3,
+            "technology": "basic",
             "position": [0, 0],
             "movement": 2,
             "cost": {
@@ -906,6 +909,7 @@ def get_troop_types():
             "attack": 15,
             "defense": 5,
             "turns": 5,
+            "technology": "basic",
             "position": [0, 0],
             "movement": 2,
             "range": 2,
@@ -916,25 +920,7 @@ def get_troop_types():
             },
             "abilities": ["ranged_attack"],
             "description": "Basic ranged unit"
-        },
-        {
-            "type_id": "cavalry",
-            "name": "Cavalry",
-            "category": "mounted",
-            "health": 120,
-            "attack": 15,
-            "defense": 8,
-            "turns": 8,
-            "position": [0, 0],
-            "movement": 4,
-            "cost": {
-                "food": 70,
-                "gold": 20
-            },
-            "abilities": ["charge"],
-            "description": "Fast moving mounted unit"
-        },
-        {
+        },{
             "type_id": "settler",
             "name": "Settler",
             "category": "civilian",
@@ -942,6 +928,7 @@ def get_troop_types():
             "attack": 0,
             "defense": 1,
             "turns": 6,
+            "technology": "basic",
             "position": [0, 0],
             "movement": 2,
             "cost": {
@@ -952,21 +939,59 @@ def get_troop_types():
             "description": "Can establish new settlements"
         },
         {
-            "type_id": "builder",
-            "name": "Builder",
-            "category": "civilian",
-            "health": 40,
-            "attack": 0,
-            "defense": 1,
-            "turns": 7,
+            "type_id": "cavalry",
+            "name": "Cavalry",
+            "category": "mounted",
+            "health": 120,
+            "attack": 15,
+            "defense": 8,
+            "turns": 8,
+            "technology": "medium",
             "position": [0, 0],
-            "movement": 2,
+            "movement": 4,
             "cost": {
-                "food": 50,
+                "food": 70,
                 "gold": 20
             },
-            "abilities": ["build_improvement"],
-            "description": "Constructs improvements on the city"
+            "abilities": ["charge"],
+            "description": "Fast moving mounted unit"
+        },
+        
+        {
+            "type_id": "boar_rider",
+            "name": "Boar Rider",
+            "category": "mounted",
+            "health": 100,
+            "attack": 20,
+            "defense": 10,
+            "turns": 7,
+            "technology": "medium",
+            "position": [0, 0],
+            "movement": 3,
+            "cost": {
+                "food": 80,
+                "gold": 20
+            },
+            "abilities": ["mace_hit"],
+            "description": "A rider on a boar, fast and strong"
+        },
+        {
+            "type_id": "tank",
+            "name": "Tank",
+            "category": "armored_vehicle",
+            "health": 200,
+            "attack": 30,
+            "defense": 25,
+            "turns": 16,
+            "technology": "advanced",
+            "position": [0, 0],
+            "movement": 1,
+            "cost": {
+                "iron": 200,
+                "gold": 30
+            },
+            "abilities": ["heavy_fire"],
+            "description": "Heavy armored vehicle with high firepower"
         }
     ]
     return troop_types
@@ -1123,6 +1148,7 @@ def get_building_types():
             "name": "Sawmill",
             "category": "production",
             "turns": 3,
+            "technology": "basic",
             "level": 1,
             "level_upgrade": 10,
             "output": {
@@ -1139,6 +1165,7 @@ def get_building_types():
             "name": "Quarry",
             "category": "production",
             "turns": 5,
+            "technology": "basic",
             "level": 1,
             "level_upgrade": 10,
             "output": {
@@ -1155,6 +1182,7 @@ def get_building_types():
             "name": "Farm",
             "category": "production",
             "turns": 3,
+            "technology": "basic",
             "level": 1,
             "level_upgrade": 15,
             "output": {
@@ -1170,6 +1198,7 @@ def get_building_types():
             "name": "Iron mine",
             "category": "production",
             "turns": 5,
+            "technology": "medium",
             "level": 1,
             "level_upgrade": 8,
             "output": {
@@ -1186,6 +1215,7 @@ def get_building_types():
             "name": "Gold mine",
             "category": "production",
             "turns": 7,
+            "technology": "medium",
             "level": 1,
             "level_upgrade": 5,
             "output": {

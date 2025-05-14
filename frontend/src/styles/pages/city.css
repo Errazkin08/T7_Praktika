@@ -1103,3 +1103,55 @@
       opacity: 1;
     }
   }
+
+  /* Locked items styling */
+  .production-button.locked {
+    opacity: 0.7;
+    background-color: rgba(50, 50, 50, 0.4);
+    cursor: not-allowed;
+    position: relative;
+  }
+
+  .production-button.locked:hover {
+    background-color: rgba(50, 50, 50, 0.5);
+  }
+
+  .troop-image-container.locked, 
+  .building-image-container.locked {
+    position: relative;
+    filter: grayscale(80%) brightness(60%);
+  }
+
+  .lock-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    z-index: 2;
+    text-shadow: 0 0 5px black;
+  }
+
+  .lock-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    text-shadow: 0 0 4px black;
+  }
+
+  .tech-requirement {
+    display: block;
+    font-size: 0.75rem;
+    color: #ff9800;
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  .troop-icon.locked,
+  .building-icon.locked {
+    opacity: 0.6;
+    filter: grayscale(100%);
+    position: relative;
+  }

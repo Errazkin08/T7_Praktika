@@ -318,11 +318,13 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             Your role is to return ONLY a valid JSON response with your actions based on the game state.
             DO NOT include any text, explanations, or comments outside the JSON structure.
             
-            YOUR OBJECTIVES (in order of priority):
-            1. EXPLORATION: Maximize your visible area on the map by moving units to unexplored regions
-            2. RESOURCES: Acquire and secure areas with valuable resources (gold, iron, wood, stone)
-            3. EXPANSION: Found new cities near resource-rich areas
-            4. MILITARY: Protect your territory and units, attack only when advantageous
+            YOUR PRIORITIES :
+            1. EXPLORATION: Expand visible map area by moving units to unexplored regions
+            2. CITY BUILDING: Found cities in resource-rich areas when you have settlers
+            3. RESOURCE ACQUISITION: Secure tiles with resources (gold, iron, wood, stone)
+            4. PRODUCTION: Train more units in your cities, especially settlers, warriors and archers
+            5. MILITARY: Protect territory and attack when advantageous
+            6. WINNING: Aim to win the game by defeating the oponent after attacking all their troops
             
             GAME RULES:
             1. TURNS AND ACTIONS:
@@ -344,12 +346,21 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
                - You can ONLY attack enemy units that are VISIBLE in your fog of war
                - You can ONLY attack enemy units that are within 3 tiles of one of your units
                - Your units can only attack once per turn
-            5. FOG OF WAR:
+            5. FOUNDING CITIES:
+               - Only settler units can found cities
+               - Cities require resources: 20 wood and 15 stone
+               - Cannot found cities on water or where another city exists
+            6. CITY PRODUCTION:
+               - You can train units in your cities, similar to the player
+               - Each city can produce one unit at a time
+               - Units will be placed adjacent to the city when completed
+            7. FOG OF WAR:
                - You start with a 4x4 area of visibility around your starting position
                - When units move, they reveal a 4x4 area around their new position
                - You can only see tiles listed in "visible_tiles"
                - Terrain information is only available for visible tiles
                - Enemy units are only shown if they're within your visible tiles
+
             
             TERRAIN TYPES:
             - 0: Normal land (passable)
@@ -385,14 +396,13 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             }
             
             IMPORTANT NOTES:
-            - You SHOULD include multiple actions for different units to maximize your turn effectiveness
-            - unit_id is REQUIRED for all actions. Find it in the units array. If not available, create one like "unit-{position[0]}-{position[1]}"
-            - Every action MUST include ALL fields specified above
-            - For units without explicit IDs, use their position to identify them (e.g., "unit-x-y")
-            - Cavalry units can move up to 4 tiles per turn - use this advantage for exploration and quick attacks
             - PRIORITIZE EXPLORATION and expanding your visible area of the map
-            - Aim to secure resource tiles (gold, iron, wood, stone) for future economic growth
-            - Each request represents a NEW TURN - all your units will have their full movement points available
+            - Found cities near resource tiles when you have enough wood (20) and stone (15)
+            - Produce more units in your cities, especially settlers for expansion
+            - Each unit can move up to its movement value and/or attack once per turn
+            - Cavalry units can move up to 4 tiles per turn - use this advantage for exploration
+            - FOCUS ON EXPLORATION AND EXPANSION early, MILITARY later
+            - All your units have full movement points available at the start of each turn
             """
             
             # Set system instructions

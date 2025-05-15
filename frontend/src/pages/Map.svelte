@@ -1907,8 +1907,7 @@
             );
           }
           break;
-        case "mine":
-        case "Gold_mine":
+        case "Gold mine":
           // Each mine building multiplies its gold outcome by the number of gold tiles
           if (outcome.gold && resourceCounts.gold > 0) {
             const goldGenerated = outcome.gold * resourceCounts.gold;
@@ -1919,7 +1918,6 @@
           }
           break;
         case "Sawmill":
-        case "lumber_mill":
           // Each sawmill building multiplies its wood outcome by the number of wood tiles
           if (outcome.wood && resourceCounts.wood > 0) {
             const woodGenerated = outcome.wood * resourceCounts.wood;
@@ -1929,8 +1927,7 @@
             );
           }
           break;
-        case "forge":
-        case "Iron_mine":
+        case "Iron mine":
           // Each forge/iron mine building multiplies its iron outcome by the number of iron tiles
           if (outcome.iron && resourceCounts.iron > 0) {
             const ironGenerated = outcome.iron * resourceCounts.iron;

@@ -968,7 +968,13 @@
 
         case "construction": {
           // Find the unit - first by ID, then by position
-          console.log("Processing construction action:", action);
+          console.log("CONSTRUCTION ACTION DETAILS:", {
+            full_action: action,
+            unit_id: action.unit_id,
+            position: action.position,
+            building_type: action.building,
+            city_name: action.city_name
+          });
           let builderIndex = -1;
 
           if (action.unit_id) {
@@ -1000,31 +1006,26 @@
           if (builderIndex !== -1) {
             const builder = units[builderIndex];
             
-            if (action.building === "city") {
-              // Create new city
-              const newCity = {
-                id: `city_${Date.now()}`,
-                name: action.city_name || `IA City ${Date.now()}`,
-                position: [...action.position],
-                owner: 'ia',
-                population: 1
-              };
-              
-              // Add city
-              cities = [...cities, newCity];
-              
-              // Remove settler
-              units.splice(builderIndex, 1);
-              units = [...units];
-              
-              // Update fog of war for city
-              updateFogOfWarAroundPosition(action.position[0], action.position[1], 3);
-            } else {
-              // Update builder state
-              builder.status = action.state_after.status;
-              builder.remainingMovement = action.state_after.remainingMovement;
-              units = [...units]; // Update reactivity
-            }
+            
+            // Create new city
+            const newCity = {
+              id: `city_${Date.now()}`,
+              name: action.city_name || `IA City ${Date.now()}`,
+              position: [...action.position],
+              owner: 'ia',
+              population: 1
+            };
+            
+            // Add city
+            cities = [...cities, newCity];
+            
+            // Remove settler
+            units.splice(builderIndex, 1);
+            units = [...units];
+            
+            // Update fog of war for city
+            updateFogOfWarAroundPosition(action.position[0], action.position[1], 3);
+            
           }
           break;
         }

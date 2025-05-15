@@ -35,7 +35,8 @@ def ai_action():
         "difficulty": game_state.get("difficulty", ""),
         "map_data": game_state.get("map_data", {}),
         "map_size": game_state.get("map_size", {}),
-        "turn": game_state.get("turn", 1)
+        "turn": game_state.get("turn", 1),
+        "ceasefire_turns": game_state.get("ceasefire_turns", 0)
     }
     
     # Opcional: añadir identificador de juego para manejar múltiples conversaciones
@@ -44,7 +45,10 @@ def ai_action():
     # Llamar a la función iaDeitu
     try:
         # El contexto de la conversación se maneja dentro de iaDeitu ahora
-        result = iaDeitu(prompt, simplified_game_state)
+        if len(prompt) < 10:
+            result = iaDeitu( game_state=simplified_game_state)
+        else:
+            result = iaDeitu(prompt, simplified_game_state)
         current_app.logger.info(f"IA response raw: {result}")
         
         if isinstance(result, str):

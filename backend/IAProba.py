@@ -291,7 +291,8 @@ def filter_game_state(game_state: dict) -> dict:
             "units": ia_units,
             "cities": ia_cities,
             "resources": game_state.get("ia", {}).get("resources", {})
-        }
+        },
+        "ceasefire_turns": game_state.get("ceasefire_turns", 0)
     }
     
     return filtered_state
@@ -401,12 +402,15 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
             - You can only attack enemy units that are visible and within 2 tiles of your units.
             - You can't move to water tiles (terrain type 1)
             - You can't move to the same tile as another unit or city
+            - To win the game you must defeat the player by attacking all their troops
+            - You can't attack while in a ceasefire
             """
             
             # Set system instructions
             iaDeitu._client.set_system_instructions(system_instructions)
 
         # --- NUEVO: Si se pasa un prompt explícito, mándalo tal cual al LLM ---
+
         if prompt is not None:
             # Si hay prompt, simplemente llama al LLM con ese prompt y devuelve la respuesta
             response = iaDeitu._client.run_call(prompt)
@@ -424,7 +428,7 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
         Return ONLY a valid JSON with your actions. Your response must follow exactly the format from the instructions:
         1. Map boundaries are {filtered_game_state["map_size"]["width"]}x{filtered_game_state["map_size"]["height"]} (0-indexed). Never move outside these bounds.
         2. Only move to tiles that are visible in your fog of war (visible_tiles)
-        3. Only attack enemy units that are VISIBLE and within 3 tiles of your units
+        3. Only attack enemy units that are VISIBLE and within 2 tiles of your units
         4. Calculate remaining movement and status correctly
         5. ALWAYS include a unit_id for all actions - if a unit has no ID, generate one using its position: "unit-x-y"
         6. You SHOULD perform multiple actions in a single turn - move all available units!

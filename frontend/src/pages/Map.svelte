@@ -667,9 +667,7 @@
       await gameAPI.updateGameSession(gameData);
       console.log("AI turn changes saved to session");
       // --- NUEVO: Guardar el JSON del game en la sesión bajo la clave 'game' ---
-      if (typeof sessionStorage !== "undefined") {
-        sessionStorage.setItem("game", JSON.stringify(gameData));
-      }
+      
       // --- FIN NUEVO ---
     } catch (error) {
       console.error("Error saving AI turn changes:", error);
@@ -814,10 +812,8 @@
             2,
           );
 
-          // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
-          if (typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem("game", JSON.stringify(gameData));
-          }
+          await gameAPI.updateGameSession(gameData);
+        
           // --- FIN NUEVO ---
           // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
           refreshSelectedUnitInfo();
@@ -2382,7 +2378,7 @@
     }
   }
 
-  function moveUnitToPosition(unit, targetX, targetY) {
+  async function moveUnitToPosition(unit, targetX, targetY) {
     if (movementInProgress) return;
 
     const occupyingUnit = units.find(
@@ -2461,7 +2457,7 @@
         const originalPosition = [...unitToMove.position];
 
         console.log(
-          `Moving unit ${unitToMove.type_id} (${unitToMove.id}) from [${originalPosition}] to [${targetX},${targetY}]`,
+          `Moving unit ${unitToMove.type_id}  from [${originalPosition}] to [${targetX},${targetY}]`,
         );
 
         // Calculate the movement cost
@@ -2551,8 +2547,7 @@
         // Update selected unit reference to the updated unit
         selectedUnit = updatedUnit;
 
-        // --- NUEVO: Guardar el estado actualizado en sessionStorage['game'] ---
-        if (typeof sessionStorage !== "undefined") {
+        
           // Actualiza las unidades de jugador en gameData antes de guardar
           if (gameData && gameData.player) {
             gameData.player.units = units.filter((u) => u.owner === "player");
@@ -2560,8 +2555,7 @@
           if (gameData && gameData.ia) {
             gameData.ia.units = units.filter((u) => u.owner === "ia");
           }
-          sessionStorage.setItem("game", JSON.stringify(gameData));
-        }
+          await gameAPI.updateGameSession(gameData);        
         // --- FIN NUEVO ---
         // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
         refreshSelectedUnitInfo();
@@ -3052,9 +3046,7 @@
         }
         // Guarda en la sesión
         await gameAPI.updateGameSession(gameData);
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("game", JSON.stringify(gameData));
-        }
+        
         cheatResult = "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
         cheatResultType = "success";
       } else {

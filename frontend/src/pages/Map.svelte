@@ -2901,6 +2901,29 @@
           "¡Movimientos ilimitados activados! Tus tropas pueden moverse sin restricciones";
         cheatResultType = "success";
         
+      } else if (command === "unlimitedResources") {
+        // --- NUEVO: Da 99999 de cada recurso y guarda en sesión ---
+        if (gameData && gameData.player && gameData.player.resources) {
+          gameData.player.resources.food = 99999;
+          gameData.player.resources.gold = 99999;
+          gameData.player.resources.wood = 99999;
+          gameData.player.resources.iron = 99999;
+          gameData.player.resources.stone = 99999;
+        }
+        // Añade el cheat a la lista si no está
+        if (!gameData.cheats_used) {
+          gameData.cheats_used = [];
+        }
+        if (!gameData.cheats_used.includes("unlimitedResources")) {
+          gameData.cheats_used.push("unlimitedResources");
+        }
+        // Guarda en la sesión
+        await gameAPI.updateGameSession(gameData);
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem("game", JSON.stringify(gameData));
+        }
+        cheatResult = "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
+        cheatResultType = "success";
       } else {
         // Invalid command
         cheatResult = `Comando inválido: ${command}`;

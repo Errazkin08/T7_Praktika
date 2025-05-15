@@ -160,30 +160,28 @@
       const loserOwner = loser.owner;
       const loserPosition = loser.position;
       
-      // Remove the defeated unit from the game data
+      // Remove the defeated unit from the game data using ONLY position (not id)
       if (loserOwner === 'player') {
-        const playerUnitIndex = gameData.player.units.findIndex(unit => 
-          unit.id === loser.id || 
-          (Array.isArray(unit.position) && 
-           Array.isArray(loserPosition) && 
-           unit.position[0] === loserPosition[0] && 
-           unit.position[1] === loserPosition[1])
-        );
-        
-        if (playerUnitIndex !== -1) {
-          gameData.player.units.splice(playerUnitIndex, 1);
+        if (Array.isArray(gameData.player.units)) {
+          gameData.player.units = gameData.player.units.filter(unit =>
+            !(
+              Array.isArray(unit.position) &&
+              Array.isArray(loserPosition) &&
+              unit.position[0] === loserPosition[0] &&
+              unit.position[1] === loserPosition[1]
+            )
+          );
         }
       } else if (loserOwner === 'ia') {
-        const aiUnitIndex = gameData.ia.units.findIndex(unit => 
-          unit.id === loser.id || 
-          (Array.isArray(unit.position) && 
-           Array.isArray(loserPosition) && 
-           unit.position[0] === loserPosition[0] && 
-           unit.position[1] === loserPosition[1])
-        );
-        
-        if (aiUnitIndex !== -1) {
-          gameData.ia.units.splice(aiUnitIndex, 1);
+        if (Array.isArray(gameData.ia.units)) {
+          gameData.ia.units = gameData.ia.units.filter(unit =>
+            !(
+              Array.isArray(unit.position) &&
+              Array.isArray(loserPosition) &&
+              unit.position[0] === loserPosition[0] &&
+              unit.position[1] === loserPosition[1]
+            )
+          );
         }
       }
       

@@ -396,13 +396,16 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             }
             
             IMPORTANT NOTES:
-            - PRIORITIZE EXPLORATION and expanding your visible area of the map
+            - PRIORITIZE EXPLORATION, FOUNDING CITIES and expanding your visible area of the map
             - Found cities near resource tiles when you have enough wood (20) and stone (15)
             - Produce more units in your cities, especially settlers for expansion
             - Each unit can move up to its movement value and/or attack once per turn
             - Cavalry units can move up to 4 tiles per turn - use this advantage for exploration
             - FOCUS ON EXPLORATION AND EXPANSION early, MILITARY later
             - All your units have full movement points available at the start of each turn
+            - You can only attack enemy units that are visible and within 2 tiles of your units.
+            - You can't move to water tiles (terrain type 1)
+            - You can't move to the same tile as another unit or city
             """
             
             # Set system instructions

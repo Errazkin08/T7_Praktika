@@ -60,6 +60,7 @@
         <ul>
           <li><code>fogOfWar_Off</code> - Gerra-lainoa desaktibatu</li>
           <li><code>unlimitedMovements</code> - Mugimendu mugagabeak zure tropentzat</li>
+          <li><code>unlimitedResources</code> - 99999 unitate bakoitzeko baliabideetan</li>
         </ul>
       </div>
     </div>

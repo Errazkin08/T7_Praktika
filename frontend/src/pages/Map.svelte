@@ -740,12 +740,13 @@
         
         case "construction": {
           // Find the unit - first by ID, then by position
+          console.log("Processing construction action:", action);
           let builderIndex = -1;
           
           if (action.unit_id) {
             builderIndex = units.findIndex(u => u.id === action.unit_id);
           }
-          
+          console.log("Builder index after ID search:", builderIndex);
           if (builderIndex === -1 && action.position && Array.isArray(action.position)) {
             // If not found by ID, try by position
             const [posX, posY] = action.position;
@@ -763,35 +764,85 @@
             }
           }
           
-          // Rest of the construction logic remains the same
+          // Enhanced city construction logic
           if (builderIndex !== -1) {
             const builder = units[builderIndex];
             
-            if (action.building === "city") {
-              // Create new city
+           
+              // Create new city with more comprehensive properties
+              const cityName = action.city_name || `IA City ${Date.now()}`;
+              const cityPosition = [...action.position];
               const newCity = {
-                id: `city_${Date.now()}`,
-                name: action.city_name || `IA City ${Date.now()}`,
-                position: [...action.position],
+                id: `ia_city_${Date.now()}`,
+                name: cityName,
+                position: { 
+                  x: cityPosition[0], 
+                  y: cityPosition[1] 
+                }, // Store position as object with x,y to match player cities
                 owner: 'ia',
-                population: 1
+                population: 1,
+                area: 5, // Standard city area
+                buildings: [],
+                production: {
+                  current_item: null,
+                  turns_remaining: 0
+                }
               };
               
-              // Add city
+              // Add city to the visible cities array
               cities = [...cities, newCity];
+              
+              // Also add to gameData structure
+              if (!gameData.ia) {
+                gameData.ia = {};
+              }
+              
+              if (!gameData.ia.cities) {
+                gameData.ia.cities = [];
+              }
+              
+              // Add to gameData
+              gameData.ia.cities.push(newCity);
               
               // Remove settler
               units.splice(builderIndex, 1);
               units = [...units];
               
+              // Also remove from gameData
+              if (gameData.ia.units) {
+                const gameDataUnitIndex = gameData.ia.units.findIndex(u => 
+                  (u.id && u.id === builder.id) ||
+                  (u.position && 
+                   Array.isArray(u.position) && 
+                   u.position[0] === action.position[0] && 
+                   u.position[1] === action.position[1] &&
+                   u.type_id === builder.type_id)
+                );
+                
+                if (gameDataUnitIndex !== -1) {
+                  gameData.ia.units.splice(gameDataUnitIndex, 1);
+                }
+              }
+              
               // Update fog of war for city
               updateFogOfWarAroundPosition(action.position[0], action.position[1], 3);
-            } else {
-              // Update builder state
-              builder.status = action.state_after.status;
-              builder.remainingMovement = action.state_after.remainingMovement;
-              units = [...units]; // Update reactivity
-            }
+              
+              // Update session storage with the new city
+              if (typeof sessionStorage !== "undefined") {
+                sessionStorage.setItem('game', JSON.stringify(gameData));
+              }
+              
+              try {
+                // Ensure game session is updated on the server to persist the city
+                await gameAPI.updateGameSession(gameData);
+                console.log("Game session updated with new AI city:", cityName);
+              } catch (error) {
+                console.error("Error updating game session after AI city construction:", error);
+              }
+              
+              // Show notification about AI city founding
+              showToastNotification(`La IA ha fundado una nueva ciudad: ${cityName}`, "warning", 5000);
+            
           }
           break;
         }
@@ -2334,9 +2385,7 @@
           cheatResultType = "info";
         }
       } else if (command === "unlimitedMovements") {
-        // Enable unlimited movements cheat
         unlimitedMovementsActive = true;
-        
         // Make sure the cheats_used array exists
         if (!gameData.cheats_used) {
           gameData.cheats_used = [];
@@ -2353,18 +2402,20 @@
             unit.status = "ready";
             unit.remainingMovement = unit.movement || 2;
           });
-          
-          // Update units array to match gameData
-          units = units.map(unit => {
-            if (unit.owner === 'player') {
-              return {
-                ...unit,
-                status: "ready",
-                remainingMovement: unit.movement || 2
-              };
-            }
-            return unit;
-          });
+          // --- MODIFICADO: Asegura que units contenga SIEMPRE todas las unidades del jugador y de la IA ---
+          const playerUnits = gameData.player.units.map(unit => ({
+            ...unit,
+            owner: 'player'
+          }));
+          let aiUnits = [];
+          if (gameData.ia && Array.isArray(gameData.ia.units)) {
+            aiUnits = gameData.ia.units.map(unit => ({
+              ...unit,
+              owner: 'ia'
+            }));
+          }
+          units = [...playerUnits, ...aiUnits];
+          // --- FIN MODIFICADO ---
         }
         
         // Save changes to session
@@ -2373,6 +2424,57 @@
         cheatResult = "¡Movimientos ilimitados activados! Tus tropas pueden moverse sin restricciones";
         cheatResultType = "success";
         
+      } else if (command === "unlimitedResources") {
+        // Handle unlimited resources cheat
+        if (gameData && gameData.player && gameData.player.resources) {
+          // Set all resources to 99999
+          gameData.player.resources.food = 99999;
+          gameData.player.resources.gold = 99999;
+          gameData.player.resources.wood = 99999;
+          gameData.player.resources.iron = 99999;
+          gameData.player.resources.stone = 99999;
+          
+          // Make sure the cheats_used array exists
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used.includes("unlimitedResources")) {
+            gameData.cheats_used.push("unlimitedResources");
+          }
+          
+          // --- MODIFICADO: Asegura que units contenga SIEMPRE todas las unidades del jugador y de la IA ---
+          if (gameData && gameData.player && Array.isArray(gameData.player.units)) {
+            const playerUnits = gameData.player.units.map(unit => ({
+              ...unit,
+              owner: 'player'
+            }));
+            let aiUnits = [];
+            if (gameData.ia && Array.isArray(gameData.ia.units)) {
+              aiUnits = gameData.ia.units.map(unit => ({
+                ...unit,
+                owner: 'ia'
+              }));
+            }
+            units = [...playerUnits, ...aiUnits];
+          }
+          // --- FIN MODIFICADO ---
+          
+          // Save changes to session
+          await gameAPI.updateGameSession(gameData);
+          
+          // Update session storage as well for consistency
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem('game', JSON.stringify(gameData));
+          }
+          
+          cheatResult = "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
+          cheatResultType = "success";
+        } else {
+          cheatResult = "Error: No se pudieron encontrar los datos del jugador";
+          cheatResultType = "error";
+        }
       } else {
         // Invalid command
         cheatResult = `Comando inválido: ${command}`;
@@ -2434,27 +2536,25 @@
           
           console.log("Total units loaded:", units.length);
 
+          // --- MODIFICADO: cargar ciudades de jugador y de IA ---
+          cities = [];
           if (gameData && gameData.player && Array.isArray(gameData.player.cities)) {
-            cities = [...gameData.player.cities];
-            console.log("Loaded cities:", cities.length);
-          } else {
-            cities = [];
+            cities = [...gameData.player.cities.map(city => ({
+              ...city,
+              owner: 'player'
+            }))];
+            console.log("Loaded player cities:", gameData.player.cities.length);
           }
+          if (gameData && gameData.ia && Array.isArray(gameData.ia.cities)) {
+            cities = [...cities, ...gameData.ia.cities.map(city => ({
+              ...city,
+              owner: 'ia'
+            }))];
+            console.log("Loaded AI cities:", gameData.ia.cities.length);
+          }
+          console.log("Total cities loaded:", cities.length);
+          // --- FIN MODIFICADO ---
 
-          // Initialize cheats_used array if it doesn't exist
-          if (!gameData.cheats_used) {
-            gameData.cheats_used = [];
-          }
-          
-          // Apply any previously used cheats
-          if (gameData.cheats_used.includes("fogOfWar_Off")) {
-            showFogOfWar = false;
-          }
-          
-          // Check if unlimitedMovements cheat was previously used
-          if (gameData.cheats_used.includes("unlimitedMovements")) {
-            unlimitedMovementsActive = true;
-          }
         }
       } catch (apiError) {
         console.error("Error loading game/map:", apiError);
@@ -2550,11 +2650,9 @@
     grid = [...grid];
   }
 
-  // Function to get city icon
+  // MODIFICADO: city icon para distinguir IA
   function getCityIcon(city) {
     const population = city.population || 0;
-    if (population >= 10) return { type: "emoji", value: "🏙️" };
-    if (population >= 5) return { type: "emoji", value: "🏢" };
     return { type: "image", value: './ia_assets/city.jpg' };
   }
 
@@ -2876,11 +2974,13 @@
               {/if}
               
               {#each cities as city}
-                {#if (city.position.x === x && city.position.y === y) || 
-                     (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)}
+                {#if ((city.position.x === x && city.position.y === y) || 
+                      (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)) && 
+                      isVisible}
                   <div 
                     class="city-marker" 
-                    title="{city.name} (Población: {city.population || 0})"
+                    class:enemy-city={city.owner === 'ia'}
+                    title="{city.name} ({city.owner === 'ia' ? 'Ciudad enemiga' : 'Tu ciudad'}, Población: {city.population || 0})"
                   >
                     <span class="city-icon">
                       {#if getCityIcon(city).type === "emoji"}
@@ -3019,9 +3119,9 @@
     
     {#if selectedCityInfo && !showPauseMenu}
       <div class="city-info-overlay">
-        <div class="city-info-card">
+        <div class="city-info-card" class:enemy-city-card={selectedCityInfo.owner === 'ia'}>
           <div class="city-info-header">
-            <h4>{selectedCityInfo.name || 'Ciudad'}</h4>
+            <h4>{selectedCityInfo.name || 'Ciudad'} {selectedCityInfo.owner === 'ia' ? '(Enemiga)' : ''}</h4>
             <button class="close-button" on:click={() => { selectedCityInfo = null; }}>×</button>
           </div>
           
@@ -3038,6 +3138,7 @@
             
             <div class="city-stats">
               <p><strong>Población:</strong> {selectedCityInfo.population || 0}</p>
+              <p><strong>Facción:</strong> {selectedCityInfo.owner === 'ia' ? 'Enemigo' : 'Jugador'}</p>
               {#if selectedCityInfo.position}
                 <p><strong>Posición:</strong> {Array.isArray(selectedCityInfo.position) ? 
                   `[${selectedCityInfo.position[0]}, ${selectedCityInfo.position[1]}]` : 
@@ -3048,7 +3149,7 @@
                 <p><strong>Edificios:</strong> {selectedCityInfo.buildings.length}</p>
               {/if}
               
-              {#if selectedCityInfo.production && selectedCityInfo.production.current_item}
+              {#if selectedCityInfo.owner !== 'ia' && selectedCityInfo.production && selectedCityInfo.production.current_item}
                 <p><strong>Producción actual:</strong> {selectedCityInfo.production.current_item}</p>
                 <p><strong>Turnos restantes:</strong> {selectedCityInfo.production.turns_remaining}</p>
               {/if}
@@ -3056,9 +3157,15 @@
           </div>
           
           <div class="city-actions">
-            <button class="action-button enter-city-button" on:click={() => enterCity(selectedCityInfo)}>
-              Entrar a la Ciudad
-            </button>
+            {#if selectedCityInfo.owner !== 'ia'}
+              <button class="action-button enter-city-button" on:click={() => enterCity(selectedCityInfo)}>
+                Entrar a la Ciudad
+              </button>
+            {:else}
+              <div class="enemy-city-message">
+                <p>Esta es una ciudad enemiga. No puedes administrarla.</p>
+              </div>
+            {/if}
           </div>
         </div>
       </div>

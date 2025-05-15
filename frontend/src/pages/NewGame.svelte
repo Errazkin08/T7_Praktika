@@ -220,6 +220,12 @@
         throw new Error("El punto de inicio debe ser de formato [x, y]");
       }
       
+      // Validar que el punto de inicio está dentro de los límites del mapa (considerando índices desde 0)
+      const [startX, startY] = newMapData.startPoint;
+      if (startX < 0 || startX >= newMapData.width || startY < 0 || startY >= newMapData.height) {
+        throw new Error(`El punto de inicio [${startX}, ${startY}] está fuera de los límites del mapa (0-${newMapData.width-1}, 0-${newMapData.height-1})`);
+      }
+      
       // Crear el mapa
       const result = await gameAPI.createMap(newMapData);
       

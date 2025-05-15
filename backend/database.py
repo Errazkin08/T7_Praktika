@@ -1252,7 +1252,7 @@ def get_building_types():
         {
             "type_id": "library",
             "name": "Library",
-            "category": "learing",
+            "category": "learning",
             "turns": 5,
             "technology": "basic",
             "level": 1,
@@ -1565,6 +1565,16 @@ def add_game_with_civilization(username, map_id, difficulty, civ_id=None, game_n
     except Exception as e:
         print(f"Error adding game with civilization: {e}")
         return None
+    
+def get_technology_type(type_id):
+    """
+    Get a specific technology type by its ID
+    """
+    technology_types = get_technology_types()
+    for technology_type in technology_types:
+        if technology_type["id"] == type_id:
+            return technology_type
+    return None
 
 def get_technology_types():
     """
@@ -1603,16 +1613,6 @@ def get_technology_types():
         }
     ]
     return technology_types
-
-def get_technology_type(tech_id):
-    """
-    Get a specific technology type by its ID
-    """
-    technology_types = get_technology_types()
-    for tech_type in technology_types:
-        if tech_type["id"] == tech_id:
-            return tech_type
-    return None
 
 def add_technology_to_city(city_id, tech_id):
     """

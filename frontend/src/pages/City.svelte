@@ -63,23 +63,72 @@
 
   // Add a helper function to check if player has the required technology
   function hasTechnology(requiredTech) {
-    // If no technology is required or it's "basic", always return true
-    if (!requiredTech || requiredTech === "basic") {
+    // Debug logging
+    console.log("Checking technology requirement:", requiredTech);
+    
+    // If no technology is required, always return true
+    if (!requiredTech) {
+      return true;
+    }
+    
+    // Special case for basic technology - more flexible checking
+    if (typeof requiredTech === 'string' && 
+        (requiredTech.toLowerCase() === "basic" || 
+         requiredTech.toLowerCase() === "básica" ||
+         requiredTech.toLowerCase() === "none" ||
+         requiredTech.toLowerCase() === "básico")) {
+      console.log("Basic technology check - automatically approved");
       return true;
     }
     
     // Check if player has the required technology
     if (gameData && gameData.player && gameData.player.technologies) {
+      // Debug: List all player technologies
+      console.log("Player technologies:", gameData.player.technologies.map(tech => 
+        typeof tech === 'string' ? tech : (tech.id || tech.name)
+      ));
+      
       return gameData.player.technologies.some(tech => {
         // Handle tech as object or string
         const techName = typeof tech === 'string' ? tech.toLowerCase() : 
           (tech.name || tech.id || "").toLowerCase();
         
-        return techName === requiredTech.toLowerCase();
+        // For string comparison, normalize the required tech
+        const requiredName = typeof requiredTech === 'string' ? 
+          requiredTech.toLowerCase() : 
+          (requiredTech.id || requiredTech.name || "").toLowerCase();
+        
+        // More flexible comparison - check for equality or substring match
+        const isMatch = techName === requiredName || 
+                       techName.includes(requiredName) || 
+                       requiredName.includes(techName);
+        
+        if (isMatch) {
+          console.log(`Technology match found: '${techName}' matches '${requiredName}'`);
+        }
+        
+        return isMatch;
       });
     }
     
     return false;
+  }
+
+  // Add debug function to be called on mount
+  function debugTechnologies() {
+    if (gameData && gameData.player && gameData.player.technologies) {
+      console.log("=== Player Technologies Debug ===");
+      gameData.player.technologies.forEach((tech, i) => {
+        if (typeof tech === 'string') {
+          console.log(`${i+1}. String: "${tech}"`);
+        } else {
+          console.log(`${i+1}. Object: id="${tech.id || 'none'}", name="${tech.name || 'none'}"`);
+        }
+      });
+      console.log("===============================");
+    } else {
+      console.log("No player technologies found!");
+    }
   }
 
   // Function to get detailed building information
@@ -804,6 +853,9 @@
       await fetchTroopTypes();
       await fetchBuildingTypes();
       await fetchTechnologyTypes();
+
+      // NEW: Debug player technologies
+      debugTechnologies();
       
       isLoading = false;
     } catch (err) {

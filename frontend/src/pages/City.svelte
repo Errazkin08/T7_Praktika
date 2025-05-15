@@ -670,7 +670,8 @@
       case 'settler': return { type: 'image', url: './ia_assets/settler.png' };
       case 'archer': return { type: 'image', url: './ia_assets/archer.png' }; // Changed from emoji to image
       case 'cavalry': return { type: 'image', url: './ia_assets/cavalry.png' };
-      case 'builder': return { type: 'emoji', value: '🔨' };
+      case 'tank': return { type: 'image', url: './ia_assets/tank.png' };
+      case 'boar rider': return { type: 'image', url: './ia_assets/boar_rider.png' };
       default: return { type: 'emoji', value: '👤' };
     }
   }
@@ -681,19 +682,12 @@
     
     switch (normalizedType) {
       case 'farm': return { type: 'image', url: './ia_assets/farm.jpg' };
-      case 'barracks': return { type: 'emoji', value: '⚔️' };
-      case 'library': return { type: 'emoji', value: '📚' };
-      case 'market': return { type: 'emoji', value: '🏪' };
-      case 'wall': return { type: 'emoji', value: '🧱' };
-      case 'tower': return { type: 'emoji', value: '🗼' };
-      case 'temple': return { type: 'emoji', value: '⛪' };
+      case 'library': return { type: 'image', url: '/ia_assets/library.jpg' };
       // Use the new image paths for specific buildings and fix their type to 'image'
       case 'quarry': return { type: 'image', url: './ia_assets/quarry.jpg' };
       case 'sawmill': return { type: 'image', url: './ia_assets/sawmill.png' };
       case 'ironmine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
-      case 'iron_mine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
       case 'goldmine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
-      case 'gold_mine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       default: return { type: 'emoji', value: '🏛️' };
     }
   }

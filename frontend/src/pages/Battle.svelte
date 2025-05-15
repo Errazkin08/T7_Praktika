@@ -287,7 +287,9 @@
       case "warrior": return './ia_assets/warrior.png';
       case "settler": return './ia_assets/settler.png';
       case "cavalry": return './ia_assets/cavalry.png';
-      case "archer": return './ia_assets/archer.png';
+      case "archer": return './ia_assets/archer.png';      
+      case "tank": return './ia_assets/tank.png';
+      case "boar_rider": return './ia_assets/boar_rider.png';      
       default: return null;
     }
   }

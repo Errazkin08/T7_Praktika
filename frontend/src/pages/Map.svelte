@@ -3510,7 +3510,11 @@
       case "cavalry":
         return "./ia_assets/cavalry.png";
       case "archer":
-        return "./ia_assets/archer.png"; // Add this case for archer image
+        return "./ia_assets/archer.png"; 
+      case "boar_rider":
+        return "./ia_assets/boar_rider.png";
+      case "tank":
+        return "./ia_assets/tank.png";
       default:
         return null;
     }

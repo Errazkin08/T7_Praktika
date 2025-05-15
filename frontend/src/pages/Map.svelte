@@ -12,6 +12,7 @@
   import { user } from "../stores/auth.js";
   import "../styles/pages/map.css";
   import CheatConsole from "../components/CheatConsole.svelte";
+  import NegotiationModal from "../components/NegotiationModal.svelte";
 
   let showPauseMenu = false;
   let isLoading = true;
@@ -110,6 +111,15 @@
 
   // Add this variable to track if unlimited movements cheat is active
   let unlimitedMovementsActive = false;
+
+  // Add negotiation modal state variables
+  let showNegotiationModal = false;
+  let negotiationUnit = null;
+  let negotiationResult = null;
+
+  // --- NUEVO: Control de alto el fuego (ceasefire) ---
+  let ceasefireTurns = 0;
+  let ceasefireActive = false;
 
   // Function to show a toast notification
   function showToastNotification(message, type = "success", duration = 3000) {
@@ -338,6 +348,10 @@
   }
 
   function canAttack(unit) {
+    if (ceasefireActive && ceasefireTurns > 0) {
+      return false;
+    }
+
     if (!unit || unit.owner !== "player") {
       return false;
     }
@@ -437,6 +451,14 @@
   }
 
   function tryAttackFromCard(unit) {
+    if (ceasefireActive && ceasefireTurns > 0) {
+      showToastNotification(
+        `No puedes atacar durante el alto el fuego (${ceasefireTurns} turnos restantes).`,
+        "warning",
+      );
+      return;
+    }
+
     // Modificación: permitir atacar si no está exhausta y tiene movimientos
     if (!unit || unit.owner !== "player") {
       showToastNotification("Esta unidad no puede atacar ahora.", "warning");
@@ -462,6 +484,37 @@
       showAttackOptions = false;
     } else {
       showAttackOptions = true;
+    }
+  }
+
+  function openNegotiation(unit) {
+    negotiationUnit = unit;
+    showNegotiationModal = true;
+    negotiationResult = null;
+  }
+
+  function closeNegotiation() {
+    showNegotiationModal = false;
+    negotiationUnit = null;
+    negotiationResult = null;
+  }
+
+  function handleNegotiationResult(event) {
+    negotiationResult = event.detail;
+    if (negotiationResult && negotiationResult.accepted) {
+      // Actualiza recursos y alto el fuego desde la sesión (el backend ya lo hizo)
+      gameAPI.getCurrentGame().then((updatedGame) => {
+        if (updatedGame) {
+          gameData = updatedGame;
+          ceasefireTurns = updatedGame.ceasefire_turns || 0;
+          ceasefireActive = !!updatedGame.ceasefire_active && ceasefireTurns > 0;
+          showToastNotification(
+            `¡Negociación exitosa! Alto el fuego durante ${ceasefireTurns} turnos.`,
+            "success",
+          );
+        }
+      });
+      showNegotiationModal = false;
     }
   }
 
@@ -1138,6 +1191,29 @@
       ) {
         showResourceGenerationNotification(playerResources, "player");
         await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // --- NUEVO: Decrementar alto el fuego ---
+      if (ceasefireActive && ceasefireTurns > 0) {
+        ceasefireTurns--;
+        if (ceasefireTurns <= 0) {
+          ceasefireActive = false;
+          ceasefireTurns = 0;
+          if (gameData) {
+            gameData.ceasefire_turns = 0;
+            gameData.ceasefire_active = false;
+          }
+          showToastNotification("El alto el fuego ha terminado.", "info");
+        } else {
+          if (gameData) {
+            gameData.ceasefire_turns = ceasefireTurns;
+            gameData.ceasefire_active = true;
+          }
+          showToastNotification(
+            `Quedan ${ceasefireTurns} turnos de alto el fuego.`,
+            "info",
+          );
+        }
       }
 
       gameData.current_player = "ia";
@@ -3005,6 +3081,9 @@
           if (gameData.cheats_used.includes("unlimitedMovements")) {
             unlimitedMovementsActive = true;
           }
+
+          ceasefireTurns = gameData.ceasefire_turns || 0;
+          ceasefireActive = !!gameData.ceasefire_active && ceasefireTurns > 0;
         }
       } catch (apiError) {
         console.error("Error loading game/map:", apiError);
@@ -3736,12 +3815,17 @@
                 </button>
               {/if}
 
-              <!-- Botón de atacar siempre visible -->
               <button
                 class="action-button attack-button"
                 on:click={() => tryAttackFromCard(selectedUnitInfo)}
               >
                 Atacar
+              </button>
+              <button
+                class="action-button negotiate-button"
+                on:click={() => openNegotiation(selectedUnitInfo)}
+              >
+                Negociar
               </button>
             </div>
           {:else if selectedUnitInfo.owner === "ia"}
@@ -4047,6 +4131,22 @@
       </div>
     </div>
   {/if}
+
+  {#if showNegotiationModal}
+    <NegotiationModal
+      unit={negotiationUnit}
+      playerResources={gameData?.player?.resources}
+      aiResources={gameData?.ia?.resources}
+      on:close={closeNegotiation}
+      on:result={handleNegotiationResult}
+    />
+  {/if}
+
+  {#if ceasefireActive && ceasefireTurns > 0}
+    <div class="ceasefire-banner">
+      🕊️ Alto el fuego activo: No se puede atacar durante {ceasefireTurns} turno{ceasefireTurns === 1 ? "" : "s"} restantes.
+    </div>
+  {/if}
 </div>
 
 <!-- Add CheatConsole component near the end of the template -->
@@ -4057,3 +4157,23 @@
   on:close={() => (showCheatConsole = false)}
   on:execute={processCheat}
 />
+
+<style>
+/* ...existing code... */
+.ceasefire-banner {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222e3a;
+  color: #fff;
+  padding: 10px 28px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  z-index: 2000;
+  border: 2px solid #5b7cff;
+  letter-spacing: 0.5px;
+}
+</style>

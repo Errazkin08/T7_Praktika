@@ -7,7 +7,7 @@ const API_BASE_URL = '/api'; // Adjust this to match your backend URL
 // Helper function for making authenticated API requests
 async function fetchWithAuth(url, options = {}) {
   // Ensure credentials are included in all requests
-  debugger
+  
   const fetchOptions = {
     ...options,
     credentials: 'include', // This ensures cookies are sent with the request
@@ -733,6 +733,27 @@ export const gameAPI = {
       return await response.json();
     } catch (error) {
       console.error("Error getting AI action:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Negotiation with AI (peace/resource exchange)
+   * @param {Object} negotiationData - { offer, game_state }
+   */
+  async negotiateWithAI(negotiationData) {
+    try {
+      const response = await fetchWithAuth(`/api/ai/negotiate`, {
+        method: 'POST',
+        body: JSON.stringify(negotiationData),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Error en la negociación");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error negotiating with AI:", error);
       throw error;
     }
   },

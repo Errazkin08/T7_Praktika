@@ -79,3 +79,88 @@ def ai_action():
     except Exception as e:
         current_app.logger.error(f"AI processing error: {str(e)}")
         return jsonify({"error": f"AI processing error: {str(e)}"}), 500
+
+@ia_blueprint.route('/api/ai/negotiate', methods=['POST'])
+def ai_negotiate():
+    """
+    Endpoint para negociar paz/intercambio de recursos con la IA.
+    """
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "User not logged in"}), 401
+
+    data = request.json
+    if not data or "offer" not in data or "game_state" not in data:
+        return jsonify({"error": "Missing offer or game_state"}), 400
+
+    offer = data["offer"]
+    game_state = data["game_state"]
+
+    # Construir prompt para negociación
+    negotiation_prompt = f"""
+Eres la IA de un juego de estrategia por turnos. El jugador te propone una negociación de paz/intercambio de recursos.
+Oferta recibida (formato JSON):
+{json.dumps(offer)}
+Estado del juego relevante (recursos, ciudades, turno actual):
+{json.dumps({
+    "player_resources": game_state.get("player", {}).get("resources", {}),
+    "ai_resources": game_state.get("ia", {}).get("resources", {}),
+    "turn": game_state.get("turn", 1)
+})}
+Debes responder SOLO con un JSON con una de estas opciones:
+- Si aceptas la oferta: {{ "accepted": true, "ceasefire_turns": N }}
+- Si rechazas pero propones una contraoferta: {{ "accepted": false, "counter_offer": {{...misma estructura que la oferta...}} }}
+- Si rechazas sin contraoferta: {{ "accepted": false }}
+NO EXPLIQUES NADA, SOLO EL JSON.
+"""
+
+    try:
+        from IAProba import iaDeitu
+        result = iaDeitu(negotiation_prompt, game_state)
+        # Extraer solo el JSON de la respuesta
+        if isinstance(result, str):
+            first_brace = result.find('{')
+            last_brace = result.rfind('}')
+            if first_brace != -1 and last_brace != -1 and first_brace < last_brace:
+                cleaned = result[first_brace:last_brace+1]
+                try:
+                    parsed = json.loads(cleaned)
+                    # --- NUEVO: Si la oferta es aceptada, actualiza los recursos y el estado de paz en la sesión ---
+                    if parsed.get("accepted"):
+                        # Actualiza recursos de ambos jugadores
+                        player = game_state.get("player", {})
+                        ia = game_state.get("ia", {})
+                        offer_data = offer
+
+                        # Sumar/restar recursos según la oferta aceptada
+                        for res in ["food", "gold", "wood", "iron", "stone"]:
+                            player_amt = offer_data.get("player", {}).get(res, 0) or 0
+                            ia_amt = offer_data.get("ai", {}).get(res, 0) or 0
+                            # El jugador da a la IA
+                            player.setdefault("resources", {}).setdefault(res, 0)
+                            ia.setdefault("resources", {}).setdefault(res, 0)
+                            player["resources"][res] = max(0, player["resources"][res] - player_amt + ia_amt)
+                            ia["resources"][res] = max(0, ia["resources"][res] - ia_amt + player_amt)
+
+                        # Guardar los cambios en la sesión
+                        if "game" in session and session["game"]:
+                            session_game = session["game"]
+                            # Actualiza recursos en la sesión
+                            if "player" in session_game:
+                                session_game["player"]["resources"] = player["resources"]
+                            if "ia" in session_game:
+                                session_game["ia"]["resources"] = ia["resources"]
+                            # Añade el estado de paz
+                            ceasefire_turns = parsed.get("ceasefire_turns") or offer.get("ceasefireTurns") or offer.get("ceasefire_turns") or 0
+                            session_game["ceasefire_turns"] = int(ceasefire_turns)
+                            session_game["ceasefire_active"] = True
+                            session["game"] = session_game
+
+                        parsed["resources_updated"] = True
+                        parsed["ceasefire_turns"] = int(parsed.get("ceasefire_turns") or offer.get("ceasefireTurns") or 0)
+                    return jsonify(parsed)
+                except Exception:
+                    return jsonify({"error": "Invalid JSON from LLM", "raw": cleaned})
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Negotiation AI error: {str(e)}"}), 500

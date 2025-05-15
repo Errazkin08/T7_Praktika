@@ -1,5 +1,6 @@
 <script>
-  import { currentRoute, navigate } from './router.js';
+  import { currentRoute} from './router.js';
+  import { navigate } from './router.js';
   import routes from './routes';
   import { user, clearUser } from './stores/auth.js';
   import ScrollManager from './components/ScrollManager.svelte';

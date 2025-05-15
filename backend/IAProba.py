@@ -296,22 +296,17 @@ def filter_game_state(game_state: dict) -> dict:
     
     return filtered_state
 
-def iaDeitu(prompt: str, game_state: dict = None) -> str:
+def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
     """
     Function to interact with the game AI.
-    
-    Args:
-        prompt: The main prompt for the AI.
-        game_state: Current game state in JSON format.
-    
-    Returns:
-        AI response, generally in JSON format.
+    If a prompt is provided, send it directly to the LLM and return its response.
+    If no prompt is provided, use the default behavior (filtered game state, system instructions, etc).
+    Returns the LLM response (usually JSON).
     """
     try:
         # Initialize the client (keep a persistent instance)
         if not hasattr(iaDeitu, "_client"):
             iaDeitu._client = GroqAPIClient()
-            
             # System instructions (only sent once)
             system_instructions = """
             You are an AI controlling a player in a turn-based strategy game similar to Civilization.
@@ -410,10 +405,17 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
             
             # Set system instructions
             iaDeitu._client.set_system_instructions(system_instructions)
-        
+
+        # --- NUEVO: Si se pasa un prompt explícito, mándalo tal cual al LLM ---
+        if prompt is not None:
+            # Si hay prompt, simplemente llama al LLM con ese prompt y devuelve la respuesta
+            response = iaDeitu._client.run_call(prompt)
+            return response
+
+        # --- Si no hay prompt, sigue el flujo normal (acción de la IA en el juego) ---
         # Filter game state
         filtered_game_state = filter_game_state(game_state)
-        
+
         # Build current message with minimal essential information
         game_prompt = f"""
         Generate actions based on this game state:
@@ -433,15 +435,15 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
         
         CRITICAL: Always verify x coordinates are between 0 and {filtered_game_state["map_size"]["width"]-1} and y coordinates are between 0 and {filtered_game_state["map_size"]["height"]-1}.
         """
-        
+
         # Call the API with the specific game prompt
         api_response = iaDeitu._client.run_call(prompt=game_prompt)
-        
+
         # Post-process the response to ensure all actions have unit_ids
         try:
             # Parse the response
             response_data = json.loads(api_response)
-            
+
             # Check if we have actions
             if "actions" in response_data and isinstance(response_data["actions"], list):
                 for action in response_data["actions"]:
@@ -450,13 +452,13 @@ def iaDeitu(prompt: str, game_state: dict = None) -> str:
                         if "position" in action and isinstance(action["position"], list) and len(action["position"]) >= 2:
                             x, y = action["position"][0], action["position"][1]
                             action["unit_id"] = f"unit-{x}-{y}"
-            
+
             # Return the fixed response
             return json.dumps(response_data)
         except:
             # If any error in post-processing, return the original response
             return api_response
-        
+
     except Exception as e:
         print(f"Error in execution: {str(e)}")
         return json.dumps({"error": str(e)})

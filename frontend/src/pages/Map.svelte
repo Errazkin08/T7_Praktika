@@ -1250,6 +1250,11 @@
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
+      // --- NUEVO: Incrementar población de ciudades del jugador ---
+      gameData.player = gameAPI.increaseCityPopulation(gameData.player);
+      // Sincronizar array de ciudades tras el cambio de población
+      cities = [...gameData.player.cities];
+
       // --- NUEVO: Decrementar alto el fuego ---
       if (ceasefireActive && ceasefireTurns > 0) {
         ceasefireTurns--;
@@ -1315,6 +1320,9 @@
         // Optional: Show notification about AI resources (or keep it hidden)
         console.log("AI resources generated:", aiResources);
       }
+
+      // --- NUEVO: Incrementar población de ciudades de la IA ---
+      gameData.ia = gameAPI.increaseCityPopulation(gameData.ia);
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -3268,9 +3276,6 @@
 
   // MODIFICADO: city icon para distinguir IA
   function getCityIcon(city) {
-    const population = city.population || 0;
-    if (population >= 10) return { type: "emoji", value: "🏙️" };
-    if (population >= 5) return { type: "emoji", value: "🏢" };
     return { type: "image", value: './ia_assets/city.jpg' };
   }
 

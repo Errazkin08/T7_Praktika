@@ -1216,6 +1216,20 @@ def get_building_types():
             "description": "Produces food over time"
         },
         {
+            "type_id": "library",
+            "name": "Library",
+            "category": "learning",
+            "turns": 5,
+            "technology": "basic",
+            "level": 1,
+            "learning": [],
+            "cost": {
+                "wood": 70,
+                "stone": 50
+            },
+            "description": "Increases the knowledge of the civilization"
+        },
+        {
             "type_id": "Iron mine",
             "name": "Iron mine",
             "category": "production",
@@ -1248,20 +1262,6 @@ def get_building_types():
                 "stone": 70
             },
             "description": "Produces gold over time"
-        },
-        {
-            "type_id": "library",
-            "name": "Library",
-            "category": "learning",
-            "turns": 5,
-            "technology": "basic",
-            "level": 1,
-            "learning": [],
-            "cost": {
-                "wood": 70,
-                "stone": 50
-            },
-            "description": "Increases the knowledge of the civilization"
         }
 
     ]

@@ -855,6 +855,33 @@ export const gameAPI = {
     }
   },
 
+  /**
+   * Incrementa la población de cada ciudad activa.
+   * Para cada ciudad, suma un número aleatorio entre 1 y 4 multiplicado por la cantidad de edificios.
+   * Devuelve una copia modificada del objeto player/ia recibido.
+   * @param {Object} playerOrIa - gameData.player o gameData.ia
+   * @returns {Object} - copia modificada
+   */
+  increaseCityPopulation(playerOrIa) {
+    if (!playerOrIa || !Array.isArray(playerOrIa.cities)) return playerOrIa;
+    // Copia profunda superficial (ciudades y sus props)
+    const newObj = {
+      ...playerOrIa,
+      cities: playerOrIa.cities.map(city => {
+        if (!city || !Array.isArray(city.buildings)) return { ...city };
+        const buildingCount = city.buildings.length;
+        if (buildingCount === 0) return { ...city };
+        const random = Math.floor(Math.random() * 4) + 1; // 1-4
+        const increment = random * buildingCount;
+        return {
+          ...city,
+          population: (city.population || 0) + increment
+        };
+      })
+    };
+    return newObj;
+  },
+
   getTroopTypes,
 
   getTechnologyTypes,

@@ -34,6 +34,36 @@
     }
     return sanitized;
   }
+  
+async function finalizeDeal(deal) {
+  // deal: { player, ai, ceasefireTurns }
+  try {
+    // Obtener el estado actual del juego
+    const game = await gameAPI.getCurrentGame();
+
+    // Actualizar recursos del jugador
+    for (const res in deal.player) {
+      if (!game.player.resources) game.player.resources = {};
+      game.player.resources[res] = (game.player.resources[res] || 0) - (deal.player[res] || 0) + (deal.ia[res] || 0);
+    }
+    // Actualizar recursos de la IA
+    for (const res in deal.ia) {
+      if (!game.ia.resources) game.ia.resources = {};
+      game.ia.resources[res] = (game.ia.resources[res] || 0) - (deal.ia[res] || 0) + (deal.player[res] || 0);
+    }
+    // Actualizar o crear ceasefireTurns
+    if (!game.ceasefireTurns) game.ceasefireTurns = 0;
+    game.ceasefireTurns = deal.ceasefireTurns;
+
+    // Guardar el estado actualizado
+    await gameAPI.updateGame(game.game_id,game);
+
+    // Cerrar el modal
+    dispatch("close");
+  } catch (e) {
+    error = "Error al finalizar el trato: " + (e.message || e);
+  }
+}
 
   async function sendOffer() {
     loading = true;
@@ -43,7 +73,7 @@
     // Limpiar nulls, negativos y limitar máximos antes de enviar
     const cleanOffer = {
       player: sanitizeOffer(offer.player, playerResources),
-      ai: sanitizeOffer(offer.ai, aiResources),
+      ia: sanitizeOffer(offer.ia, aiResources),
       ceasefireTurns:
         offer.ceasefireTurns === null ||
         offer.ceasefireTurns === undefined ||
@@ -54,7 +84,7 @@
     };
     // Actualizar el formulario con los valores ajustados antes de enviar
     offer.player = { ...cleanOffer.player };
-    offer.ai = { ...cleanOffer.ai };
+    offer.ia = { ...cleanOffer.ia };
     offer.ceasefireTurns = cleanOffer.ceasefireTurns;
 
     try {
@@ -69,7 +99,7 @@
         // Mostrar la contraoferta de forma editable y limitar máximos
         counterOffer = {
           player: sanitizeOffer(result.counter_offer.player || {}, playerResources),
-          ai: sanitizeOffer(result.counter_offer.ai || {}, aiResources),
+          ai: sanitizeOffer(result.counter_offer.ia || {}, aiResources),
           ceasefireTurns:
             result.counter_offer.ceasefireTurns === null ||
             result.counter_offer.ceasefireTurns === undefined ||
@@ -83,6 +113,12 @@
       }
       aiResponse = result;
       dispatch("result", result);
+      // Si la IA acepta la oferta, finalizar el trato despues de mostrar la respuesta durante 2 segundos
+      if (result.accepted) {
+        setTimeout(() => {
+          finalizeDeal(cleanOffer);
+        }, 2000);
+      }
     } catch (e) {
       error = e.message || "Error en la negociación";
     } finally {
@@ -90,9 +126,9 @@
     }
   }
 
-  function acceptCounterOffer() {
+  async function acceptCounterOffer() {
     // Aquí podrías actualizar el estado del juego según la contraoferta
-    dispatch("close");
+    await finalizeDeal(offer);
   }
 </script>
 
@@ -134,7 +170,7 @@
     <div class="negotiation-section">
       <h4>Lo que pides a la IA</h4>
       <div class="resource-row">
-        {#each Object.keys(offer.ai) as res}
+        {#each Object.keys(offer.ia) as res}
           <div class="resource-field">
             <label for={"ai-" + res}>{res.charAt(0).toUpperCase() + res.slice(1)}:</label>
             <input
@@ -142,16 +178,16 @@
               type="number"
               min="0"
               max={aiResources?.[res] || 9999}
-              bind:value={offer.ai[res]}
+              bind:value={offer.ia[res]}
               on:input={() => {
                 if (
-                  offer.ai[res] === "" ||
-                  offer.ai[res] === null ||
-                  offer.ai[res] === undefined ||
-                  Number(offer.ai[res]) < 0
-                ) offer.ai[res] = 0;
-                if (aiResources?.[res] !== undefined && Number(offer.ai[res]) > aiResources[res]) {
-                  offer.ai[res] = aiResources[res];
+                  offer.ia[res] === "" ||
+                  offer.ia[res] === null ||
+                  offer.ia[res] === undefined ||
+                  Number(offer.ia[res]) < 0
+                ) offer.ia[res] = 0;
+                if (aiResources?.[res] !== undefined && Number(offer.ia[res]) > aiResources[res]) {
+                  offer.ia[res] = aiResources[res];
                 }
               }}
             />
@@ -206,7 +242,7 @@
                 <div class="counter-offer-row">
                   <div>{res.charAt(0).toUpperCase() + res.slice(1)}</div>
                   <div class="counter-value">{offer.player[res]}</div>
-                  <div class="counter-value">{offer.ai[res]}</div>
+                  <div class="counter-value">{offer.ia[res]}</div>
                 </div>
               {/each}
               <div class="counter-offer-row">
@@ -395,7 +431,7 @@ h3 {
   text-align: center;
   font-weight: 600;
 }
-.ai-response {
+.ia-response {
   margin-top: 1.2rem;
   background: #23263a;
   padding: 1.1rem 1rem 1rem 1rem;

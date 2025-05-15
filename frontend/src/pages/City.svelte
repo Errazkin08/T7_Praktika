@@ -31,6 +31,14 @@
   let loadingTechnologyTypes = false;
   let selectedTechnology = null;
 
+  // NUEVO: Estado para el diálogo de confirmación de producción
+  let showProductionConfirmationDialog = false;
+  let productionConfirmationMessage = "";
+  let productionConfirmationCallback = null;
+  let productionItemToStart = null;
+  let productionItemTypeToStart = null;
+  let productionItemCostToShow = null;
+
   // Add a helper function to render costs dynamically based on what's in the cost object
   function getResourceCostString(costObject) {
     if (!costObject) return 'Costo no disponible';
@@ -473,47 +481,106 @@
     });
   }
 
-  // Update startProduction to double-check technology requirement
+  // NUEVO: Función para mostrar el diálogo de confirmación de producción
+  function confirmStartProduction(item, itemType) {
+    // Mostrar el coste en el mensaje
+    const costString = getResourceCostString(item.cost);
+    productionConfirmationMessage = `¿Quieres iniciar la ${itemType === 'troop' ? 'producción de la unidad' : (buildingTypeExists(item) ? 'mejora del edificio' : 'construcción del edificio')} "${item.name}"?\nCoste: ${costString}`;
+    productionConfirmationCallback = () => doStartProduction(item, itemType);
+    productionItemToStart = item;
+    productionItemTypeToStart = itemType;
+    productionItemCostToShow = item.cost;
+    showProductionConfirmationDialog = true;
+  }
+
+  // NUEVO: Función que realmente inicia la producción tras confirmar
+  async function doStartProduction(item, itemType) {
+    showProductionConfirmationDialog = false;
+    productionConfirmationMessage = "";
+    productionConfirmationCallback = null;
+    productionItemToStart = null;
+    productionItemTypeToStart = null;
+    productionItemCostToShow = null;
+    await startProduction(item, itemType);
+  }
+
+  // NUEVO: Cerrar el diálogo de confirmación de producción
+  function closeProductionConfirmationDialog() {
+    showProductionConfirmationDialog = false;
+    productionConfirmationMessage = "";
+    productionConfirmationCallback = null;
+    productionItemToStart = null;
+    productionItemTypeToStart = null;
+    productionItemCostToShow = null;
+  }
+
+  // Modificado: startProduction ahora descuenta recursos y comprueba antes de iniciar
   async function startProduction(item, itemType) {
     try {
       if (!city) {
         showToastNotification("Error: No hay ciudad seleccionada", "error");
         return;
       }
-      
+
       // Check technology requirement again as a security measure
       if (!hasTechnology(item.technology)) {
         showToastNotification(`Se requiere la tecnología "${item.technology}" para producir ${item.name}`, "error");
         return;
       }
-      
+
       // Check if there's already production in progress
       if (city.production && city.production.current_item) {
         showToastNotification("Ya hay una producción en curso", "error");
         return;
       }
-      
+
+      // Obtener el coste del item
+      const cost = item.cost || {};
+      // Comprobar si el jugador (o IA) tiene suficientes recursos para TODOS los recursos requeridos
+      if (gameData && gameData.player && gameData.player.resources) {
+        const playerResources = gameData.player.resources;
+        // Comprobar todos los recursos antes de restar
+        let canAfford = true;
+        for (const resource in cost) {
+          if (cost[resource] > 0 && (!playerResources[resource] || playerResources[resource] < cost[resource])) {
+            canAfford = false;
+            break;
+          }
+        }
+        if (!canAfford) {
+          showToastNotification("No tienes suficientes recursos para iniciar la producción", "error");
+          return;
+        }
+        // Restar todos los recursos (solo si puede pagarlos todos)
+        for (const resource in cost) {
+          if (cost[resource] > 0) {
+            playerResources[resource] -= cost[resource];
+          }
+        }
+      } else {
+        showToastNotification("Error: No se pueden obtener los recursos del jugador", "error");
+        return;
+      }
+
       // Get the number of turns required for this item
       const turnsToComplete = item.turns_to_build || item.turns || 3;
-      
+
       // Get the proper type/id for production
       const itemId = item.id || item.type_id;
-      
+
       if (!itemId) {
         showToastNotification(`Error: No se puede identificar el tipo de ${itemType === 'troop' ? 'tropa' : 'edificio'}`, "error");
         return;
       }
-      
-      console.log(`Setting ${itemType} for production:`, itemId);
-      
+
       // Determine the production_type (build, upgrade, train)
       let production_type = itemType === 'troop' ? 'train' : 'build';
-      
+
       // Check if it's a building upgrade
       if (itemType === 'building' && buildingTypeExists(item)) {
         production_type = 'upgrade';
       }
-      
+
       // Create the production object with the proper values
       city.production = {
         current_item: itemId,
@@ -521,25 +588,25 @@
         itemType: itemType, // Keep for backward compatibility
         production_type: production_type // Add new production_type attribute
       };
-      
-      console.log("Setting production:", city.production);
-      
+
       // Update the game data with the new production
       if (gameData && gameData.player && gameData.player.cities) {
         const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
         if (cityIndex !== -1) {
           gameData.player.cities[cityIndex].production = city.production;
-          
+          // Guardar también los recursos actualizados
+          gameData.player.resources = { ...gameData.player.resources };
+
           // Save changes to game session
           await gameAPI.updateGameSession(gameData);
-          
+
           // Clear selected item to hide the expanded panel
           if (itemType === 'troop') {
             selectedTroopType = null;
           } else if (itemType === 'building') {
             selectedBuildingType = null;
           }
-          
+
           // Show feedback messages based on production type
           if (production_type === 'upgrade') {
             showToastNotification(`¡Iniciada mejora de ${item.name}!`, "success");
@@ -548,7 +615,7 @@
           } else {
             showToastNotification(`¡Iniciado entrenamiento de ${item.name}!`, "success");
           }
-          
+
           // Switch to the summary tab to show the production info
           setActiveTab('summary');
         }
@@ -689,123 +756,6 @@
       case 'ironmine': return { type: 'image', url: './ia_assets/Iron_mine.png' };
       case 'goldmine': return { type: 'image', url: './ia_assets/mina_oro.jpg' };
       default: return { type: 'emoji', value: '🏛️' };
-    }
-  }
-
-  async function upgradeBuilding(building) {
-    try {
-      if (!city || !city.buildings) {
-        showToastNotification("Error: No hay edificios en esta ciudad", "error");
-        return;
-      }
-      
-      // Find the building in the city's buildings array
-      const buildingIndex = city.buildings.findIndex(b => 
-        b.id === building.id || 
-        (b.name === building.name && b.type === building.type)
-      );
-      
-      if (buildingIndex === -1) {
-        showToastNotification("Error: No se encontró el edificio para mejorar", "error");
-        return;
-      }
-      
-      // Define upgrade cost based on building level
-      const upgradeCost = {
-        gold: 50 * (building.level || 1),
-        stone: 30 * (building.level || 1),
-        wood: 20 * (building.level || 1)
-      };
-      
-      // Check if player has enough resources
-      if (gameData && gameData.player && gameData.player.resources) {
-        const playerResources = gameData.player.resources;
-        
-        if (playerResources.gold < upgradeCost.gold || 
-            playerResources.stone < upgradeCost.stone || 
-            playerResources.wood < upgradeCost.wood) {
-          showToastNotification(`Recursos insuficientes para mejorar. Necesitas: ${upgradeCost.gold} oro, ${upgradeCost.stone} piedra, ${upgradeCost.wood} madera`, "error");
-          return;
-        }
-        
-        // Deduct resources
-        playerResources.gold -= upgradeCost.gold;
-        playerResources.stone -= upgradeCost.stone;
-        playerResources.wood -= upgradeCost.wood;
-      } else {
-        showToastNotification("Error: No se pueden obtener los recursos del jugador", "error");
-        return;
-      }
-      
-      // Get a copy of the building to modify (to ensure reactivity)
-      const buildingToUpgrade = { ...city.buildings[buildingIndex] };
-      
-      // Increase the building's level
-      buildingToUpgrade.level = (buildingToUpgrade.level || 1) + 1;
-      
-      // Get the level_upgrade value 
-      const levelUpgradeValue = building.level_upgrade || 1;
-      
-      // Initialize output if it doesn't exist
-      if (!buildingToUpgrade.output) {
-        buildingToUpgrade.output = {};
-      }
-      
-      // For each resource in the output, increase by level_upgrade
-      for (const resource in buildingToUpgrade.output) {
-        buildingToUpgrade.output[resource] += levelUpgradeValue;
-      }
-      
-      // If there are no resources in output but the building should produce something,
-      // add a default resource based on building type
-      if (Object.keys(buildingToUpgrade.output).length === 0) {
-        const defaultOutput = getDefaultBuildingOutput(buildingToUpgrade.type || buildingToUpgrade.name);
-        buildingToUpgrade.output = defaultOutput;
-      }
-      
-      // Update the city's buildings array
-      city.buildings[buildingIndex] = buildingToUpgrade;
-      
-      // Ensure reactivity by creating a new array
-      city.buildings = [...city.buildings];
-      
-      // Update the game data
-      if (gameData && gameData.player && gameData.player.cities) {
-        const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
-        if (cityIndex !== -1) {
-          gameData.player.cities[cityIndex].buildings = city.buildings;
-          
-          // Save changes to backend
-          await gameAPI.updateGameSession(gameData);
-          
-          // Show confirmation
-          showToastNotification(`Edificio ${buildingToUpgrade.name} mejorado al nivel ${buildingToUpgrade.level}`, "success");
-        }
-      }
-    } catch (error) {
-      console.error("Error al mejorar el edificio:", error);
-      showToastNotification("Error al mejorar el edificio", "error");
-    }
-  }
-
-  // Helper function to get default building output based on type
-  function getDefaultBuildingOutput(buildingType) {
-    if (!buildingType) return { food: 1 };
-    
-    const type = buildingType.toLowerCase();
-    
-    if (type.includes('farm')) {
-      return { food: 2 };
-    } else if (type.includes('mine') || type.includes('gold')) {
-      return { gold: 2 };
-    } else if (type.includes('wood') || type.includes('lumber') || type.includes('sawmill')) {
-      return { wood: 2 };
-    } else if (type.includes('stone') || type.includes('quarry')) {
-      return { stone: 2 };
-    } else if (type.includes('iron') || type.includes('forge')) {
-      return { iron: 2 };
-    } else {
-      return { food: 1 }; // Default to food if type is unknown
     }
   }
 
@@ -1168,7 +1118,7 @@
                               </div>
                               
                               <div class="troop-action">
-                                <button class="train-button" on:click={() => startProduction(troopType, 'troop')}>
+                                <button class="train-button" on:click={() => confirmStartProduction(troopType, 'troop')}>
                                   Entrenar {troopType.name}
                                 </button>
                               </div>
@@ -1324,11 +1274,11 @@
                               
                               <div class="building-action">
                                 {#if existingBuilding}
-                                  <button class="upgrade-button" on:click={() => startProduction(buildingType, 'building')}>
+                                  <button class="upgrade-button" on:click={() => confirmStartProduction(buildingType, 'building')}>
                                     Mejorar {buildingType.name}
                                   </button>
                                 {:else}
-                                  <button class="construct-button" on:click={() => startProduction(buildingType, 'building')}>
+                                  <button class="construct-button" on:click={() => confirmStartProduction(buildingType, 'building')}>
                                     Construir {buildingType.name}
                                   </button>
                                 {/if}
@@ -1452,13 +1402,6 @@
                         </div>
                       {/if}
                     </div>
-                    
-                    <!-- Upgrade Building Button -->
-                    {#if building.level !== undefined && building.level_upgrade !== undefined}
-                      <div class="building-upgrade">
-                        <button class="upgrade-button" on:click={() => upgradeBuilding(building)}>Mejorar a Nivel {building.level + 1}</button>
-                      </div>
-                    {/if}
                   </div>
                 {/each}
               </div>
@@ -1622,6 +1565,19 @@
           <img src="./ia_assets/harria.png" alt="Stone" class="resource-bar-icon" />
         </div>
         <div class="resource-value">{gameData.player.resources.stone || 0}</div>
+      </div>
+    </div>
+  {/if}
+
+  {#if showProductionConfirmationDialog}
+    <div class="modal-overlay">
+      <div class="confirmation-dialog">
+        <h3>Confirmar Producción</h3>
+        <p>{@html productionConfirmationMessage}</p>
+        <div class="confirmation-actions">
+          <button class="cancel-button" on:click={closeProductionConfirmationDialog}>Cancelar</button>
+          <button class="confirm-button" on:click={productionConfirmationCallback}>Confirmar</button>
+        </div>
       </div>
     </div>
   {/if}

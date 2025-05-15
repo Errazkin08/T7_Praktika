@@ -602,23 +602,7 @@
   }
   
   .building-upgrade {
-    margin-top: 10px;
-  }
-  
-  .upgrade-button {
-    background-color: #FFC107;
-    color: #333;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    width: 100%;
-    transition: background-color 0.2s;
-  }
-  
-  .upgrade-button:hover {
-    background-color: #FFD54F;
+    margin-top: 0;
   }
   
   .building-container {

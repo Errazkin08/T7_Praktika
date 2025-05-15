@@ -1,27 +1,57 @@
 <script>
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
   import { gameAPI } from "../services/gameAPI.js";
 
   export let unit;
-  export let playerResources = {};
-  export let aiResources = {};
+  
+  // Initialize with empty objects that will be populated from session
+  let playerResources = {};
+  let aiResources = {};
+  let gameData = null;
 
   const dispatch = createEventDispatcher();
 
+  // Default empty resources object for safety
+  const defaultResources = { food: 0, gold: 0, wood: 0, iron: 0, stone: 0 };
   let offer = {
-    player: { food: 0, gold: 0, wood: 0, iron: 0, stone: 0 },
-    ai: { food: 0, gold: 0, wood: 0, iron: 0, stone: 0 },
+    player: { ...defaultResources },
+    ai: { ...defaultResources },
     ceasefireTurns: 3
   };
+  
   let loading = false;
   let error = null;
   let aiResponse = null;
-  let counterOffer = null; // Para mostrar la contraoferta de la IA de forma editable
+  let counterOffer = null;
+  let resourceKeys = Object.keys(defaultResources);
+
+  // Load game data on component mount
+  onMount(async () => {
+    try {
+      gameData = await gameAPI.getCurrentGame();
+      if (gameData) {
+        // Set player resources
+        if (gameData.player && gameData.player.resources) {
+          playerResources = { ...defaultResources, ...gameData.player.resources };
+        }
+        
+        // Set AI resources
+        if (gameData.ia && gameData.ia.resources) {
+          aiResources = { ...defaultResources, ...gameData.ia.resources };
+        }
+        
+        console.log("Loaded resources:", { player: playerResources, ai: aiResources });
+      }
+    } catch (e) {
+      console.error("Error loading game data:", e);
+      error = "Error cargando datos del juego";
+    }
+  });
 
   // Helper para limpiar null/undefined/negativos -> 0 antes de enviar y limitar máximos
   function sanitizeOffer(obj, maxObj = {}) {
     const sanitized = {};
-    for (const key in obj) {
+    for (const key of resourceKeys) {
       let val = obj[key];
       if (val === "" || val === null || val === undefined || isNaN(val)) val = 0;
       val = Number(val);
@@ -35,45 +65,55 @@
     return sanitized;
   }
   
-async function finalizeDeal(deal) {
-  // deal: { player, ai, ceasefireTurns }
-  try {
-    // Obtener el estado actual del juego
-    const game = await gameAPI.getCurrentGame();
+  async function finalizeDeal(deal) {
+    // deal: { player, ai, ceasefireTurns }
+    try {
+      // Obtener el estado actual del juego si no lo tenemos ya
+      if (!gameData) {
+        gameData = await gameAPI.getCurrentGame();
+      }
 
-    // Actualizar recursos del jugador
-    for (const res in deal.player) {
-      if (!game.player.resources) game.player.resources = {};
-      game.player.resources[res] = (game.player.resources[res] || 0) - (deal.player[res] || 0) + (deal.ia[res] || 0);
+      // Actualizar recursos del jugador
+      for (const res of resourceKeys) {
+        if (!gameData.player.resources) gameData.player.resources = { ...defaultResources };
+        gameData.player.resources[res] = (gameData.player.resources[res] || 0) - (deal.player[res] || 0) + (deal.ai[res] || 0);
+      }
+      
+      // Actualizar recursos de la IA
+      for (const res of resourceKeys) {
+        if (!gameData.ia.resources) gameData.ia.resources = { ...defaultResources };
+        gameData.ia.resources[res] = (gameData.ia.resources[res] || 0) - (deal.ai[res] || 0) + (deal.player[res] || 0);
+      }
+      
+      // Actualizar o crear ceasefireTurns
+      gameData.ceasefire_turns = deal.ceasefireTurns || 0;
+      gameData.ceasefire_active = deal.ceasefireTurns > 0;
+
+      // Guardar el estado actualizado
+      await gameAPI.updateGameSession(gameData);
+
+      // Notificar resultado al componente padre
+      dispatch("result", { 
+        accepted: true, 
+        ceasefire_turns: deal.ceasefireTurns 
+      });
+      
+      // No cerramos aquí - el componente padre se encargará
+    } catch (e) {
+      error = "Error al finalizar el trato: " + (e.message || e);
     }
-    // Actualizar recursos de la IA
-    for (const res in deal.ia) {
-      if (!game.ia.resources) game.ia.resources = {};
-      game.ia.resources[res] = (game.ia.resources[res] || 0) - (deal.ia[res] || 0) + (deal.player[res] || 0);
-    }
-    // Actualizar o crear ceasefireTurns
-    if (!game.ceasefireTurns) game.ceasefireTurns = 0;
-    game.ceasefireTurns = deal.ceasefireTurns;
-
-    // Guardar el estado actualizado
-    await gameAPI.updateGame(game.game_id,game);
-
-    // Cerrar el modal
-    dispatch("close");
-  } catch (e) {
-    error = "Error al finalizar el trato: " + (e.message || e);
   }
-}
 
   async function sendOffer() {
     loading = true;
     error = null;
     aiResponse = null;
     counterOffer = null;
+    
     // Limpiar nulls, negativos y limitar máximos antes de enviar
     const cleanOffer = {
       player: sanitizeOffer(offer.player, playerResources),
-      ia: sanitizeOffer(offer.ia, aiResources),
+      ai: sanitizeOffer(offer.ai, aiResources),
       ceasefireTurns:
         offer.ceasefireTurns === null ||
         offer.ceasefireTurns === undefined ||
@@ -82,24 +122,26 @@ async function finalizeDeal(deal) {
           ? 0
           : Number(offer.ceasefireTurns)
     };
+    
     // Actualizar el formulario con los valores ajustados antes de enviar
     offer.player = { ...cleanOffer.player };
-    offer.ia = { ...cleanOffer.ia };
+    offer.ai = { ...cleanOffer.ai };
     offer.ceasefireTurns = cleanOffer.ceasefireTurns;
 
     try {
       console.log("[NEGOCIACIÓN] Petición enviada a la IA:", JSON.stringify(cleanOffer, null, 2));
       const result = await gameAPI.negotiateWithAI({
         offer: cleanOffer,
-        game_state: await gameAPI.getCurrentGame()
+        game_state: gameData || await gameAPI.getCurrentGame()
       });
+      
       console.log("[NEGOCIACIÓN] Respuesta completa de la IA:", result);
       if (result && result.counter_offer) {
         console.log("[NEGOCIACIÓN] Contraoferta de la IA:", result.counter_offer);
         // Mostrar la contraoferta de forma editable y limitar máximos
         counterOffer = {
           player: sanitizeOffer(result.counter_offer.player || {}, playerResources),
-          ai: sanitizeOffer(result.counter_offer.ia || {}, aiResources),
+          ai: sanitizeOffer(result.counter_offer.ai || {}, aiResources),
           ceasefireTurns:
             result.counter_offer.ceasefireTurns === null ||
             result.counter_offer.ceasefireTurns === undefined ||
@@ -108,11 +150,14 @@ async function finalizeDeal(deal) {
               ? 0
               : Number(result.counter_offer.ceasefireTurns)
         };
+        
         // Actualiza los valores del formulario para mostrar la contraoferta
         offer = JSON.parse(JSON.stringify(counterOffer));
       }
+      
       aiResponse = result;
       dispatch("result", result);
+      
       // Si la IA acepta la oferta, finalizar el trato despues de mostrar la respuesta durante 2 segundos
       if (result.accepted) {
         setTimeout(() => {
@@ -136,10 +181,11 @@ async function finalizeDeal(deal) {
   <div class="modal-content">
     <h3>🤝 Negociar con la IA</h3>
     <p class="subtitle">Propón un intercambio de recursos y un alto al fuego:</p>
+    
     <div class="negotiation-section">
       <h4>Tu oferta a la IA</h4>
       <div class="resource-row">
-        {#each Object.keys(offer.player) as res}
+        {#each resourceKeys as res}
           <div class="resource-field">
             <label for={"player-" + res}>{res.charAt(0).toUpperCase() + res.slice(1)}:</label>
             <input
@@ -167,10 +213,11 @@ async function finalizeDeal(deal) {
         {/each}
       </div>
     </div>
+    
     <div class="negotiation-section">
       <h4>Lo que pides a la IA</h4>
       <div class="resource-row">
-        {#each Object.keys(offer.ia) as res}
+        {#each resourceKeys as res}
           <div class="resource-field">
             <label for={"ai-" + res}>{res.charAt(0).toUpperCase() + res.slice(1)}:</label>
             <input
@@ -178,16 +225,16 @@ async function finalizeDeal(deal) {
               type="number"
               min="0"
               max={aiResources?.[res] || 9999}
-              bind:value={offer.ia[res]}
+              bind:value={offer.ai[res]}
               on:input={() => {
                 if (
-                  offer.ia[res] === "" ||
-                  offer.ia[res] === null ||
-                  offer.ia[res] === undefined ||
-                  Number(offer.ia[res]) < 0
-                ) offer.ia[res] = 0;
-                if (aiResources?.[res] !== undefined && Number(offer.ia[res]) > aiResources[res]) {
-                  offer.ia[res] = aiResources[res];
+                  offer.ai[res] === "" ||
+                  offer.ai[res] === null ||
+                  offer.ai[res] === undefined ||
+                  Number(offer.ai[res]) < 0
+                ) offer.ai[res] = 0;
+                if (aiResources?.[res] !== undefined && Number(offer.ai[res]) > aiResources[res]) {
+                  offer.ai[res] = aiResources[res];
                 }
               }}
             />
@@ -196,6 +243,7 @@ async function finalizeDeal(deal) {
         {/each}
       </div>
     </div>
+    
     <div class="negotiation-section ceasefire-section">
       <label>Turnos de alto al fuego:
         <input
@@ -214,16 +262,20 @@ async function finalizeDeal(deal) {
         />
       </label>
     </div>
+    
     <div class="modal-actions">
       <button class="cancel-btn" on:click={() => dispatch("close")}>Cancelar</button>
       <button class="send-btn" on:click={sendOffer} disabled={loading}>Enviar Oferta</button>
     </div>
+    
     {#if loading}
       <div class="loading-msg">Cargando...</div>
     {/if}
+    
     {#if error}
       <div class="error">{error}</div>
     {/if}
+    
     {#if aiResponse}
       <div class="ai-response">
         <h4>Respuesta de la IA:</h4>
@@ -238,11 +290,11 @@ async function finalizeDeal(deal) {
                 <div>Tú ofreces</div>
                 <div>Pides a la IA</div>
               </div>
-              {#each Object.keys(offer.player) as res}
+              {#each resourceKeys as res}
                 <div class="counter-offer-row">
                   <div>{res.charAt(0).toUpperCase() + res.slice(1)}</div>
                   <div class="counter-value">{offer.player[res]}</div>
-                  <div class="counter-value">{offer.ia[res]}</div>
+                  <div class="counter-value">{offer.ai[res]}</div>
                 </div>
               {/each}
               <div class="counter-offer-row">
@@ -264,7 +316,6 @@ async function finalizeDeal(deal) {
 </div>
 
 <style>
-/* filepath: c:\Users\erraz\repos VS\T7_Praktika\frontend\src\components\NegotiationModal.svelte */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;

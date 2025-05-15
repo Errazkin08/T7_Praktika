@@ -487,7 +487,67 @@
     }
   }
 
+  // Update function to check if a unit can negotiate with enemies
+  function canNegotiate(unit) {
+    if (!unit || unit.owner !== "player") {
+      return false;
+    }
+
+    // Already exhausted units can't negotiate
+    if (
+      unit.status === "exhausted" ||
+      (unit.remainingMovement !== undefined && unit.remainingMovement <= 0)
+    ) {
+      return false;
+    }
+
+    // Get unit position
+    const [unitX, unitY] = unit.position;
+
+    // Check for enemies within negotiation range (2 tiles)
+    const negotiationRange = 2;
+
+    // Quick check for nearby enemies
+    for (const enemy of units) {
+      if (
+        enemy.owner !== "ia" ||
+        !enemy.position ||
+        !Array.isArray(enemy.position)
+      )
+        continue;
+
+      const [enemyX, enemyY] = enemy.position;
+
+      // Calculate Manhattan distance (number of steps)
+      const manhattanDistance =
+        Math.abs(enemyX - unitX) + Math.abs(enemyY - unitY);
+
+      // Check if the enemy is within negotiation range
+      if (manhattanDistance <= negotiationRange) {
+        // If fog of war is disabled, all enemies in range can be negotiated with
+        if (!showFogOfWar) {
+          return true;
+        }
+        
+        // Check if enemy is visible (not in fog of war)
+        if (grid[enemyY] && grid[enemyY][enemyX] === FOG_OF_WAR.VISIBLE) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   function openNegotiation(unit) {
+    if (!canNegotiate(unit)) {
+      showToastNotification(
+        "Necesitas estar a 2 casillas de una unidad enemiga para negociar.",
+        "warning"
+      );
+      return;
+    }
+    
     negotiationUnit = unit;
     showNegotiationModal = true;
     negotiationResult = null;
@@ -3818,9 +3878,14 @@
               >
                 Atacar
               </button>
+              
               <button
                 class="action-button negotiate-button"
                 on:click={() => openNegotiation(selectedUnitInfo)}
+                disabled={!canNegotiate(selectedUnitInfo)}
+                title={canNegotiate(selectedUnitInfo) ? 
+                  "Negociar con la IA" : 
+                  "Necesitas estar a 2 casillas de una unidad enemiga para negociar"}
               >
                 Negociar
               </button>
@@ -4132,8 +4197,6 @@
   {#if showNegotiationModal}
     <NegotiationModal
       unit={negotiationUnit}
-      playerResources={gameData?.player?.resources}
-      aiResources={gameData?.ia?.resources}
       on:close={closeNegotiation}
       on:result={handleNegotiationResult}
     />

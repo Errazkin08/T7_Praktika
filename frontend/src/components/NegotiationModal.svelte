@@ -179,11 +179,11 @@
 
 <div class="modal-overlay">
   <div class="modal-content">
-    <h3>🤝 Negociar con la IA</h3>
-    <p class="subtitle">Propón un intercambio de recursos y un alto al fuego:</p>
+    <h3>🤝 IArekin negoziatu</h3>
+    <p class="subtitle">Proposatu baliabide-trukea eta bakea:</p>
     
     <div class="negotiation-section">
-      <h4>Tu oferta a la IA</h4>
+      <h4>Zure eskaintza IAri</h4>
       <div class="resource-row">
         {#each resourceKeys as res}
           <div class="resource-field">
@@ -208,14 +208,14 @@
                 }
               }}
             />
-            <small class="max-info">Máx: {playerResources?.[res] || 0}</small>
+            <small class="max-info">Geh: {playerResources?.[res] || 0}</small>
           </div>
         {/each}
       </div>
     </div>
     
     <div class="negotiation-section">
-      <h4>Lo que pides a la IA</h4>
+      <h4>IAri eskatzen diozuna</h4>
       <div class="resource-row">
         {#each resourceKeys as res}
           <div class="resource-field">
@@ -238,14 +238,14 @@
                 }
               }}
             />
-            <small class="max-info">Máx: {aiResources?.[res] || 0}</small>
+            <small class="max-info">Geh: {aiResources?.[res] || 0}</small>
           </div>
         {/each}
       </div>
     </div>
     
     <div class="negotiation-section ceasefire-section">
-      <label>Turnos de alto al fuego:
+      <label>Bake txandak:
         <input
           type="number"
           min="1"
@@ -264,31 +264,39 @@
     </div>
     
     <div class="modal-actions">
-      <button class="cancel-btn" on:click={() => dispatch("close")}>Cancelar</button>
-      <button class="send-btn" on:click={sendOffer} disabled={loading}>Enviar Oferta</button>
+      <button class="cancel-btn" on:click={() => dispatch("close")}>Utzi</button>
+      <button class="send-btn" on:click={sendOffer} disabled={loading}>
+        {#if !loading}
+          Eskaintza Bidali
+        {:else}
+          <span class="spinner"></span>
+        {/if}
+      </button>
     </div>
     
     {#if loading}
-      <div class="loading-msg">Cargando...</div>
+      <div class="loading-msg">Kargatzen<span class="dot-animation">...</span></div>
     {/if}
     
     {#if error}
-      <div class="error">{error}</div>
+      <div class="error">
+        <i class="error-icon">⚠️</i> {error}
+      </div>
     {/if}
     
     {#if aiResponse}
       <div class="ai-response">
-        <h4>Respuesta de la IA:</h4>
+        <h4>IAren erantzuna:</h4>
         {#if aiResponse.accepted}
-          <div class="accepted">¡La IA ha aceptado tu oferta! <span class="emoji">✅</span></div>
+          <div class="accepted"><i class="success-icon">✅</i> IAk zure eskaintza onartu du!</div>
         {:else if aiResponse.counter_offer}
           <div>
-            <div class="counter-title">La IA propone una contraoferta:</div>
+            <div class="counter-title">IAk kontraeskaintza bat proposatzen du:</div>
             <div class="counter-offer-table">
               <div class="counter-offer-row header">
-                <div>Recurso</div>
-                <div>Tú ofreces</div>
-                <div>Pides a la IA</div>
+                <div>Baliabidea</div>
+                <div>Zuk eskaintzen duzu</div>
+                <div>IAri eskatzen diozu</div>
               </div>
               {#each resourceKeys as res}
                 <div class="counter-offer-row">
@@ -298,17 +306,17 @@
                 </div>
               {/each}
               <div class="counter-offer-row">
-                <div>Turnos de paz</div>
+                <div>Bake txandak</div>
                 <div class="counter-value" colspan="2">{offer.ceasefireTurns}</div>
               </div>
             </div>
             <div class="counter-offer-info">
-              <span>La IA ha modificado la oferta. Puedes aceptarla o modificarla y volver a enviar.</span>
+              <span>IAk eskaintza aldatu du. Onar dezakezu edo aldatu eta berriro bidali.</span>
             </div>
-            <button class="accept-counter-btn" on:click={acceptCounterOffer}>Aceptar Contraoferta</button>
+            <button class="accept-counter-btn" on:click={acceptCounterOffer}>Kontraeskaintza Onartu</button>
           </div>
         {:else}
-          <div class="rejected">La IA ha rechazado la oferta. <span class="emoji">❌</span></div>
+          <div class="rejected"><i class="error-icon">❌</i> IAk eskaintza baztertu du.</div>
         {/if}
       </div>
     {/if}
@@ -316,237 +324,402 @@
 </div>
 
 <style>
+:root {
+  --bg-primary: #151825;
+  --bg-secondary: #1e2235;
+  --bg-tertiary: #272b45;
+  --text-primary: #e8ecf8;
+  --text-secondary: #b9c0de;
+  --accent: #6c8fff;
+  --accent-secondary: #ff6b8e;
+  --success: #4caf50;
+  --error: #ff6b6b;
+  --border: #3a406a;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(10, 15, 30, 0.85);
+  background: rgba(7, 10, 25, 0.92);
   display: flex; align-items: center; justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
+
 .modal-content {
-  background: linear-gradient(135deg, #23263a 80%, #181a26 100%);
-  border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
-  padding: 2.5rem 2.2rem 2rem 2.2rem;
-  min-width: 370px;
-  max-width: 420px;
-  border: 2px solid #2e3650;
+  background: linear-gradient(160deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 20px rgba(108,143,255,0.15);
+  padding: 2.5rem 2.5rem 2.2rem;
+  min-width: 380px;
+  max-width: 440px;
+  border: 1px solid var(--border);
   position: relative;
-  animation: modal-in 0.3s;
+  animation: modal-in 0.4s cubic-bezier(0.19, 1, 0.22, 1);
   max-height: 90vh;
   overflow-y: auto;
 }
+
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(-30px) scale(0.97);}
+  from { opacity: 0; transform: translateY(-40px) scale(0.95);}
   to   { opacity: 1; transform: translateY(0) scale(1);}
 }
+
 h3 {
   margin-top: 0;
-  margin-bottom: 0.5rem;
-  font-size: 1.6rem;
-  color: #e0e6f7;
+  margin-bottom: 0.7rem;
+  font-size: 1.7rem;
+  color: var(--text-primary);
   letter-spacing: 0.5px;
   font-weight: 700;
   text-align: center;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
+
 .subtitle {
-  color: #b2b8d6;
+  color: var(--text-secondary);
   font-size: 1.05rem;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.5rem;
   text-align: center;
+  font-weight: 400;
 }
+
 .negotiation-section {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.5rem;
+  background: rgba(30, 34, 53, 0.4);
+  padding: 1.2rem;
+  border-radius: 16px;
+  border: 1px solid rgba(58, 64, 106, 0.4);
+  transition: all 0.2s ease;
 }
+
+.negotiation-section:hover {
+  background: rgba(30, 34, 53, 0.6);
+  border: 1px solid rgba(58, 64, 106, 0.6);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
 .negotiation-section h4 {
-  margin: 0 0 0.5rem 0;
-  color: #b2b8d6;
-  font-size: 1.08rem;
+  margin: 0 0 0.8rem 0;
+  color: var(--accent);
+  font-size: 1.1rem;
   font-weight: 600;
 }
+
 .resource-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem 1.2rem;
+  gap: 0.9rem 1.4rem;
   margin-bottom: 0.2rem;
 }
+
 .resource-field {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   min-width: 90px;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.4rem;
 }
+
 .resource-field label {
-  font-size: 0.98rem;
-  color: #b2b8d6;
-  margin-bottom: 0.1rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
   font-weight: 500;
 }
-.resource-field input {
-  width: 60px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1.5px solid #2e3650;
-  background: #23263a;
-  color: #e0e6f7;
+
+.resource-field input, .ceasefire-section input {
+  width: 70px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid rgba(58, 64, 106, 0.6);
+  background: rgba(21, 24, 37, 0.7);
+  color: var(--text-primary);
   font-size: 1rem;
-  transition: border 0.2s, background 0.2s;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
-.resource-field input:focus {
-  border: 1.5px solid #5b7cff;
+
+.resource-field input:focus, .ceasefire-section input:focus {
+  border: 2px solid var(--accent);
   outline: none;
-  background: #23263a;
+  background: rgba(21, 24, 37, 0.9);
+  box-shadow: 0 0 0 3px rgba(108,143,255,0.15);
 }
+
 .max-info {
-  color: #888;
+  color: #828aa8;
   font-size: 0.85em;
-  margin-top: 2px;
+  margin-top: 4px;
   margin-left: 2px;
 }
+
+.ceasefire-section {
+  display: flex;
+  justify-content: center;
+}
+
 .ceasefire-section label {
   font-size: 1.05rem;
-  color: #b2b8d6;
+  color: var(--text-secondary);
   font-weight: 500;
+  display: flex;
+  align-items: center;
 }
+
 .ceasefire-section input {
   width: 60px;
-  margin-left: 0.5rem;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1.5px solid #2e3650;
-  background: #23263a;
-  color: #e0e6f7;
-  font-size: 1rem;
-  transition: border 0.2s, background 0.2s;
+  margin-left: 0.8rem;
 }
-.ceasefire-section input:focus {
-  border: 1.5px solid #5b7cff;
-  outline: none;
-  background: #23263a;
-}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  margin-top: 1.2rem;
+  margin-top: 1.8rem;
 }
+
 .cancel-btn, .send-btn, .accept-counter-btn {
-  padding: 0.5rem 1.2rem;
-  border-radius: 7px;
+  padding: 0.65rem 1.4rem;
+  border-radius: 12px;
   border: none;
   font-size: 1.05rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  transition: all 0.3s ease;
 }
+
 .cancel-btn {
-  background: #23263a;
-  color: #b2b8d6;
-  border: 1.5px solid #2e3650;
+  background: rgba(30, 34, 53, 0.8);
+  color: var(--text-secondary);
+  border: 2px solid rgba(58, 64, 106, 0.6);
 }
+
 .cancel-btn:hover {
-  background: #181a26;
+  background: rgba(21, 24, 37, 0.9);
+  transform: translateY(-2px);
 }
+
 .send-btn {
-  background: linear-gradient(90deg, #5b7cff 60%, #23263a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #5367dd 100%);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(91,124,255,0.07);
+  box-shadow: 0 4px 15px rgba(108,143,255,0.25);
+  min-width: 150px;
+  position: relative;
 }
+
 .send-btn:disabled {
   background: #2e3650;
-  color: #b2b8d6;
+  color: #8c94b7;
+  box-shadow: none;
   cursor: not-allowed;
+  transform: none;
 }
+
 .send-btn:hover:enabled {
-  background: linear-gradient(90deg, #23263a 60%, #5b7cff 100%);
+  background: linear-gradient(135deg, #5b7cff 0%, #4a5dcf 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(108,143,255,0.3);
 }
+
 .accept-counter-btn {
-  background: #388e3c;
+  background: linear-gradient(135deg, var(--success) 0%, #388e3c 100%);
   color: #fff;
-  margin-top: 0.7rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 15px rgba(76,175,80,0.2);
+  width: 100%;
+  font-size: 1.1rem;
+  padding: 0.7rem 0;
 }
+
 .accept-counter-btn:hover {
-  background: #256c27;
+  background: linear-gradient(135deg, #45a049 0%, #2e7d32 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(76,175,80,0.3);
 }
+
 .loading-msg {
   margin-top: 1rem;
-  color: #5b7cff;
+  color: var(--accent);
   font-weight: 500;
   text-align: center;
+  font-size: 1.1rem;
 }
+
+.dot-animation {
+  animation: dots 1.5s infinite;
+  display: inline-block;
+  width: 20px;
+}
+
+@keyframes dots {
+  0%, 20% { content: "."; }
+  40% { content: ".."; }
+  60%, 100% { content: "..."; }
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .error {
-  color: #ff6b6b;
-  margin-top: 0.7rem;
+  color: var(--error);
+  margin-top: 1rem;
   text-align: center;
   font-weight: 600;
-}
-.ia-response {
-  margin-top: 1.2rem;
-  background: #23263a;
-  padding: 1.1rem 1rem 1rem 1rem;
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.3);
+  padding: 0.7rem;
   border-radius: 10px;
-  border: 1.5px solid #2e3650;
-  box-shadow: 0 2px 8px rgba(91,124,255,0.04);
-  color: #e0e6f7;
-  font-size: 1.08rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.error-icon, .success-icon {
+  margin-right: 0.5rem;
+  font-style: normal;
+  font-size: 1.2rem;
+}
+
+.ai-response {
+  margin-top: 1.8rem;
+  background: linear-gradient(135deg, rgba(30, 34, 53, 0.6) 0%, rgba(21, 24, 37, 0.6) 100%);
+  padding: 1.3rem 1.2rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid rgba(58, 64, 106, 0.5);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  color: var(--text-primary);
+  font-size: 1.08rem;
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-response h4 {
+  color: var(--accent);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
 .accepted, .rejected {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 600;
   margin-top: 0.5rem;
   text-align: center;
+  padding: 0.8rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.accepted { color: #4caf50; }
-.rejected { color: #ff6b6b; }
-.emoji { font-size: 1.3em; vertical-align: middle; }
+
+.accepted { 
+  color: var(--success); 
+  background: rgba(76,175,80,0.1);
+  border: 1px solid rgba(76,175,80,0.2);
+}
+
+.rejected { 
+  color: var(--error); 
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.2);
+}
+
+.emoji { 
+  font-size: 1.4em; 
+  vertical-align: middle; 
+  margin-right: 0.5rem;
+}
+
 .counter-title {
   font-weight: 600;
-  color: #b2b8d6;
-  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 1.1rem;
 }
+
 .counter-offer-table {
-  margin: 0.7rem 0 0.5rem 0;
-  border-radius: 6px;
+  margin: 1.2rem 0;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #2e3650;
-  background: #181a26;
+  border: 1px solid var(--border);
+  background: rgba(21, 24, 37, 0.5);
   font-size: 0.98rem;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
 }
+
 .counter-offer-row {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #2e3650;
+  border-bottom: 1px solid rgba(58, 64, 106, 0.4);
+  transition: background 0.2s;
 }
+
 .counter-offer-row.header {
-  background: #23263a;
-  color: #b2b8d6;
+  background: linear-gradient(90deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-secondary);
   font-weight: 600;
+  padding: 0.5rem 0;
 }
+
+.counter-offer-row:not(.header):hover {
+  background: rgba(108,143,255,0.05);
+}
+
 .counter-offer-row:last-child {
   border-bottom: none;
 }
+
 .counter-offer-row > div {
   flex: 1;
-  padding: 0.4rem 0.7rem;
+  padding: 0.6rem 0.7rem;
   text-align: center;
 }
+
 .counter-value {
-  color: #5b7cff;
+  color: var(--accent);
   font-weight: 600;
 }
+
 .counter-offer-info {
-  margin: 0.5rem 0 0.2rem 0;
-  color: #b2b8d6;
+  margin: 0.8rem 0;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   text-align: center;
+  padding: 0.6rem;
+  background: rgba(21, 24, 37, 0.3);
+  border-radius: 8px;
 }
+
 @media (max-width: 500px) {
   .modal-content {
     min-width: 95vw;
-    padding: 1.2rem 0.5rem;
+    padding: 1.5rem 1rem;
   }
-  .resource-row { flex-direction: column; gap: 0.5rem 0; }
+  .resource-row { 
+    flex-direction: column; 
+    gap: 0.6rem; 
+  }
+  .negotiation-section {
+    padding: 1rem;
+  }
 }
 </style>

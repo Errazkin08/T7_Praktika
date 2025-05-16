@@ -3,9 +3,9 @@
 </script>
 
 <div class="not-found">
-  <h1>404 - Page Not Found</h1>
-  <p>The page you are looking for doesn't exist or has been moved.</p>
-  <a href="/" on:click|preventDefault={() => navigate('/')}>Go back to Home</a>
+  <h1>404 - Orrialdea ez da aurkitu</h1>
+  <p>Bilatzen ari zaren orrialdea ez da existitzen edo mugitu egin da.</p>
+  <a href="/" on:click|preventDefault={() => navigate('/')}>Itzuli hasierako orrira</a>
 </div>
 
 <style>

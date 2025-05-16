@@ -55,7 +55,7 @@
       }
     } catch (err) {
       console.error("Login error:", err);
-      error = err.message || "Failed to login. Please check your credentials.";
+      error = err.message || "Saioa hastean huts egin du. Egiaztatu zure kredentzialak.";
     } finally {
       isLoading = false;
     }
@@ -63,7 +63,7 @@
 </script>
 
 <div class="login">
-  <h1>Login</h1>
+  <h1>Hasi saioa</h1>
   
   {#if error}
     <div class="error-message">{error}</div>
@@ -71,26 +71,26 @@
   
   <form on:submit|preventDefault={handleSubmit}>
     <div class="form-group">
-      <label for="username">Username</label>
+      <label for="username">Erabiltzaile-izena</label>
       <input type="text" id="username" bind:value={username} required disabled={isLoading} />
     </div>
     
     <div class="form-group">
-      <label for="password">Password</label>
+      <label for="password">Pasahitza</label>
       <input type="password" id="password" bind:value={password} required disabled={isLoading} />
     </div>
     
     <button type="submit" disabled={isLoading}>
       {#if isLoading}
-        Loading...
+        Kargatzen...
       {:else}
-        Login
+        Hasi saioa
       {/if}
     </button>
   </form>
   
   <p>
-    Don't have an account? <a href="/register" on:click|preventDefault={() => navigate('/register')}>Register</a>
+    Ez duzu konturik? <a href="/register" on:click|preventDefault={() => navigate('/register')}>Erregistratu</a>
   </p>
 </div>
 

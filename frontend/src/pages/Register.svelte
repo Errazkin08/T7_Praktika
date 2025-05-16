@@ -16,7 +16,7 @@
       
       // Client-side validation
       if (password !== confirmPassword) {
-        error = "Passwords do not match";
+        error = "Pasahitzak ez datoz bat";
         return;
       }
       
@@ -61,7 +61,7 @@
       
     } catch (err) {
       console.error("Registration error:", err);
-      error = err.message || "Registration failed. Please try again.";
+      error = err.message || "Erregistratzeak huts egin du. Saiatu berriro.";
     } finally {
       isLoading = false;
     }
@@ -69,7 +69,7 @@
 </script>
 
 <div class="register">
-  <h1>Register</h1>
+  <h1>Erregistratu</h1>
   
   {#if error}
     <div class="error-message">{error}</div>
@@ -77,36 +77,36 @@
   
   <form on:submit|preventDefault={handleSubmit}>
     <div class="form-group">
-      <label for="username">Username</label>
+      <label for="username">Erabiltzaile-izena</label>
       <input type="text" id="username" bind:value={username} required disabled={isLoading} />
     </div>
     
     <div class="form-group">
-      <label for="email">Email</label>
+      <label for="email">Helbide elektronikoa</label>
       <input type="email" id="email" bind:value={email} required disabled={isLoading} />
     </div>
     
     <div class="form-group">
-      <label for="password">Password</label>
+      <label for="password">Pasahitza</label>
       <input type="password" id="password" bind:value={password} required disabled={isLoading} />
     </div>
     
     <div class="form-group">
-      <label for="confirmPassword">Confirm Password</label>
+      <label for="confirmPassword">Pasahitza berretsi</label>
       <input type="password" id="confirmPassword" bind:value={confirmPassword} required disabled={isLoading} />
     </div>
     
     <button type="submit" disabled={isLoading}>
       {#if isLoading}
-        Loading...
+        Kargatzen...
       {:else}
-        Register
+        Erregistratu
       {/if}
     </button>
   </form>
   
   <p>
-    Already have an account? <a href="/login" on:click|preventDefault={() => navigate('/login')}>Login</a>
+    Dagoeneko kontua duzu? <a href="/login" on:click|preventDefault={() => navigate('/login')}>Hasi saioa</a>
   </p>
 </div>
 

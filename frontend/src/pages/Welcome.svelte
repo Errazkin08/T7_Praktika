@@ -14,14 +14,14 @@
 <div class="welcome-page">
   <div class="welcome-container">
     <h1>CIVilizaTu Game</h1>
-    <p>Welcome to the CIVilizaTu Strategy Game</p>
+    <p>Ongi etorri CIVilizaTu Estrategia Jokora</p>
     
     <div class="action-buttons">
       <button class="btn-primary" on:click={() => navigate('/login')}>
-        Login
+        Hasi saioa
       </button>
       <button class="btn-secondary" on:click={() => navigate('/register')}>
-        Register
+        Erregistratu
       </button>
     </div>
   </div>

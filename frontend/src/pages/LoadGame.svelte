@@ -144,41 +144,41 @@
   
   function getDifficultyDisplay(difficulty) {
     switch(difficulty) {
-      case 'easy': return 'Fácil';
-      case 'medium': return 'Media';
-      case 'hard': return 'Difícil';
-      default: return difficulty || 'Media';
+      case 'easy': return 'Erraza';
+      case 'medium': return 'Ertaina';
+      case 'hard': return 'Zaila';
+      default: return difficulty || 'Ertaina';
     }
   }
 </script>
 
 <div class="load-game-page">
   <button class="back-button-inline" on:click={() => navigate('/home')}>
-    Volver al Inicio
+    Hasierara Itzuli
   </button>
   <div class="page-header">
-    <h1>Cargar Partida</h1>
+    <h1>Jokoa Kargatu</h1>
   </div>
   
   <div class="games-container">
     {#if isLoading}
       <div class="loading-state">
         <div class="loading-spinner"></div>
-        <p>Cargando partidas guardadas...</p>
+        <p>Gordetako jokoak kargatzen...</p>
       </div>
     {:else if error}
       <div class="error-state">
         <p>{error}</p>
         <button class="retry-button" on:click={loadUserGames}>
-          Reintentar
+          Berriro Saiatu
         </button>
       </div>
     {:else if savedGames.length === 0}
       <div class="empty-state">
-        <h2>No hay partidas guardadas</h2>
-        <p>Aún no tienes partidas guardadas. ¡Comienza una nueva partida!</p>
+        <h2>Ez dago gordetako jokorik</h2>
+        <p>Oraindik ez duzu joko bat ere gorde. Hasi joko berri bat!</p>
         <button class="new-game-button" on:click={() => navigate('/new-game')}>
-          Iniciar Nueva Partida
+          Joko Berria Hasi
         </button>
       </div>
     {:else}
@@ -186,38 +186,38 @@
         {#each savedGames as game}
           <div class="game-card" on:click={() => loadGame(game.game_id)}>
             <div class="game-info">
-              <h3>{game.name || `Partida ${game.game_id.substring(0, 6)}...`}</h3>
+              <h3>{game.name || `Jokoa ${game.game_id.substring(0, 6)}...`}</h3>
               
               <div class="game-stats">
                 <div class="stat">
-                  <span class="stat-label">Dificultad:</span>
+                  <span class="stat-label">Zailtasuna:</span>
                   <span class="stat-value">{getDifficultyDisplay(game.difficulty)}</span>
                 </div>
                 
                 <div class="stat">
-                  <span class="stat-label">Tamaño de mapa:</span>
+                  <span class="stat-label">Mapa tamaina:</span>
                   <span class="stat-value">{getMapSizeDisplay(game)}</span>
                 </div>
                 
                 {#if game.created_at}
                 <div class="stat">
-                  <span class="stat-label">Creado:</span>
+                  <span class="stat-label">Sortua:</span>
                   <span class="stat-value">{formatDate(game.created_at)}</span>
                 </div>
                 {/if}
                 
                 {#if game.last_saved && game.last_saved !== game.created_at}
                 <div class="stat">
-                  <span class="stat-label">Guardado:</span>
+                  <span class="stat-label">Gordeta:</span>
                   <span class="stat-value">{formatDate(game.last_saved)}</span>
                 </div>
                 {/if}
               </div>
             </div>
             <div class="card-actions">
-              <button class="load-button">Cargar Partida</button>
+              <button class="load-button">Jokoa Kargatu</button>
               <button class="delete-button" on:click={(e) => deleteGame(e, game.game_id)}>
-                Borrar
+                Ezabatu
               </button>
             </div>
           </div>
@@ -229,11 +229,11 @@
   {#if confirmingDelete}
     <div class="confirm-dialog-overlay">
       <div class="confirm-dialog">
-        <h3>Confirmar Borrado</h3>
-        <p>¿Estás seguro de que quieres borrar esta partida? Esta acción no se puede deshacer.</p>
+        <h3>Ezabatzea Baieztatu</h3>
+        <p>Ziur zaude joko hau ezabatu nahi duzula? Ekintza hau ezin da desegin.</p>
         <div class="dialog-buttons">
-          <button class="cancel-button" on:click={cancelDelete}>Cancelar</button>
-          <button class="confirm-button" on:click={confirmDelete}>Borrar</button>
+          <button class="cancel-button" on:click={cancelDelete}>Utzi</button>
+          <button class="confirm-button" on:click={confirmDelete}>Ezabatu</button>
         </div>
       </div>
     </div>

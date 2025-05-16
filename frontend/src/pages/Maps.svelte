@@ -202,82 +202,82 @@
 
 <div class="maps-page">
   <button class="back-button-inline" on:click={() => navigate('/home')}>
-    Volver al Inicio
+    Hasierara Itzuli
   </button>
   {#if error}
     <div class="error-message">
       <p>{error}</p>
-      <button on:click={() => { error = null; }}>Cerrar</button>
+      <button on:click={() => { error = null; }}>Itxi</button>
     </div>
   {/if}
   
   <div class="page-header">
-    <h1>Gestión de Mapas</h1>
+    <h1>Mapen Kudeaketa</h1>
   </div>
   
   {#if isLoading}
     <div class="loading">
       <div class="loading-spinner"></div>
-      <p>Cargando...</p>
+      <p>Kargatzen...</p>
     </div>
   {:else}
     <div class="maps-container">
       <div class="section-header">
-        <h2>Mapas Disponibles</h2>
+        <h2>Mapa Eskuragarriak</h2>
         <button class="create-map-button" on:click={() => showCreateMapForm = !showCreateMapForm}>
-          {showCreateMapForm ? 'Cancelar' : 'Crear Nuevo Mapa'}
+          {showCreateMapForm ? 'Utzi' : 'Mapa Berria Sortu'}
         </button>
       </div>
       
       {#if showCreateMapForm}
         <div class="create-map-form">
-          <h3>Crear Nuevo Mapa</h3>
+          <h3>Mapa Berria Sortu</h3>
           
           <div class="form-group">
-            <label for="map-name">Nombre del mapa:</label>
+            <label for="map-name">Maparen izena:</label>
             <input type="text" id="map-name" bind:value={newMapData.name} 
-              placeholder="Nombre personalizado (opcional)" />
+              placeholder="Izen pertsonalizatua (aukerakoa)" />
           </div>
           
           <div class="form-group">
-            <label for="map-width">Ancho:</label>
+            <label for="map-width">Zabalera:</label>
             <input type="number" id="map-width" bind:value={newMapData.width} min="10" max="100" />
           </div>
           
           <div class="form-group">
-            <label for="map-height">Alto:</label>
+            <label for="map-height">Altuera:</label>
             <input type="number" id="map-height" bind:value={newMapData.height} min="10" max="100" />
           </div>
           
           <div class="form-group">
-            <label for="map-start">Punto de Inicio [x,y]:</label>
+            <label for="map-start">Hasiera Puntua [x,y]:</label>
             <input type="text" id="map-start" 
               bind:value={newMapData.startPoint} 
               placeholder="15,7" />
-            <small class="form-hint">Las coordenadas deben estar entre 0 y el ancho/alto del mapa. Ejemplo: 15,7</small>
+            <small class="form-hint">Koordenatuak 0 eta maparen zabalera/altuera artean egon behar dira. Adibidez: 15,7</small>
           </div>
           
           <div class="form-group">
-            <label for="map-difficulty">Dificultad:</label>
+            <label for="map-difficulty">Zailtasuna:</label>
             <select id="map-difficulty" bind:value={newMapData.difficulty}>
-              <option value="easy">Fácil</option>
-              <option value="medium">Media</option>
-              <option value="hard">Difícil</option>
+              <option value="easy">Erraza</option>
+              <option value="medium">Ertaina</option>
+              <option value="hard">Zaila</option>
             </select>
           </div>
           
           <button class="submit-map-button" on:click={createNewMap} disabled={isLoading}>
-            {isLoading ? 'Creando...' : 'Crear Mapa'}
+            {isLoading ? 'Sortzen...' : 'Mapa Sortu'}
           </button>
         </div>
       {/if}
       
       {#if maps.length === 0}
         <div class="no-maps">
-          <p>No hay mapas disponibles.</p>
+          <p>Ez dago mapa eskuragarririk.</p>
           {#if !showCreateMapForm}
             <button class="create-map-button" on:click={() => showCreateMapForm = true}>
-              Crear Nuevo Mapa
+              Mapa Berria Sortu
             </button>
           {/if}
         </div>
@@ -290,10 +290,10 @@
               </div>
               <div class="map-info">
                 <h3>{map.name || `Mapa ${map.map_id.substring(0, 8)}...`}</h3>
-                <p>Dimensiones: {map.width}x{map.height}</p>
-                <p>Dificultad: {map.difficulty || 'normal'}</p>
+                <p>Neurriak: {map.width}x{map.height}</p>
+                <p>Zailtasuna: {map.difficulty || 'normal'}</p>
                 <button class="delete-button" on:click={() => confirmDelete(map)}>
-                  Borrar Mapa
+                  Mapa Ezabatu
                 </button>
               </div>
             </div>
@@ -306,18 +306,18 @@
   {#if showConfirmDialog}
     <div class="confirm-dialog-overlay">
       <div class="confirm-dialog">
-        <h3>Confirmar Borrado</h3>
-        <p>¿Estás seguro de que quieres borrar este mapa? Esta acción no se puede deshacer.</p>
+        <h3>Ezabatzea Baieztatu</h3>
+        <p>Ziur zaude mapa hau ezabatu nahi duzula? Ekintza hau ezin da desegin.</p>
         
         <div class="map-info">
           <p><strong>ID:</strong> {mapToDelete.map_id}</p>
-          <p><strong>Dimensiones:</strong> {mapToDelete.width}x{mapToDelete.height}</p>
-          <p><strong>Dificultad:</strong> {mapToDelete.difficulty || 'normal'}</p>
+          <p><strong>Neurriak:</strong> {mapToDelete.width}x{mapToDelete.height}</p>
+          <p><strong>Zailtasuna:</strong> {mapToDelete.difficulty || 'normal'}</p>
         </div>
         
         <div class="dialog-buttons">
-          <button class="cancel-button" on:click={cancelDelete}>Cancelar</button>
-          <button class="confirm-button" on:click={deleteMap}>Borrar</button>
+          <button class="cancel-button" on:click={cancelDelete}>Utzi</button>
+          <button class="confirm-button" on:click={deleteMap}>Ezabatu</button>
         </div>
       </div>
     </div>

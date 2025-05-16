@@ -13,27 +13,27 @@
 
 <div class="dashboard">
   <div class="welcome-header">
-    <h1>Welcome, {$user ? $user.username : 'Player'}</h1>
-    <p>Choose an option to start playing</p>
+    <h1>Ongi etorri, {$user ? $user.username : 'Jokalari'}</h1>
+    <p>Aukeratu aukera bat jokatzen hasteko</p>
   </div>
   
   <div class="options-container">
     <div class="option-card" on:click={() => navigate('/new-game')}>
       <div class="option-icon">🎮</div>
-      <h2>New Game</h2>
-      <p>Start a new CIVilizaTu and conquer the world</p>
+      <h2>Joko Berria</h2>
+      <p>Hasi CIVilizaTu berri bat eta konkistatu mundua</p>
     </div>
     
     <div class="option-card" on:click={() => navigate('/load-game')}>
       <div class="option-icon">💾</div>
-      <h2>Load Game</h2>
-      <p>Continue one of your saved games</p>
+      <h2>Jokoa Kargatu</h2>
+      <p>Jarraitu zure gordetako jokoetako bat</p>
     </div>
     
     <div class="option-card" on:click={() => navigate('/maps')}>
       <div class="option-icon">🗺️</div>
-      <h2>Mapas</h2>
-      <p>Gestionar los mapas disponibles</p>
+      <h2>Mapak</h2>
+      <p>Kudeatu eskuragarri dauden mapak</p>
     </div>
   </div>
 </div>

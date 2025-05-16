@@ -41,7 +41,7 @@
 
   // Add a helper function to render costs dynamically based on what's in the cost object
   function getResourceCostString(costObject) {
-    if (!costObject) return 'Costo no disponible';
+    if (!costObject) return 'Kostua ez dago eskuragarri';
     
     const resourceDisplay = [];
     
@@ -66,7 +66,7 @@
       resourceDisplay.push(`<span class="resource-cost-item"><img src="./ia_assets/lingote_hierro.png" alt="Iron" class="resource-icon-small" style="width:12px;height:12px;vertical-align:middle;" /> ${costObject.iron}</span>`);
     }
     
-    return resourceDisplay.length > 0 ? resourceDisplay.join(' ') : 'Costo no disponible';
+    return resourceDisplay.length > 0 ? resourceDisplay.join(' ') : 'Kostua ez dago eskuragarri';
   }
 
   // Add a helper function to check if player has the required technology
@@ -260,27 +260,27 @@
   async function startResearch(technology) {
     try {
       if (!city) {
-        showToastNotification("Error: No hay ciudad seleccionada", "error");
+        showToastNotification("Errorea: Ez dago hiririk hautatuta", "error");
         return;
       }
       
       // Find the library building
       const library = findLibraryBuilding();
       if (!library) {
-        showToastNotification("La ciudad necesita una biblioteca para investigar tecnologías", "error");
+        showToastNotification("Hiriak liburutegi bat behar du teknologiak ikertzeko", "error");
         return;
       }
       
       // Check if there's already research in progress
       if ((library.production && library.production.current_technology) || 
           (city.research && city.research.current_technology)) {
-        showToastNotification("Ya hay una investigación en curso", "error");
+        showToastNotification("Dagoeneko ikerketa bat martxan dago", "error");
         return;
       }
       
       // Check if population meets minimum requirement
       if (city.population < technology.min_civilians) {
-        showToastNotification(`Se requieren al menos ${technology.min_civilians} ciudadanos para investigar esta tecnología`, "error");
+        showToastNotification(`Teknologia hau ikertzeko gutxienez ${technology.min_civilians} herritar behar dira`, "error");
         return;
       }
       
@@ -294,7 +294,7 @@
         );
         
         if (missingPrereqs.length > 0) {
-          showToastNotification(`Faltan tecnologías previas: ${missingPrereqs.join(", ")}`, "error");
+          showToastNotification(`Aurretiko teknologiak falta dira: ${missingPrereqs.join(", ")}`, "error");
           return;
         }
       }
@@ -328,7 +328,7 @@
           await gameAPI.updateGameSession(gameData);
           
           // Show confirmation
-          showToastNotification(`¡Iniciada investigación de ${technology.name}!`, "success");
+          showToastNotification(`¡${technology.name} ikerketa hasi da!`, "success");
           
           // Switch to the summary tab to show the research info
           setActiveTab('summary');
@@ -336,7 +336,7 @@
       }
     } catch (err) {
       console.error("Error starting research:", err);
-      showToastNotification("Error al iniciar la investigación", "error");
+      showToastNotification("Errorea ikerketa hasterakoan", "error");
     }
   }
 
@@ -348,7 +348,7 @@
       const hasCityResearch = city && city.research && city.research.current_technology;
       
       if (!hasLibraryResearch && !hasCityResearch) {
-        showToastNotification("No hay investigación activa que cancelar", "warning");
+        showToastNotification("Ez dago ezeztatzeko ikerketa aktiborik", "warning");
         return;
       }
 
@@ -359,12 +359,12 @@
       const displayName = techName || (techType ? techType.name : techId);
       
       // Show the confirmation dialog
-      confirmationMessage = `¿Estás seguro de que quieres cancelar la investigación de ${displayName}? No recuperarás ningún progreso.`;
+      confirmationMessage = `Ziur zaude ${displayName} ikerketa ezeztatu nahi duzula? Ez duzu aurrerapenik berreskuratuko.`;
       confirmationCallback = confirmCancelResearch;
       showConfirmationDialog = true;
     } catch (error) {
-      console.error("Error al cancelar la investigación:", error);
-      showToastNotification("Error al cancelar la investigación", "error");
+      console.error("Errorea ikerketa ezeztatzean:", error);
+      showToastNotification("Errorea ikerketa ezeztatzean", "error");
     }
   }
 
@@ -396,12 +396,12 @@
           await gameAPI.updateGameSession(gameData);
           
           // Show confirmation
-          showToastNotification("Investigación cancelada", "info");
+          showToastNotification("Ikerketa ezeztatu da", "info");
         }
       }
     } catch (error) {
-      console.error("Error al cancelar la investigación:", error);
-      showToastNotification("Error al cancelar la investigación", "error");
+      console.error("Errorea ikerketa ezeztatzean:", error);
+      showToastNotification("Errorea ikerketa ezeztatzean", "error");
     } finally {
       // Reset the confirmation dialog state
       closeConfirmationDialog();
@@ -414,7 +414,7 @@
     
     // Check if troop is locked due to technology requirements
     if (!hasTechnology(troopType.technology)) {
-      showToastNotification(`Se requiere la tecnología "${troopType.technology}" para ${troopType.name}`, "warning");
+      showToastNotification(`"${troopType.technology}" teknologia beharrezkoa da ${troopType.name} egiteko`, "warning");
       return;
     }
     
@@ -435,7 +435,7 @@
     
     // Check if building is locked due to technology requirements
     if (!hasTechnology(buildingType.technology)) {
-      showToastNotification(`Se requiere la tecnología "${buildingType.technology}" para ${buildingType.name}`, "warning");
+      showToastNotification(`"${buildingType.technology}" teknologia beharrezkoa da ${buildingType.name} egiteko`, "warning");
       return;
     }
     
@@ -485,7 +485,7 @@
   function confirmStartProduction(item, itemType) {
     // Mostrar el coste en el mensaje
     const costString = getResourceCostString(item.cost);
-    productionConfirmationMessage = `¿Quieres iniciar la ${itemType === 'troop' ? 'producción de la unidad' : (buildingTypeExists(item) ? 'mejora del edificio' : 'construcción del edificio')} "${item.name}"?\nCoste: ${costString}`;
+    productionConfirmationMessage = `${itemType === 'troop' ? 'Unitate honen ekoizpena' : (buildingTypeExists(item) ? 'Eraikin honen hobekuntza' : 'Eraikin honen eraikuntza')} "${item.name}" hasi nahi duzu?\nKostua: ${costString}`;
     productionConfirmationCallback = () => doStartProduction(item, itemType);
     productionItemToStart = item;
     productionItemTypeToStart = itemType;
@@ -518,19 +518,19 @@
   async function startProduction(item, itemType) {
     try {
       if (!city) {
-        showToastNotification("Error: No hay ciudad seleccionada", "error");
+        showToastNotification("Errorea: Ez dago hiririk hautatuta", "error");
         return;
       }
 
       // Check technology requirement again as a security measure
       if (!hasTechnology(item.technology)) {
-        showToastNotification(`Se requiere la tecnología "${item.technology}" para producir ${item.name}`, "error");
+        showToastNotification(`"${item.technology}" teknologia beharrezkoa da ${item.name} ekoizteko`, "error");
         return;
       }
 
       // Check if there's already production in progress
       if (city.production && city.production.current_item) {
-        showToastNotification("Ya hay una producción en curso", "error");
+        showToastNotification("Dagoeneko ekoizpen bat martxan dago", "error");
         return;
       }
 
@@ -548,7 +548,7 @@
           }
         }
         if (!canAfford) {
-          showToastNotification("No tienes suficientes recursos para iniciar la producción", "error");
+          showToastNotification("Ez duzu nahikoa baliabide ekoizpena hasteko", "error");
           return;
         }
         // Restar todos los recursos (solo si puede pagarlos todos)
@@ -558,7 +558,7 @@
           }
         }
       } else {
-        showToastNotification("Error: No se pueden obtener los recursos del jugador", "error");
+        showToastNotification("Errorea: Ezin dira jokalariaren baliabideak lortu", "error");
         return;
       }
 
@@ -569,7 +569,7 @@
       const itemId = item.id || item.type_id;
 
       if (!itemId) {
-        showToastNotification(`Error: No se puede identificar el tipo de ${itemType === 'troop' ? 'tropa' : 'edificio'}`, "error");
+        showToastNotification(`Errorea: Ezin da ${itemType === 'troop' ? 'tropa' : 'eraikina'} identifikatu`, "error");
         return;
       }
 
@@ -609,11 +609,11 @@
 
           // Show feedback messages based on production type
           if (production_type === 'upgrade') {
-            showToastNotification(`¡Iniciada mejora de ${item.name}!`, "success");
+            showToastNotification(`¡${item.name} hobekuntza hasi da!`, "success");
           } else if (production_type === 'build') {
-            showToastNotification(`¡Iniciada construcción de ${item.name}!`, "success");
+            showToastNotification(`¡${item.name} eraikuntza hasi da!`, "success");
           } else {
-            showToastNotification(`¡Iniciado entrenamiento de ${item.name}!`, "success");
+            showToastNotification(`¡${item.name} trebakuntza hasi da!`, "success");
           }
 
           // Switch to the summary tab to show the production info
@@ -621,8 +621,8 @@
         }
       }
     } catch (err) {
-      console.error(`Error starting ${itemType} production:`, err);
-      showToastNotification("Error al iniciar la producción", "error");
+      console.error(`Errorea ${itemType} ekoizpena hasterakoan:`, err);
+      showToastNotification("Errorea ekoizpena hasterakoan", "error");
     }
   }
 
@@ -630,7 +630,7 @@
   async function cancelProduction() {
     try {
       if (!city || !city.production || !city.production.current_item) {
-        showToastNotification("No hay producción activa que cancelar", "warning");
+        showToastNotification("Ez dago ezeztatzeko ekoizpen aktiborik", "warning");
         return;
       }
       
@@ -650,13 +650,13 @@
       itemToCancel = itemName;
       
       // Show the confirmation dialog instead of using browser confirm()
-      confirmationMessage = `¿Estás seguro de que quieres cancelar la ${city.production.production_type === 'upgrade' ? 'mejora' : 
-        city.production.production_type === 'build' ? 'construcción' : 'producción'} de ${itemName}? No recuperarás ningún recurso.`;
+      confirmationMessage = `Ziur zaude ${city.production.production_type === 'upgrade' ? 'hobekuntza' : 
+        city.production.production_type === 'build' ? 'eraikuntza' : 'ekoizpena'} ezeztatu nahi duzula ${itemName}? Ez duzu baliabiderik berreskuratuko.`;
       confirmationCallback = confirmCancelProduction;
       showConfirmationDialog = true;
     } catch (error) {
-      console.error("Error al cancelar la producción:", error);
-      showToastNotification("Error al cancelar la producción", "error");
+      console.error("Errorea ekoizpena ezeztatzean:", error);
+      showToastNotification("Errorea ekoizpena ezeztatzean", "error");
     }
   }
 
@@ -681,12 +681,12 @@
           await gameAPI.updateGameSession(gameData);
           
           // Show confirmation
-          showToastNotification(`Producción de ${itemToCancel} cancelada`, "info");
+          showToastNotification(`${itemToCancel} ekoizpena ezeztatu da`, "info");
         }
       }
     } catch (error) {
-      console.error("Error al cancelar la producción:", error);
-      showToastNotification("Error al cancelar la producción", "error");
+      console.error("Errorea ekoizpena ezeztatzean:", error);
+      showToastNotification("Errorea ekoizpena ezeztatzean", "error");
     } finally {
       // Reset the confirmation dialog state
       closeConfirmationDialog();
@@ -771,15 +771,15 @@
       
       gameData = await gameAPI.getCurrentGame();
       if (!gameData) {
-        throw new Error("No hay datos de juego disponibles.");
+        throw new Error("Ez dago joko daturik eskuragarri.");
       }
       
       const selectedCityId = await gameAPI.getTemporaryData('selectedCityId');
       if (!selectedCityId) {
         // Improved error handling with more specific error
-        showToastNotification("No se ha seleccionado ninguna ciudad. Volviendo al mapa...", "error");
+        showToastNotification("Ez da hiririk hautatu. Mapara itzultzen...", "error");
         setTimeout(() => navigate('/map'), 1500);
-        throw new Error("No se ha seleccionado ninguna ciudad.");
+        throw new Error("Ez da hiririk hautatu.");
       }
       
       if (gameData.player && gameData.player.cities) {
@@ -788,9 +788,9 @@
       
       if (!city) {
         // Improved error handling when city isn't found
-        showToastNotification("La ciudad seleccionada no se encontró. Volviendo al mapa...", "error");
+        showToastNotification("Hautatutako hiria ez da aurkitu. Mapara itzultzen...", "error");
         setTimeout(() => navigate('/map'), 1500);
-        throw new Error("No se encontró la ciudad seleccionada.");
+        throw new Error("Hautatutako hiria ez da aurkitu.");
       }
       
       // Only fetch these if we have a valid city
@@ -803,7 +803,7 @@
       
       isLoading = false;
     } catch (err) {
-      console.error("Error loading city:", err);
+      console.error("Errorea hiria kargatzean:", err);
       error = err.message;
       isLoading = false;
     }
@@ -816,24 +816,24 @@
 </script>
 
 <svelte:head>
-  <title>Ciudad {city ? city.name : ''} - Civilization Game</title>
+  <title>Hiria {city ? city.name : ''} - Civilization Game</title>
 </svelte:head>
 
 <div class="city-page game-view">
   <div class="city-background"></div>
   
-  <button class="back-button" on:click={returnToMap}>← Volver al Mapa</button>
+  <button class="back-button" on:click={returnToMap}>← Mapara Itzuli</button>
   
   {#if isLoading}
     <div class="loading-container">
       <div class="loading-spinner"></div>
-      <h2>Cargando datos de la ciudad...</h2>
+      <h2>Hiriaren datuak kargatzen...</h2>
     </div>
   {:else if error}
     <div class="error-container">
-      <h2>Error al cargar la ciudad</h2>
+      <h2>Errorea hiria kargatzean</h2>
       <p>{error}</p>
-      <button class="retry-button" on:click={returnToMap}>Volver al Mapa</button>
+      <button class="retry-button" on:click={returnToMap}>Mapara Itzuli</button>
     </div>
   {:else if city}
     <div class="content-container">
@@ -852,46 +852,46 @@
             class:active={activeTab === 'summary'} 
             on:click={() => setActiveTab('summary')}
           >
-            Resumen
+            Laburpena
           </button>
           <button 
             class="tab-button" 
             class:active={activeTab === 'production'} 
             on:click={() => setActiveTab('production')}
           >
-            Producción
+            Ekoizpena
           </button>
           <button 
             class="tab-button" 
             class:active={activeTab === 'buildings'} 
             on:click={() => setActiveTab('buildings')}
           >
-            Edificios
+            Eraikinak
           </button>
           <button 
             class="tab-button" 
             class:active={activeTab === 'library'} 
             on:click={() => setActiveTab('library')}
           >
-            Biblioteca
+            Liburutegia
           </button>
         </div>
         
         <div class="city-content">
           <div class="tab-content" class:active={activeTab === 'summary'}>
-            <h3>Resumen de la Ciudad</h3>
-            <p>Panel de gestión de la ciudad. Aquí se mostrarán más opciones en futuras implementaciones.</p>
+            <h3>Hiriaren Laburpena</h3>
+            <p>Hiria kudeatzeko panela. Etorkizuneko inplementazioetan aukera gehiago erakutsiko dira.</p>
             
             <div class="info-section">
-              <h4>Información</h4>
-              <p><strong>Posición:</strong> {Array.isArray(city.position) ? 
+              <h4>Informazioa</h4>
+              <p><strong>Kokapena:</strong> {Array.isArray(city.position) ? 
                 `${city.position[0]}, ${city.position[1]}` : 
                 `${city.position.x}, ${city.position.y}`}</p>
             </div>
             
             {#if city.buildings && city.buildings.length > 0}
               <div class="info-section">
-                <h4>Edificios ({city.buildings.length})</h4>
+                <h4>Eraikinak ({city.buildings.length})</h4>
                 <ul class="buildings-list">
                   {#each city.buildings as building}
                     <li>{building.name || building}</li>
@@ -900,8 +900,8 @@
               </div>
             {:else}
               <div class="info-section">
-                <h4>Edificios</h4>
-                <p>No hay edificios construidos en esta ciudad.</p>
+                <h4>Eraikinak</h4>
+                <p>Ez dago eraikinrik hiri honetan.</p>
               </div>
             {/if}
             
@@ -913,21 +913,21 @@
               <div class="info-section production-status-section">
                 <h4>
                   {#if city.production.production_type === 'upgrade'}
-                    Mejora en Curso
+                    Hobekuntza Martxan
                   {:else if city.production.production_type === 'build' || !city.production.production_type && !isProducingTroop}
-                    Construcción en Curso
+                    Eraikuntza Martxan
                   {:else}
-                    Producción Actual
+                    Uneko Ekoizpena
                   {/if}
                 </h4>
                 <div class="production-type-badge {isProducingTroop ? 'troop' : 
                   city.production.production_type === 'upgrade' ? 'upgrade' : 'building'}">
                   {#if city.production.production_type === 'upgrade'}
-                    Mejora
+                    Hobekuntza
                   {:else if city.production.production_type === 'build' || !city.production.production_type && !isProducingTroop}
-                    Construcción
+                    Eraikuntza
                   {:else}
-                    Entrenamiento
+                    Trebakuntza
                   {/if}
                 </div>
                 <div class="production-item">
@@ -956,27 +956,27 @@
                     </span>
                     <div class="production-progress">
                       <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
-                      <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                      <span class="progress-text">{city.production.turns_remaining} txanda geratzen dira</span>
                     </div>
-                    <button class="cancel-production-button" on:click={cancelProduction}>Cancelar Producción</button>
+                    <button class="cancel-production-button" on:click={cancelProduction}>Ekoizpena Ezeztatu</button>
                   </div>
                 </div>
               </div>
             {:else}
               <div class="info-section">
-                <h4>Producción</h4>
-                <p>No hay producción en curso.</p>
-                <button class="start-production-button" on:click={() => setActiveTab('production')}>Iniciar Producción</button>
+                <h4>Ekoizpena</h4>
+                <p>Ez dago ekoizpenik martxan.</p>
+                <button class="start-production-button" on:click={() => setActiveTab('production')}>Ekoizpena Hasi</button>
               </div>
             {/if}
           </div>
           
           <div class="tab-content" class:active={activeTab === 'production'}>
-            <h3>Producción</h3>
-            <p>En este panel podrás gestionar qué construye tu ciudad.</p>
+            <h3>Ekoizpena</h3>
+            <p>Panel honetan zure hiriak zer eraikiko duen kudeatu ahal izango duzu.</p>
             
             <div class="info-section">
-              <h4>Producción Actual</h4>
+              <h4>Uneko Ekoizpena</h4>
               {#if city.production && city.production.current_item}
                 {@const isProducingTroop = !city.production.itemType || city.production.itemType === 'troop'}
                 {@const productionType = isProducingTroop 
@@ -1008,25 +1008,25 @@
                     </span>
                     <div class="production-progress">
                       <div class="progress-bar" style="width: {100 - (city.production.turns_remaining * 100 / (productionType?.turns_to_build || productionType?.turns || 3))}%;"></div>
-                      <span class="progress-text">{city.production.turns_remaining} turnos restantes</span>
+                      <span class="progress-text">{city.production.turns_remaining} txanda geratzen dira</span>
                     </div>
-                    <button class="cancel-production-button" on:click={cancelProduction}>Cancelar Producción</button>
+                    <button class="cancel-production-button" on:click={cancelProduction}>Ekoizpena Ezeztatu</button>
                   </div>
                 </div>
               {:else}
-                <p>No hay producción en curso. Selecciona una unidad para comenzar la producción.</p>
+                <p>Ez dago ekoizpenik martxan. Aukeratu unitate bat ekoizpena hasteko.</p>
               {/if}
             </div>
             
             <div class="info-section">
-              <h4>Construir</h4>
+              <h4>Eraiki</h4>
               <div class="production-options">
                 <div class="production-option">
-                  <h5>Unidades</h5>
+                  <h5>Unitateak</h5>
                   {#if loadingTroopTypes}
-                    <p>Cargando tipos de tropas...</p>
+                    <p>Tropa motak kargatzen...</p>
                   {:else if troopTypes.length === 0}
-                    <p>No hay tipos de tropas disponibles.</p>
+                    <p>Ez daude tropa motak eskuragarri.</p>
                   {:else}
                     {#each troopTypes as troopType, index}
                       {@const uniqueKey = troopType.id || `troop-type-${index}`}
@@ -1057,13 +1057,13 @@
                               <span class="troop-name">{troopType.name}</span>
                               <span class="troop-cost">{@html getResourceCostString(troopType.cost)}</span>
                               {#if isLocked && troopType.technology}
-                                <span class="tech-requirement">Requiere: {troopType.technology}</span>
+                                <span class="tech-requirement">Beharrezkoa: {troopType.technology}</span>
                               {/if}
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
                               <span class="turns-count">{troopType.turns_to_build || troopType.turns || '?'}</span>
-                              <span class="turns-label">turnos</span>
+                              <span class="turns-label">txanda</span>
                             </span>
                           </div>
                         </button>
@@ -1079,7 +1079,7 @@
                                 {#if troopType.attack !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">⚔️</span>
-                                    <span class="attribute-label">Ataque:</span>
+                                    <span class="attribute-label">Erasoa:</span>
                                     <span class="attribute-value">{troopType.attack}</span>
                                   </div>
                                 {/if}
@@ -1087,7 +1087,7 @@
                                 {#if troopType.defense !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">🛡️</span>
-                                    <span class="attribute-label">Defensa:</span>
+                                    <span class="attribute-label">Defentsa:</span>
                                     <span class="attribute-value">{troopType.defense}</span>
                                   </div>
                                 {/if}
@@ -1095,7 +1095,7 @@
                                 {#if troopType.health !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">❤️</span>
-                                    <span class="attribute-label">Salud:</span>
+                                    <span class="attribute-label">Osasuna:</span>
                                     <span class="attribute-value">{troopType.health}</span>
                                   </div>
                                 {/if}
@@ -1103,7 +1103,7 @@
                                 {#if troopType.movement !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">👣</span>
-                                    <span class="attribute-label">Movimiento:</span>
+                                    <span class="attribute-label">Mugimendua:</span>
                                     <span class="attribute-value">{troopType.movement}</span>
                                   </div>
                                 {/if}
@@ -1111,7 +1111,7 @@
                                 {#if troopType.range !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">🎯</span>
-                                    <span class="attribute-label">Alcance:</span>
+                                    <span class="attribute-label">Irismena:</span>
                                     <span class="attribute-value">{troopType.range}</span>
                                   </div>
                                 {/if}
@@ -1119,7 +1119,7 @@
                               
                               <div class="troop-action">
                                 <button class="train-button" on:click={() => confirmStartProduction(troopType, 'troop')}>
-                                  Entrenar {troopType.name}
+                                  {troopType.name} Entrenatu
                                 </button>
                               </div>
                             </div>
@@ -1130,11 +1130,11 @@
                   {/if}
                 </div>
                 <div class="production-option">
-                  <h5>Edificios</h5>
+                  <h5>Eraikinak</h5>
                   {#if loadingBuildingTypes}
-                    <p>Cargando tipos de edificios...</p>
+                    <p>Eraikin motak kargatzen...</p>
                   {:else if buildingTypes.length === 0}
-                    <p>No hay tipos de edificios disponibles.</p>
+                    <p>Ez daude eraikin motak eskuragarri.</p>
                   {:else}
                     {#each buildingTypes as buildingType, index}
                       {@const uniqueKey = buildingType.id || `building-type-${index}`}
@@ -1167,22 +1167,22 @@
                               <span class="building-status">
                                 {#if existingBuilding}
                                   {#if typeof existingBuilding === 'string'}
-                                    <span class="building-level">Construido</span>
+                                    <span class="building-level">Eraikita</span>
                                   {:else}
-                                    <span class="building-level">Nivel {existingBuilding.level || 1}</span>
+                                    <span class="building-level">Maila {existingBuilding.level || 1}</span>
                                   {/if}
                                 {:else}
                                   <span class="building-cost">{@html getResourceCostString(buildingType.cost)}</span>
                                 {/if}
                               </span>
                               {#if isLocked && buildingType.technology}
-                                <span class="tech-requirement">Requiere: {buildingType.technology}</span>
+                                <span class="tech-requirement">Beharrezkoa: {buildingType.technology}</span>
                               {/if}
                             </div>
                             <span class="production-turns">
                               <span class="turns-icon">🕒</span>
                               <span class="turns-count">{buildingType.turns_to_build || buildingType.turns || '?'}</span>
-                              <span class="turns-label">turnos</span>
+                              <span class="turns-label">txanda</span>
                             </span>
                           </div>
                         </button>
@@ -1200,7 +1200,7 @@
                                 {#if buildingType.level !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">⭐</span>
-                                    <span class="attribute-label">Nivel:</span>
+                                    <span class="attribute-label">Maila:</span>
                                     <span class="attribute-value">{buildingType.level}</span>
                                   </div>
                                 {/if}
@@ -1209,18 +1209,17 @@
                                 {#if buildingType.level_upgrade !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">⬆️</span>
-                                    <span class="attribute-label">Mejora:</span>
+                                    <span class="attribute-label">Hobekuntza:</span>
                                     <span class="attribute-value">{buildingType.level_upgrade}</span>
                                   </div>
                                 {/if}
                                 
                                 <!-- Output Resources -->
                                 {#if buildingType.output}
-                                  <!-- Replace the original output display with more compact version -->
                                   <div class="resource-output-attribute">
                                     <div class="resource-output-header">
                                       <span class="attribute-icon">⚒️</span>
-                                      <span class="attribute-label">Producción</span>
+                                      <span class="attribute-label">Ekoizpena</span>
                                     </div>
                                     {#each Object.entries(buildingType.output) as [resource, amount]}
                                       <div class="resource-item">
@@ -1250,7 +1249,7 @@
                                 {#if buildingType.production_bonus !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">⚒️</span>
-                                    <span class="attribute-label">Producción:</span>
+                                    <span class="attribute-label">Ekoizpena:</span>
                                     <span class="attribute-value">+{buildingType.production_bonus}%</span>
                                   </div>
                                 {/if}
@@ -1258,7 +1257,7 @@
                                 {#if buildingType.research_bonus !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">📚</span>
-                                    <span class="attribute-label">Investigación:</span>
+                                    <span class="attribute-label">Ikerketa:</span>
                                     <span class="attribute-value">+{buildingType.research_bonus}%</span>
                                   </div>
                                 {/if}
@@ -1266,7 +1265,7 @@
                                 {#if buildingType.defense_bonus !== undefined}
                                   <div class="attribute">
                                     <span class="attribute-icon">🛡️</span>
-                                    <span class="attribute-label">Defensa:</span>
+                                    <span class="attribute-label">Defentsa:</span>
                                     <span class="attribute-value">+{buildingType.defense_bonus}%</span>
                                   </div>
                                 {/if}
@@ -1275,11 +1274,11 @@
                               <div class="building-action">
                                 {#if existingBuilding}
                                   <button class="upgrade-button" on:click={() => confirmStartProduction(buildingType, 'building')}>
-                                    Mejorar {buildingType.name}
+                                    {buildingType.name} Hobetu
                                   </button>
                                 {:else}
                                   <button class="construct-button" on:click={() => confirmStartProduction(buildingType, 'building')}>
-                                    Construir {buildingType.name}
+                                    {buildingType.name} Eraiki
                                   </button>
                                 {/if}
                               </div>
@@ -1295,8 +1294,8 @@
           </div>
           
           <div class="tab-content" class:active={activeTab === 'buildings'}>
-            <h3>Edificios</h3>
-            <p>Gestiona los edificios de tu ciudad.</p>
+            <h3>Eraikinak</h3>
+            <p>Zure hiriko eraikinak kudeatu.</p>
             
             {#if city.buildings && city.buildings.length > 0}
               <div class="info-section buildings-grid">
@@ -1316,14 +1315,14 @@
                     {#if building.description}
                       <p class="building-description">{building.description}</p>
                     {:else}
-                      <p class="building-description">Edificio de la ciudad.</p>
+                      <p class="building-description">Hiriko eraikina.</p>
                     {/if}
                     
                     <div class="building-stats">
                       <!-- Level Information -->
                       <div class="building-stat">
                         <span class="stat-icon">⭐</span>
-                        <span class="stat-label">Nivel:</span>
+                        <span class="stat-label">Maila:</span>
                         <span class="stat-value">{building.level || 1}</span>
                       </div>
                       
@@ -1346,8 +1345,8 @@
                                 {resource} 
                               {/if}
                             </span>
-                            <span class="stat-label">Producción:</span>
-                            <span class="stat-value">+{amount}/turno</span>
+                            <span class="stat-label">Ekoizpena:</span>
+                            <span class="stat-value">+{amount}/txanda</span>
                           </div>
                         {/each}
                       {/if}
@@ -1356,7 +1355,7 @@
                       {#if building.level_upgrade !== undefined}
                         <div class="building-stat upgrade-info">
                           <span class="stat-icon">⬆️</span>
-                          <span class="stat-label">Mejora al siguiente nivel:</span>
+                          <span class="stat-label">Hurrengo mailara hobetzeko:</span>
                           <span class="stat-value">{building.level_upgrade}</span>
                         </div>
                       {/if}
@@ -1365,7 +1364,7 @@
                       {#if building.production_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">⚒️</span>
-                          <span class="stat-label">Producción:</span>
+                          <span class="stat-label">Ekoizpena:</span>
                           <span class="stat-value">+{building.production_bonus}%</span>
                         </div>
                       {/if}
@@ -1373,7 +1372,7 @@
                       {#if building.research_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">📚</span>
-                          <span class="stat-label">Investigación:</span>
+                          <span class="stat-label">Ikerketa:</span>
                           <span class="stat-value">+{building.research_bonus}%</span>
                         </div>
                       {/if}
@@ -1381,7 +1380,7 @@
                       {#if building.defense_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">🛡️</span>
-                          <span class="stat-label">Defensa:</span>
+                          <span class="stat-label">Defentsa:</span>
                           <span class="stat-value">+{building.defense_bonus}%</span>
                         </div>
                       {/if}
@@ -1389,7 +1388,7 @@
                       {#if building.food_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">🌾</span>
-                          <span class="stat-label">Alimento:</span>
+                          <span class="stat-label">Janaria:</span>
                           <span class="stat-value">+{building.food_bonus}%</span>
                         </div>
                       {/if}
@@ -1397,7 +1396,7 @@
                       {#if building.gold_bonus !== undefined}
                         <div class="building-stat">
                           <span class="stat-icon">💰</span>
-                          <span class="stat-label">Oro:</span>
+                          <span class="stat-label">Urrea:</span>
                           <span class="stat-value">+{building.gold_bonus}%</span>
                         </div>
                       {/if}
@@ -1407,22 +1406,22 @@
               </div>
             {:else}
               <div class="info-section">
-                <p>No hay edificios construidos en esta ciudad.</p>
-                <button class="action-button" on:click={() => setActiveTab('production')}>Construir Edificios</button>
+                <p>Ez dago eraikinrik hiri honetan.</p>
+                <button class="action-button" on:click={() => setActiveTab('production')}>Eraikinak Eraiki</button>
               </div>
             {/if}
           </div>
 
           <div class="tab-content" class:active={activeTab === 'library'}>
-            <h3>Biblioteca y Tecnologías</h3>
+            <h3>Liburutegia eta Teknologiak</h3>
             {#if cityHasLibrary()}
-              <p>Investiga nuevas tecnologías para mejorar tu civilización.</p>
+              <p>Teknologia berriak ikertu zure zibilizazioa hobetzeko.</p>
               
               {#if city.research && city.research.current_technology}
                 {@const researchTech = technologyTypes.find(t => t.id === city.research.current_technology)}
                 <div class="info-section research-status-section">
-                  <h4>Investigación en Curso</h4>
-                  <div class="production-type-badge research">Investigación</div>
+                  <h4>Martxan Dagoen Ikerketa</h4>
+                  <div class="production-type-badge research">Ikerketa</div>
                   <div class="production-item">
                     <div class="production-icon">
                       <span class="production-emoji">
@@ -1435,20 +1434,20 @@
                       </span>
                       <div class="production-progress">
                         <div class="progress-bar" style="width: {100 - (city.research.turns_remaining * 100 / (researchTech?.turns || 10))}%;"></div>
-                        <span class="progress-text">{city.research.turns_remaining} turnos restantes</span>
+                        <span class="progress-text">{city.research.turns_remaining} txanda geratzen dira</span>
                       </div>
-                      <button class="cancel-production-button" on:click={cancelResearch}>Cancelar Investigación</button>
+                      <button class="cancel-production-button" on:click={cancelResearch}>Ikerketa Ezeztatu</button>
                     </div>
                   </div>
                 </div>
               {/if}
               
               <div class="info-section">
-                <h4>Tecnologías Disponibles</h4>
+                <h4>Teknologia Eskuragarriak</h4>
                 {#if loadingTechnologyTypes}
-                  <p>Cargando tecnologías...</p>
+                  <p>Teknologiak kargatzen...</p>
                 {:else if technologyTypes.length === 0}
-                  <p>No hay tecnologías disponibles.</p>
+                  <p>Ez dago teknologiarik eskuragarri.</p>
                 {:else}
                   <div class="technologies-list">
                     {#each technologyTypes as technology}
@@ -1465,21 +1464,21 @@
                             <p class="technology-description">{technology.description}</p>
                             
                             {#if isResearched}
-                              <div class="technology-status">Investigada</div>
+                              <div class="technology-status">Ikertuta</div>
                             {:else if isResearching}
-                              <div class="technology-status">En progreso ({city.research.turns_remaining} turnos)</div>
+                              <div class="technology-status">Abian ({city.research.turns_remaining} txanda)</div>
                             {:else}
                               <div class="technology-requirements">
                                 <div class="technology-req {city.population >= technology.min_civilians ? 'met' : ''}">
                                   <span class="req-icon">👥</span>
-                                  <span class="req-label">Población:</span>
+                                  <span class="req-label">Biztanleria:</span>
                                   <span class="req-value">{city.population}/{technology.min_civilians}</span>
                                 </div>
                                 
                                 {#if technology.prerequisites && technology.prerequisites.length > 0}
                                   <div class="technology-prereqs">
                                     <span class="req-icon">📋</span>
-                                    <span class="req-label">Requisitos:</span>
+                                    <span class="req-label">Betekizunak:</span>
                                     <span class="req-value">
                                       {#each technology.prerequisites as prereq}
                                         {@const prereqName = technologyTypes.find(t => t.id === prereq)?.name || prereq}
@@ -1491,8 +1490,8 @@
                                 
                                 <div class="technology-time">
                                   <span class="req-icon">⏳</span>
-                                  <span class="req-label">Tiempo:</span>
-                                  <span class="req-value">{technology.turns} turnos</span>
+                                  <span class="req-label">Denbora:</span>
+                                  <span class="req-value">{technology.turns} txanda</span>
                                 </div>
                               </div>
                               
@@ -1501,7 +1500,7 @@
                                 disabled={!canResearch || hasMissingPrereqs || (city.research && city.research.current_technology)}
                                 on:click={() => startResearch(technology)}
                               >
-                                Investigar
+                                Ikertu
                               </button>
                             {/if}
                           </div>
@@ -1509,7 +1508,7 @@
                         
                         {#if technology.unlocks && technology.unlocks.length > 0}
                           <div class="technology-unlocks">
-                            <h5>Desbloquea:</h5>
+                            <h5>Desblokeatzen du:</h5>
                             <div class="unlocks-list">
                               {#each technology.unlocks as unlock}
                                 <span class="unlock-item">{unlock}</span>
@@ -1524,8 +1523,8 @@
               </div>
             {:else}
               <div class="info-section">
-                <p>Para investigar tecnologías, primero debes construir una Biblioteca en esta ciudad.</p>
-                <button class="action-button" on:click={() => setActiveTab('production')}>Construir Biblioteca</button>
+                <p>Teknologiak ikertzeko, lehenik Liburutegi bat eraiki behar duzu hiri honetan.</p>
+                <button class="action-button" on:click={() => setActiveTab('production')}>Liburutegia Eraiki</button>
               </div>
             {/if}
           </div>
@@ -1572,11 +1571,11 @@
   {#if showProductionConfirmationDialog}
     <div class="modal-overlay">
       <div class="confirmation-dialog">
-        <h3>Confirmar Producción</h3>
+        <h3>Ekoizpena Baieztatu</h3>
         <p>{@html productionConfirmationMessage}</p>
         <div class="confirmation-actions">
-          <button class="cancel-button" on:click={closeProductionConfirmationDialog}>Cancelar</button>
-          <button class="confirm-button" on:click={productionConfirmationCallback}>Confirmar</button>
+          <button class="cancel-button" on:click={closeProductionConfirmationDialog}>Utzi</button>
+          <button class="confirm-button" on:click={productionConfirmationCallback}>Baieztatu</button>
         </div>
       </div>
     </div>
@@ -1585,12 +1584,12 @@
   {#if showConfirmationDialog}
     <div class="modal-overlay">
       <div class="confirmation-dialog">
-        <h3>Confirmar Acción</h3>
+        <h3>Ekintza Baieztatu</h3>
         <p>{confirmationMessage}</p>
         
         <div class="confirmation-actions">
-          <button class="cancel-button" on:click={closeConfirmationDialog}>Cancelar</button>
-          <button class="confirm-button" on:click={confirmationCallback}>Confirmar</button>
+          <button class="cancel-button" on:click={closeConfirmationDialog}>Utzi</button>
+          <button class="confirm-button" on:click={confirmationCallback}>Baieztatu</button>
         </div>
       </div>
     </div>

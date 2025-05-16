@@ -39,7 +39,7 @@
       
       // Add initial battle log entry
       battleLog = [
-        `¡Batalla entre ${attacker.name || attacker.type_id} y ${defender.name || defender.type_id}!`
+        `Bataila ${attacker.name || attacker.type_id} eta ${defender.name || defender.type_id} artean!`
       ];
 
       // Start battle after a shorter delay (reduced from 1500ms to 500ms)
@@ -51,7 +51,7 @@
       };
     } catch (error) {
       console.error('Error initializing battle:', error);
-      battleLog = [...battleLog, `Error: ${error.message}`];
+      battleLog = [...battleLog, `Errorea: ${error.message}`];
     }
   });
 
@@ -72,7 +72,7 @@
 
     while (attacker.health > 0 && defender.health > 0) {
       currentTurn++;
-      addToBattleLog(`--- Turno ${currentTurn} ---`);
+      addToBattleLog(`--- Txanda ${currentTurn} ---`);
 
       // Determine who attacks this turn
       const currentAttacker = isAttackerTurn ? attacker : defender;
@@ -102,7 +102,7 @@
 
       // Log the attack - prepend instead of append
       addToBattleLog(
-        `${currentAttacker.name || currentAttacker.type_id} ataca y causa ${damage} puntos de daño a ${currentDefender.name || currentDefender.type_id}`
+        `${currentAttacker.name || currentAttacker.type_id} erasotzen du eta ${damage} kalte puntu eragiten dizkio ${currentDefender.name || currentDefender.type_id}`
       );
 
       // Apply damage
@@ -135,10 +135,10 @@
     // Determine winner
     if (attacker.health <= 0) {
       winner = defender;
-      addToBattleLog(`¡${defender.name || defender.type_id} ha vencido!`);
+      addToBattleLog(`${defender.name || defender.type_id} garaile!`);
     } else {
       winner = attacker;
-      addToBattleLog(`¡${attacker.name || attacker.type_id} ha vencido!`);
+      addToBattleLog(`${attacker.name || attacker.type_id} garaile!`);
     }
 
     battleEnded = true;
@@ -268,7 +268,7 @@
       
     } catch (error) {
       console.error('Error updating game state after battle:', error);
-      battleLog = [...battleLog, `Error: ${error.message}`];
+      battleLog = [...battleLog, `Errorea: ${error.message}`];
     }
   }
 
@@ -287,13 +287,13 @@
 </script>
 
 <svelte:head>
-  <title>Batalla - Civilization Game</title>
+  <title>Bataila - Zibilizazio Jokoa</title>
 </svelte:head>
 
 <div class="battle-page">
   <div class="battle-container">
     <div class="battle-header">
-      <h2>Batalla</h2>
+      <h2>Bataila</h2>
     </div>
     
     <div class="battle-arena">
@@ -302,7 +302,7 @@
         <div class="unit attacker" class:animating={attackerAnimating}>
           <!-- Add owner label -->
           <div class="owner-label {attacker.owner === 'player' ? 'player-label' : 'ai-label'}">
-            {attacker.owner === 'player' ? '🧑 TU UNIDAD' : '🤖 UNIDAD IA'}
+            {attacker.owner === 'player' ? '🧑 ZURE UNITATEA' : '🤖 IA UNITATEA'}
           </div>
           
           <div class="unit-portrait">
@@ -316,18 +316,18 @@
             <h3>{attacker.name || attacker.type_id}</h3>
             <div class="unit-stats">
               <div class="stat">
-                <span class="stat-label">❤️ Vida:</span>
+                <span class="stat-label">❤️ Bizitza:</span>
                 <div class="health-bar">
                   <div class="health-fill" style="width: {Math.max(0, attacker.health)}%"></div>
                 </div>
                 <span class="stat-value">{Math.max(0, attacker.health)}</span>
               </div>
               <div class="stat">
-                <span class="stat-label">⚔️ Ataque:</span>
+                <span class="stat-label">⚔️ Erasoa:</span>
                 <span class="stat-value">{attacker.attack}</span>
               </div>
               <div class="stat">
-                <span class="stat-label">🛡️ Defensa:</span>
+                <span class="stat-label">🛡️ Defentsa:</span>
                 <span class="stat-value">{attacker.defense}</span>
               </div>
             </div>
@@ -343,7 +343,7 @@
         <div class="unit defender" class:animating={defenderAnimating}>
           <!-- Add owner label -->
           <div class="owner-label {defender.owner === 'player' ? 'player-label' : 'ai-label'}">
-            {defender.owner === 'player' ? '🧑 TU UNIDAD' : '🤖 UNIDAD IA'}
+            {defender.owner === 'player' ? '🧑 ZURE UNITATEA' : '🤖 IA UNITATEA'}
           </div>
           
           <div class="unit-portrait">
@@ -357,18 +357,18 @@
             <h3>{defender.name || defender.type_id}</h3>
             <div class="unit-stats">
               <div class="stat">
-                <span class="stat-label">❤️ Vida:</span>
+                <span class="stat-label">❤️ Bizitza:</span>
                 <div class="health-bar">
                   <div class="health-fill" style="width: {Math.max(0, defender.health)}%"></div>
                 </div>
                 <span class="stat-value">{Math.max(0, defender.health)}</span>
               </div>
               <div class="stat">
-                <span class="stat-label">⚔️ Ataque:</span>
+                <span class="stat-label">⚔️ Erasoa:</span>
                 <span class="stat-value">{defender.attack}</span>
               </div>
               <div class="stat">
-                <span class="stat-label">🛡️ Defensa:</span>
+                <span class="stat-label">🛡️ Defentsa:</span>
                 <span class="stat-value">{defender.defense}</span>
               </div>
             </div>
@@ -385,7 +385,7 @@
     </div>
     
     <div class="battle-log">
-      <h3>Registro de batalla</h3>
+      <h3>Bataila erregistroa</h3>
       <div class="log-content">
         {#each battleLog as entry}
           <p>{entry}</p>
@@ -396,7 +396,7 @@
     {#if battleEnded && winner}
       <div class="battle-result">
         <h2 class="winner-announcement">
-          {winner.owner === 'player' ? '¡Has vencido!' : '¡Has sido derrotado!'}
+          {winner.owner === 'player' ? 'Irabazi duzu!' : 'Galdu duzu!'}
         </h2>
       </div>
     {/if}

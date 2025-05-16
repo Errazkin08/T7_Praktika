@@ -4,6 +4,7 @@
   import { gameState, startGame } from '../stores/gameState.js';
   import { onMount } from 'svelte';
   import { gameAPI } from '../services/gameAPI.js';
+  import AudioPlayer from '../components/AudioPlayer.svelte';
   
   let error = null;
   let isLoading = true;
@@ -11,6 +12,16 @@
   let selectedMap = null;
   let gameName = "Mi partida";
   let showCreateMapForm = false;
+  let audioPlayer;
+
+  function handleFirstInteraction() {
+    if (audioPlayer) {
+      audioPlayer.initializeAudio();
+      // Eliminar event listeners después de inicialización
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    }
+  }
 
   // Datos para crear un nuevo mapa
   let newMapData = {
@@ -33,7 +44,8 @@
         navigate('/');
         return;
       }
-      
+      document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
       // Cargar todos los mapas disponibles
       await loadExistingMaps();
       
@@ -43,6 +55,10 @@
       console.error("Error in NewGame component:", err);
       error = err.message;
     }
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
   });
 
   // Función para cargar los mapas existentes
@@ -311,6 +327,7 @@
 </script>
 
 <div class="new-game-page">
+  <AudioPlayer bind:this={audioPlayer} />
   <button class="back-button-inline" on:click={() => navigate('/home')}>
     Volver al Inicio
   </button>

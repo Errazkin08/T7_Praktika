@@ -13,6 +13,18 @@
   import "../styles/pages/map.css";
   import CheatConsole from "../components/CheatConsole.svelte";
   import NegotiationModal from "../components/NegotiationModal.svelte";
+  import AudioPlayer from '../components/AudioPlayer.svelte';
+
+  let audioPlayer;
+
+  function handleFirstInteraction() {
+    if (audioPlayer) {
+      audioPlayer.initializeAudio();
+      // Eliminar event listeners después de inicialización
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    }
+  }
 
   let showPauseMenu = false;
   let isLoading = true;
@@ -2962,6 +2974,8 @@
     try {
       document.body.classList.add("map-active");
       document.documentElement.classList.add("map-active");
+      document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
 
       if (!$user) {
         navigate("/");
@@ -2982,6 +2996,8 @@
         document.body.classList.remove("map-active");
         document.documentElement.classList.remove("map-active");
         window.removeEventListener("keydown", handleKeyPress);
+        document.removeEventListener('click', handleFirstInteraction);
+        document.removeEventListener('keydown', handleFirstInteraction);
       };
     } catch (err) {
       console.error("Error mounting Map component:", err);
@@ -3595,6 +3611,8 @@
 </svelte:head>
 
 <div class="map-page">
+    <AudioPlayer bind:this={audioPlayer} />
+
   {#if isLoading}
     <div class="loading">
       <div class="loading-spinner"></div>

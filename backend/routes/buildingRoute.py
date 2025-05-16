@@ -96,3 +96,44 @@ def remove_building_endpoint(city_id, building_id):
         "message": "Building removed successfully",
         "building": removed_building
     }), 200
+
+@building_blueprint.route('/api/buildings/costs', methods=['GET'])
+def get_building_costs():
+    """Get costs of all available building types"""
+    try:
+        building_types = get_building_types()
+        
+        # Extract only the cost information from each building type
+        building_costs = {}
+        for building in building_types:
+            building_costs[building["type_id"]] = {
+                "name": building["name"],
+                "cost": building["cost"],
+                "turns": building.get("turns", 0)
+            }
+            
+        return jsonify(building_costs), 200
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+@building_blueprint.route('/api/buildings/costs/<type_id>', methods=['GET'])
+def get_building_cost(type_id):
+    """Get the cost of a specific building type by ID"""
+    try:
+        # Get the building type from the database
+        building_type = get_building_type(type_id)
+        
+        if not building_type:
+            return jsonify({"error": "Building type not found"}), 404
+        
+        # Extract only the cost information
+        cost_data = {
+            "name": building_type["name"],
+            "cost": building_type["cost"],
+            "turns": building_type.get("turns", 0)
+        }
+        
+        return jsonify(cost_data), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500

@@ -145,3 +145,49 @@ def reset_troops_endpoint():
     return jsonify({
         "message": message
     }), 200
+
+@troop_blueprint.route('/api/troops/costs', methods=['GET'])
+def get_troop_costs():
+    """Get costs of all available troop types"""
+    logger.info("Retrieving costs for all troop types")
+    try:
+        troop_types = get_troop_types()
+        
+        # Extract only the cost information from each troop type
+        troop_costs = {}
+        for troop in troop_types:
+            troop_costs[troop["type_id"]] = {
+                "name": troop["name"],
+                "cost": troop["cost"]
+            }
+            
+        return jsonify(troop_costs), 200
+    except Exception as e:
+        logger.error(f"Error retrieving troop costs: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+@troop_blueprint.route('/api/troops/costs/<type_id>', methods=['GET'])
+def get_troop_cost(type_id):
+    """Get the cost of a specific troop type by ID"""
+    logger.info(f"Retrieving cost for troop type with ID: {type_id}")
+    
+    try:
+        # Get the troop type from the database - passing [0,0] as default position
+        troop_type = get_troop_type(type_id, [0, 0])
+        
+        if not troop_type:
+            logger.warning(f"Troop type with ID {type_id} not found in database")
+            return jsonify({"error": "Troop type not found"}), 404
+        
+        # Extract only the cost information
+        cost_data = {
+            "name": troop_type["name"],
+            "cost": troop_type["cost"]
+        }
+        
+        logger.info(f"Successfully returning troop cost: {cost_data}")
+        return jsonify(cost_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error retrieving cost for troop type {type_id}: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Server error: {str(e)}"}), 500

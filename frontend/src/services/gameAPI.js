@@ -882,6 +882,155 @@ export const gameAPI = {
     return newObj;
   },
 
+  /**
+   * Get costs of all troops
+   * @returns {Object} - Object with troop type IDs as keys and their cost information
+   */
+  async getTroopCosts() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/troops/costs`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get troop costs: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get troop costs');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getTroopCosts:", error);
+      // Return empty object as fallback
+      return {};
+    }
+  },
+
+  /**
+   * Get cost of a specific troop by its type ID
+   * @param {string} typeId - The ID of the troop type
+   * @returns {Object} - Object with the troop's name and cost information
+   */
+  async getTroopCost(typeId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/troops/costs/${typeId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get troop cost: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get troop cost');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error getting cost for troop ${typeId}:`, error);
+      // Return a minimal fallback object
+      return {
+        name: `Troop ${typeId}`,
+        cost: {
+          food: 50,
+          gold: 20
+        }
+      };
+    }
+  },
+
+  /**
+   * Get costs of all technologies
+   * @returns {Object} - Object with technology IDs as keys and their cost information
+   */
+  async getTechnologyCosts() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/technology/costs`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get technology costs: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get technology costs');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getTechnologyCosts:", error);
+      // Return empty object as fallback
+      return {};
+    }
+  },
+
+  /**
+   * Get cost of a specific technology by its ID
+   * @param {string} typeId - The ID of the technology
+   * @returns {Object} - Object with the technology's name and cost information
+   */
+  async getTechnologyCost(typeId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/technology/costs/${typeId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get technology cost: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get technology cost');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error getting cost for technology ${typeId}:`, error);
+      // Return a minimal fallback object
+      return {
+        name: `Technology ${typeId}`,
+        cost: {
+          gold: 20,
+          science: 10
+        },
+        turns: 10
+      };
+    }
+  },
+
+  /**
+   * Get costs of all buildings
+   * @returns {Object} - Object with building type IDs as keys and their cost information
+   */
+  async getBuildingCosts() {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/buildings/costs`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get building costs: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get building costs');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getBuildingCosts:", error);
+      // Return empty object as fallback
+      return {};
+    }
+  },
+
+  /**
+   * Get cost of a specific building by its type ID
+   * @param {string} typeId - The ID of the building type
+   * @returns {Object} - Object with the building's name and cost information
+   */
+  async getBuildingCost(typeId) {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/buildings/costs/${typeId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Failed to get building cost: ${response.status}` }));
+        throw new Error(errorData.error || 'Failed to get building cost');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error getting cost for building ${typeId}:`, error);
+      // Return a minimal fallback object
+      return {
+        name: `Building ${typeId}`,
+        cost: {
+          wood: 30,
+          stone: 20
+        },
+        turns: 5
+      };
+    }
+  },
+
   getTroopTypes,
 
   getTechnologyTypes,

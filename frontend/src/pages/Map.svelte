@@ -528,7 +528,7 @@
         if (!showFogOfWar) {
           return true;
         }
-        
+
         // Check if enemy is visible (not in fog of war)
         if (grid[enemyY] && grid[enemyY][enemyX] === FOG_OF_WAR.VISIBLE) {
           return true;
@@ -543,11 +543,11 @@
     if (!canNegotiate(unit)) {
       showToastNotification(
         "Necesitas estar a 2 casillas de una unidad enemiga para negociar.",
-        "warning"
+        "warning",
       );
       return;
     }
-    
+
     negotiationUnit = unit;
     showNegotiationModal = true;
     negotiationResult = null;
@@ -567,7 +567,8 @@
         if (updatedGame) {
           gameData = updatedGame;
           ceasefireTurns = updatedGame.ceasefire_turns || 0;
-          ceasefireActive = !!updatedGame.ceasefire_active && ceasefireTurns > 0;
+          ceasefireActive =
+            !!updatedGame.ceasefire_active && ceasefireTurns > 0;
           showToastNotification(
             `¡Negociación exitosa! Alto el fuego durante ${ceasefireTurns} turnos.`,
             "success",
@@ -659,15 +660,11 @@
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
-    // Update game state
-    updateGameStateAfterAITurn();
-
-    // Save changes to session
-    try {
+      try {
       await gameAPI.updateGameSession(gameData);
       console.log("AI turn changes saved to session");
       // --- NUEVO: Guardar el JSON del game en la sesión bajo la clave 'game' ---
-      
+
       // --- FIN NUEVO ---
     } catch (error) {
       console.error("Error saving AI turn changes:", error);
@@ -728,8 +725,12 @@
           let unitIndex = -1;
 
           if (action.unit_id) {
+            const unitType = action.unit_id.split("-")[0];
             // Find by ID if available
-            unitIndex = units.findIndex((u) => u.id === action.unit_id);
+            console.log("UNITATEAAAKKK", units);
+            unitIndex = units.findIndex((u) => u.id === action.unit_id && action.position == u.position 
+            || u.type_id === unitType && u.position == action.position 
+            || u.name === unitType && u.position == action.position);
           }
 
           if (
@@ -813,7 +814,7 @@
           );
 
           await gameAPI.updateGameSession(gameData);
-        
+
           // --- FIN NUEVO ---
           // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
           refreshSelectedUnitInfo();
@@ -973,7 +974,7 @@
             unit_id: action.unit_id,
             position: action.position,
             building_type: action.building,
-            city_name: action.city_name
+            city_name: action.city_name,
           });
           let builderIndex = -1;
 
@@ -981,7 +982,11 @@
             builderIndex = units.findIndex((u) => u.id === action.unit_id);
           }
           console.log("Builder index after ID search:", builderIndex);
-          if (builderIndex === -1 && action.position && Array.isArray(action.position)) {
+          if (
+            builderIndex === -1 &&
+            action.position &&
+            Array.isArray(action.position)
+          ) {
             // If not found by ID, try by position
             const [posX, posY] = action.position;
             builderIndex = units.findIndex(
@@ -990,7 +995,8 @@
                 Array.isArray(u.position) &&
                 u.position[0] === posX &&
                 u.position[1] === posY &&
-                u.owner === "ia",
+                u.owner === "ia" &&
+                (u.type_id == "settler" || u.name == "Settler"),
             );
 
             // Assign ID if found but missing
@@ -1001,34 +1007,195 @@
               units[builderIndex].id = `unit-${posX}-${posY}`;
             }
           }
-          
+
           // Rest of the construction logic remains the same
           if (builderIndex !== -1) {
             const builder = units[builderIndex];
-            
-            
+
             // Create new city
             const newCity = {
               id: `city_${Date.now()}`,
               name: action.city_name || `IA City ${Date.now()}`,
               position: [...action.position],
-              owner: 'ia',
-              population: 1
+              owner: "ia",
+              population: 1,
             };
-            
+
             // Add city
             cities = [...cities, newCity];
-            
+
             // Remove settler
             units.splice(builderIndex, 1);
             units = [...units];
-            
+
             // Update fog of war for city
-            updateFogOfWarAroundPosition(action.position[0], action.position[1], 3);
-            
+            updateFogOfWarAroundPosition(
+              action.position[0],
+              action.position[1],
+              3,
+            );
+            gameData.ia.cities =[...gameData.ia.cities, newCity];
+            gameAPI.updateGameSession(gameData);
+            console.log("Horrela geratzen da gameData:", gameData);
           }
           break;
         }
+        case "city_production":
+        try {
+          // Verificar que tenemos los campos necesarios
+          if (!action.city_id || !action.action || !action.item_id) {
+            console.error(
+              "Invalid city_production action, missing required fields:",
+              action,
+            );
+            break;
+          }
+
+          // Encontrar la ciudad correcta
+          const city = cities.find(
+            (c) =>
+              c.owner === "ia" &&
+              (c.id === action.city_id ||
+                (Array.isArray(c.position) &&
+                  c.position[0] === action.position[0] &&
+                  c.position[1] === action.position[1])),
+          );
+
+          if (!city) {
+            console.error(`AI city with id ${action.city_id} not found`);
+            break;
+          }
+
+          // Asegurar que la ciudad tiene un objeto de producción
+          if (!city.production) {
+            city.production = {
+              current_item: null,
+              turns_remaining: 0,
+              itemType: null,
+            };
+          }
+          if(city.production.turns_remaining > 0 && city.production.current_item != 'technology') {
+            console.log(`City ${city.name} is already producing something`);
+            break;
+          }
+
+          // Procesar la acción según su tipo
+          switch (action.action) {
+            case "build": {
+              // Configurar la construcción de un edificio555
+              const buildingCosts = gameAPI.getBuildingCost(action.item_id);
+
+              // Verificar y deducir recursos
+              if (gameData && gameData.ia && gameData.ia.resources) {
+                const resources = gameData.ia.resources;
+
+                // Si la IA tiene recursos suficientes
+                if (
+                  resources.wood >= buildingCosts.wood &&
+                  resources.stone >= buildingCosts.stone
+                ) {
+                  // Deducir costos
+                  resources.wood -= buildingCosts.wood;
+                  resources.stone -= buildingCosts.stone;
+
+                  // Configurar producción
+                  city.production.current_item = action.item_id;
+                  city.production.turns_remaining = buildingCosts.turns || 5;
+                  city.production.itemType = "building";
+
+                  showToastNotification(
+                    `La ciudad ${city.name} de la IA ha comenzado a construir ${action.item_id}`,
+                    "info",
+                  );
+                } else {
+                  console.log(
+                    `AI tried to build ${action.item_id} but lacks resources`,
+                  );
+                }
+              }
+              break;
+            }
+
+            case "train": {
+              // Configurar entrenamiento de una unidad
+              const unitCosts = gameAPI.getTroopCost(action.item_id);
+
+              // Verificar y deducir recursos
+              if (gameData && gameData.ia && gameData.ia.resources) {
+                const resources = gameData.ia.resources;
+
+                // Si la IA tiene recursos suficientes
+                if (
+                  resources.food >= unitCosts.food &&
+                  resources.gold >= unitCosts.gold
+                ) {
+                  // Deducir costos
+                  resources.food -= unitCosts.food;
+                  resources.gold -= unitCosts.gold;
+
+                  // Configurar producción
+                  city.production.current_item = action.item_id;
+                  city.production.turns_remaining = unitCosts.turns || 3;
+                  city.production.itemType = "troop";
+
+                  showToastNotification(
+                    `La ciudad ${city.name} de la IA ha comenzado a entrenar ${action.item_id}`,
+                    "info",
+                  );
+                } else {
+                  console.log(
+                    `AI tried to train ${action.item_id} but lacks resources`,
+                  );
+                }
+              }
+              break;
+            }
+
+            case "research": {
+              // Configurar investigación tecnológica
+              const techCosts = gameAPI.getTechnologyCost(action.item_id);
+
+              // Verificar si hay una biblioteca
+              const hasLibrary =
+                city.buildings &&
+                city.buildings.some(
+                  (b) =>
+                    b.type_id === "library" ||
+                    b.name?.toLowerCase() === "library",
+                );
+
+              if (hasLibrary) {
+                // Configurar investigación
+                city.production.current_item = action.item_id;
+                city.production.turns_remaining = techCosts.turns || 10;
+                city.production.itemType = "technology";
+
+                showToastNotification(
+                  `La ciudad ${city.name} de la IA ha comenzado a investigar ${action.item_id}`,
+                  "info",
+                );
+              } else {
+                console.log(
+                  `AI tried to research but city ${city.name} has no library`,
+                );
+              }
+              break;
+            }
+          }
+
+          // Actualizar el estado del juego
+          cities = [...cities];
+          console.log(
+            `AI city ${city.name} production updated:`,
+            city.production,
+          );
+          game;
+          gameAPI.updateGameSession(gameData);
+        } catch (error) {
+          console.error("Error processing AI city production:", error);
+        }
+
+        break;
 
         default:
           console.log("Unhandled action type:", action.type);
@@ -1036,7 +1203,7 @@
     } catch (error) {
       console.error("Error visualizing AI action:", error);
     }
-
+    console.log("Game data after action:", gameData);
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
@@ -1146,22 +1313,6 @@
     }
   }
 
-  function updateGameStateAfterAITurn() {
-    if (!gameData || !gameData.ia) return;
-
-    // Update gameData with the changes to units
-    const aiUnits = units.filter((u) => u.owner === "ia");
-    gameData.ia.units = aiUnits;
-
-    // Update gameData with the changes to cities
-    const aiCities = cities.filter((c) => c.owner === "ia");
-    gameData.ia.cities = aiCities || [];
-
-    console.log(
-      `AI state updated: ${aiUnits.length} units and ${aiCities.length} cities`,
-    );
-  }
-
   function centerMapOnPosition(x, y) {
     const containerWidth = window.innerWidth;
     const containerHeight = window.innerHeight;
@@ -1249,10 +1400,7 @@
         showResourceGenerationNotification(playerResources, "player");
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-
-      // --- NUEVO: Incrementar población de ciudades del jugador ---
       gameData.player = gameAPI.increaseCityPopulation(gameData.player);
-      // Sincronizar array de ciudades tras el cambio de población
       cities = [...gameData.player.cities];
 
       // --- NUEVO: Decrementar alto el fuego ---
@@ -1280,6 +1428,7 @@
 
       gameData.current_player = "ia";
       currentPlayer.set(gameData.current_player);
+      gameAPI.updateGameSession(gameData);
       showToastNotification("IA's Turn - Processing...", "info");
 
       // Process AI city production before AI actions
@@ -1647,10 +1796,10 @@
             );
             // In case of error, still clear the research
             city.production = {
-                  current_item: null,
-                  turns_remaining: 0,
-                  itemType: null,
-                  production_type: null,
+              current_item: null,
+              turns_remaining: 0,
+              itemType: null,
+              production_type: null,
             };
             if (city.research) {
               city.research.current_technology = null;
@@ -1663,7 +1812,6 @@
             itemType: null,
             production_type: null,
           };
-
         }
       }
 
@@ -2556,15 +2704,14 @@
         // Update selected unit reference to the updated unit
         selectedUnit = updatedUnit;
 
-        
-          // Actualiza las unidades de jugador en gameData antes de guardar
-          if (gameData && gameData.player) {
-            gameData.player.units = units.filter((u) => u.owner === "player");
-          }
-          if (gameData && gameData.ia) {
-            gameData.ia.units = units.filter((u) => u.owner === "ia");
-          }
-          await gameAPI.updateGameSession(gameData);        
+        // Actualiza las unidades de jugador en gameData antes de guardar
+        if (gameData && gameData.player) {
+          gameData.player.units = units.filter((u) => u.owner === "player");
+        }
+        if (gameData && gameData.ia) {
+          gameData.ia.units = units.filter((u) => u.owner === "ia");
+        }
+        await gameAPI.updateGameSession(gameData);
         // --- FIN NUEVO ---
         // --- NUEVO: Refrescar la tarjeta de información de la tropa ---
         refreshSelectedUnitInfo();
@@ -2995,7 +3142,7 @@
         }
       } else if (command === "unlimitedMovements") {
         unlimitedMovementsActive = true;
-        
+
         // Make sure the cheats_used array exists
         if (!gameData.cheats_used) {
           gameData.cheats_used = [];
@@ -3016,14 +3163,14 @@
             unit.status = "ready";
             unit.remainingMovement = unit.movement || 2;
           });
-          
+
           // Update units array to match gameData
-          units = units.map(unit => {
-            if (unit.owner === 'player') {
+          units = units.map((unit) => {
+            if (unit.owner === "player") {
               return {
                 ...unit,
                 status: "ready",
-                remainingMovement: unit.movement || 2
+                remainingMovement: unit.movement || 2,
               };
             }
             return unit;
@@ -3036,7 +3183,6 @@
         cheatResult =
           "¡Movimientos ilimitados activados! Tus tropas pueden moverse sin restricciones";
         cheatResultType = "success";
-        
       } else if (command === "unlimitedResources") {
         // --- NUEVO: Da 99999 de cada recurso y guarda en sesión ---
         if (gameData && gameData.player && gameData.player.resources) {
@@ -3055,8 +3201,9 @@
         }
         // Guarda en la sesión
         await gameAPI.updateGameSession(gameData);
-        
-        cheatResult = "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
+
+        cheatResult =
+          "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
         cheatResultType = "success";
       } else {
         // Invalid command
@@ -3118,7 +3265,11 @@
 
           console.log("Total units loaded:", units.length);
 
-          if (gameData && gameData.player && Array.isArray(gameData.player.cities)) {
+          if (
+            gameData &&
+            gameData.player &&
+            Array.isArray(gameData.player.cities)
+          ) {
             cities = [...gameData.player.cities];
             console.log("Loaded cities:", cities.length);
           } else {
@@ -3129,12 +3280,12 @@
           if (!gameData.cheats_used) {
             gameData.cheats_used = [];
           }
-          
+
           // Apply any previously used cheats
           if (gameData.cheats_used.includes("fogOfWar_Off")) {
             showFogOfWar = false;
           }
-          
+
           // Check if unlimitedMovements cheat was previously used
           if (gameData.cheats_used.includes("unlimitedMovements")) {
             unlimitedMovementsActive = true;
@@ -3276,7 +3427,7 @@
 
   // MODIFICADO: city icon para distinguir IA
   function getCityIcon(city) {
-    return { type: "image", value: './ia_assets/city.jpg' };
+    return { type: "image", value: "./ia_assets/city.jpg" };
   }
 
   // Function to get terrain background URL based on type
@@ -3508,7 +3659,7 @@
       case "cavalry":
         return "./ia_assets/cavalry.png";
       case "archer":
-        return "./ia_assets/archer.png"; 
+        return "./ia_assets/archer.png";
       case "boar_rider":
         return "./ia_assets/boar_rider.png";
       case "tank":
@@ -3688,10 +3839,9 @@
               {/if}
 
               {#each cities as city}
-                {#if (city.position.x === x && city.position.y === y) || 
-                     (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)}
-                  <div 
-                    class="city-marker" 
+                {#if (city.position.x === x && city.position.y === y) || (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)}
+                  <div
+                    class="city-marker"
                     title="{city.name} (Población: {city.population || 0})"
                   >
                     <span class="city-icon">
@@ -3880,14 +4030,14 @@
               >
                 Atacar
               </button>
-              
+
               <button
                 class="action-button negotiate-button"
                 on:click={() => openNegotiation(selectedUnitInfo)}
                 disabled={!canNegotiate(selectedUnitInfo)}
-                title={canNegotiate(selectedUnitInfo) ? 
-                  "Negociar con la IA" : 
-                  "Necesitas estar a 2 casillas de una unidad enemiga para negociar"}
+                title={canNegotiate(selectedUnitInfo)
+                  ? "Negociar con la IA"
+                  : "Necesitas estar a 2 casillas de una unidad enemiga para negociar"}
               >
                 Negociar
               </button>
@@ -3907,10 +4057,18 @@
 
     {#if selectedCityInfo && !showPauseMenu}
       <div class="city-info-overlay">
-        <div class="city-info-card" class:enemy-city-card={selectedCityInfo.owner === 'ia'}>
+        <div
+          class="city-info-card"
+          class:enemy-city-card={selectedCityInfo.owner === "ia"}
+        >
           <div class="city-info-header">
-            <h4>{selectedCityInfo.name || 'Ciudad'}</h4>
-            <button class="close-button" on:click={() => { selectedCityInfo = null; }}>×</button>
+            <h4>{selectedCityInfo.name || "Ciudad"}</h4>
+            <button
+              class="close-button"
+              on:click={() => {
+                selectedCityInfo = null;
+              }}>×</button
+            >
           </div>
 
           <div class="city-details">
@@ -3929,7 +4087,10 @@
             </div>
 
             <div class="city-stats">
-              <p><strong>Población:</strong> {selectedCityInfo.population || 0}</p>
+              <p>
+                <strong>Población:</strong>
+                {selectedCityInfo.population || 0}
+              </p>
               {#if selectedCityInfo.position}
                 <p>
                   <strong>Posición:</strong>
@@ -3945,16 +4106,25 @@
                   {selectedCityInfo.buildings.length}
                 </p>
               {/if}
-              
+
               {#if selectedCityInfo.production && selectedCityInfo.production.current_item}
-                <p><strong>Producción actual:</strong> {selectedCityInfo.production.current_item}</p>
-                <p><strong>Turnos restantes:</strong> {selectedCityInfo.production.turns_remaining}</p>
+                <p>
+                  <strong>Producción actual:</strong>
+                  {selectedCityInfo.production.current_item}
+                </p>
+                <p>
+                  <strong>Turnos restantes:</strong>
+                  {selectedCityInfo.production.turns_remaining}
+                </p>
               {/if}
             </div>
           </div>
 
           <div class="city-actions">
-            <button class="action-button enter-city-button" on:click={() => enterCity(selectedCityInfo)}>
+            <button
+              class="action-button enter-city-button"
+              on:click={() => enterCity(selectedCityInfo)}
+            >
               Entrar a la Ciudad
             </button>
           </div>
@@ -4206,7 +4376,10 @@
 
   {#if ceasefireActive && ceasefireTurns > 0}
     <div class="ceasefire-banner">
-      🕊️ Alto el fuego activo: No se puede atacar durante {ceasefireTurns} turno{ceasefireTurns === 1 ? "" : "s"} restantes.
+      🕊️ Alto el fuego activo: No se puede atacar durante {ceasefireTurns} turno{ceasefireTurns ===
+      1
+        ? ""
+        : "s"} restantes.
     </div>
   {/if}
 </div>
@@ -4221,21 +4394,21 @@
 />
 
 <style>
-/* ...existing code... */
-.ceasefire-banner {
-  position: fixed;
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #222e3a;
-  color: #fff;
-  padding: 10px 28px;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-  z-index: 2000;
-  border: 2px solid #5b7cff;
-  letter-spacing: 0.5px;
-}
+  /* ...existing code... */
+  .ceasefire-banner {
+    position: fixed;
+    top: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #222e3a;
+    color: #fff;
+    padding: 10px 28px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    z-index: 2000;
+    border: 2px solid #5b7cff;
+    letter-spacing: 0.5px;
+  }
 </style>

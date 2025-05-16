@@ -315,8 +315,8 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
             DO NOT include any text, explanations, or comments outside the JSON structure.
             
             YOUR PRIORITIES :
-            1. EXPLORATION: Expand visible map area by moving units to unexplored regions
-            2. CITY BUILDING: Found cities in resource-rich areas when you have settlers
+            1. CITY BUILDING: Found cities in resource-rich areas when you have settlers
+            2. EXPLORATION: Expand visible map area by moving units to unexplored regions
             3. RESOURCE ACQUISITION: Secure tiles with resources (gold, iron, wood, stone)
             4. PRODUCTION: Train more units in your cities, especially settlers, warriors and archers
             5. MILITARY: Protect territory and attack when advantageous
@@ -334,6 +334,7 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
                - CAVALRY units are faster and can move up to 4 tiles per turn
                - Each unit's movement is stored in the "movement" property (cavalry=4, others=2)
             3. INVALID MOVEMENTS:
+               - Unit CANNOT move to other units or cities tale, including if they will move to other position in the next action
                - Units CANNOT move outside map boundaries (all x must be 0 to width-1, all y must be 0 to height-1)
                - Units CANNOT move onto water tiles (terrain type 1)
                - Units CANNOT occupy tiles with other units
@@ -346,11 +347,51 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
                - Only settler units can found cities
                - Cities require resources: 20 wood and 15 stone
                - Cannot found cities on water or where another city exists
-            6. CITY PRODUCTION:
-               - You can train units in your cities, similar to the player
-               - Each city can produce one unit at a time
-               - Units will be placed adjacent to the city when completed
-            7. FOG OF WAR:
+            6. CITY MANAGEMENT AND CONSTRUCTION:
+            Before manage or produce in your cities check if you have any city, if you don't, you can't do anything. So, to create a city use these example:
+            {
+                "type": "construction",
+                "building": "city",
+                "city_id": "city-identifier",
+                "action": "build",
+                "item_id": "settler",
+                "position": [5, 7]
+            }
+
+            To produce in your city use this example:
+            {
+                "type": "city_production",
+                "city_id": "city-identifier",
+                "action": "build|train|research",
+                "item_id": "building_type|unit_type|technology_id"
+            }
+            - When you have cities, PRIORITIZE BUILDING construction in this order:
+                a) Sawmill (produces wood: 10/turn, costs: 20 wood, 20 stone)
+                b) Quarry (produces stone: 10/turn, costs: 30 wood, 20 stone)
+                c) Farm (produces food: 15/turn, costs: 40 wood)
+                d) Library (enables technology research, costs: 70 wood, 50 stone)
+                e) Iron Mine (produces iron: 8/turn, costs: 50 wood, 50 stone, requires "medium" technology)
+                f) Gold Mine (produces gold: 5/turn, costs: 50 wood, 70 stone, requires "medium" technology)
+            
+            - UNIT TRAINING priorities:
+                a) Settler (for expansion, costs: 100 food, 50 gold)
+                b) Warrior (for defense, costs: 50 food, 10 gold)
+                c) Archer (for ranged combat, costs: 40 food, 15 gold, 10 wood)
+                d) Cavalry (for fast exploration, costs: 70 food, 20 gold, requires "medium" technology)
+
+            - TECHNOLOGY research sequence:
+                a) Begin with "medium" technology (10 turns) when you have a library
+                b) Later research "advanced" technology (20 turns) when population reaches 100
+
+            7. CITY PRODUCTION ACTIONS:
+            - Include in your response construction actions with format:
+                {
+                "type": "city_production",
+                "city_id": "city-identifier",
+                "action": "build|train|research",
+                "item_id": "building_type|unit_type|technology_id"
+                }
+            8. FOG OF WAR:
                - You start with a 4x4 area of visibility around your starting position
                - When units move, they reveal a 4x4 area around their new position
                - You can only see tiles listed in "visible_tiles"
@@ -377,7 +418,7 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
               "actions": [
                 {
                   "type": "movement|attack|construction",
-                  "unit_id": "unit-identifier", // IMPORTANT: Always include a valid unit ID
+                  "unit_id": "unit-identifier", // IMPORTANT: Always include a valid unit TYPE_ID(settler, warrior, archer, cavalry, tank) of the unit
                   "position": [x, y],           // Current unit position
                   "target_position": [x, y],    // For movement/attack: target position
                   "state_before": { "position": [x, y], "remainingMovement": n, "status": "ready|moved|exhausted" },
@@ -404,6 +445,7 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
             - You can't move to the same tile as another unit or city
             - To win the game you must defeat the player by attacking all their troops
             - You can't attack while in a ceasefire
+            - You can't move to a tile that is another troop or city
             """
             
             # Set system instructions
@@ -436,7 +478,14 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
         8. Your PRIMARY OBJECTIVE is to maximize exploration and visibility - prioritize movements that reveal new areas
         9. Your SECONDARY OBJECTIVE is to secure valuable resource tiles (gold, iron, wood, stone)
         10. IMPORTANT: This is a NEW TURN - all units shown in the game state have full movement points and status "ready"
-        
+        11. CITY MANAGEMENT: For each city without active production:
+        a) Build Sawmills and Quarries first to secure resource production
+        b) Build a Farm when food drops below 100
+        c) Build a Library when you have at least 70 wood and 50 stone
+        d) Start researching "medium" technology once you have a Library
+        e) Train units when defenses are needed or for expansion
+
+
         CRITICAL: Always verify x coordinates are between 0 and {filtered_game_state["map_size"]["width"]-1} and y coordinates are between 0 and {filtered_game_state["map_size"]["height"]-1}.
         """
 

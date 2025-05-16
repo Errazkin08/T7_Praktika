@@ -13,7 +13,7 @@
   import "../styles/pages/map.css";
   import CheatConsole from "../components/CheatConsole.svelte";
   import NegotiationModal from "../components/NegotiationModal.svelte";
-  import AudioPlayer from '../components/AudioPlayer.svelte';
+  import AudioPlayer from "../components/AudioPlayer.svelte";
 
   let audioPlayer;
 
@@ -21,8 +21,8 @@
     if (audioPlayer) {
       audioPlayer.initializeAudio();
       // Eliminar event listeners después de inicialización
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
     }
   }
 
@@ -150,7 +150,7 @@
   // Function to display the found city modal
   function showFoundCityDialog(settler) {
     settlerToFoundCity = settler;
-    newCityName = `Ciudad ${Math.floor(Math.random() * 1000)}`;
+    newCityName = `Hiria ${Math.floor(Math.random() * 1000)}`;
     showCityFoundingModal = true;
   }
 
@@ -164,7 +164,7 @@
   // Function to found a city at the current settler's position
   function foundCity() {
     if (!settlerToFoundCity || !newCityName.trim()) {
-      showToastNotification("Se requiere un nombre para la ciudad", "error");
+      showToastNotification("Hiriaren izena beharrezkoa da", "error");
       return;
     }
 
@@ -172,7 +172,7 @@
       const [x, y] = settlerToFoundCity.position;
       if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) {
         showToastNotification(
-          "No se puede fundar una ciudad en el agua",
+          "Ezin da hiria sortu ur gainean",
           "error",
         );
         return;
@@ -187,7 +187,7 @@
       );
 
       if (existingCity) {
-        showToastNotification("Ya existe una ciudad en esta posición", "error");
+        showToastNotification("Hiri bat dago jada posizio honetan", "error");
         return;
       }
 
@@ -200,7 +200,7 @@
         playerResources.stone < requiredResources.stone
       ) {
         showToastNotification(
-          `Recursos insuficientes. Se necesita: ${requiredResources.wood} madera, ${requiredResources.stone} piedra`,
+          `Baliabideak ez dira nahikoak. Beharrezkoa: ${requiredResources.wood} egur, ${requiredResources.stone} harria`,
           "error",
         );
         return;
@@ -254,7 +254,7 @@
         updateFogOfWarAroundPosition(x, y, 3);
 
         showToastNotification(
-          `¡Ciudad ${newCityName} fundada con éxito!`,
+          `¡${newCityName} hiria sortu da arrakastaz!`,
           "success",
         );
       }
@@ -272,7 +272,7 @@
     } catch (error) {
       console.error("Error founding city:", error);
       showToastNotification(
-        "Error al fundar la ciudad: " + error.message,
+        "Errorea hiria sortzean: " + error.message,
         "error",
       );
     }
@@ -352,7 +352,7 @@
     // If we have attack targets, show a notification
     if (attackTargets.length > 0) {
       showToastNotification(
-        `${attackTargets.length} unidades enemigas al alcance`,
+        `${attackTargets.length} etsai unitate eraso barrutian`,
         "info",
         2000,
       );
@@ -465,7 +465,7 @@
   function tryAttackFromCard(unit) {
     if (ceasefireActive && ceasefireTurns > 0) {
       showToastNotification(
-        `No puedes atacar durante el alto el fuego (${ceasefireTurns} turnos restantes).`,
+        `Ezin duzu eraso su-etenean zehar (${ceasefireTurns} txanda geratzen).`,
         "warning",
       );
       return;
@@ -473,7 +473,7 @@
 
     // Modificación: permitir atacar si no está exhausta y tiene movimientos
     if (!unit || unit.owner !== "player") {
-      showToastNotification("Esta unidad no puede atacar ahora.", "warning");
+      showToastNotification("Unitate honek ezin du orain eraso.", "warning");
       return;
     }
 
@@ -483,7 +483,7 @@
       (unit.remainingMovement !== undefined && unit.remainingMovement <= 0)
     ) {
       showToastNotification(
-        "Esta unidad no tiene suficientes puntos de movimiento para atacar.",
+        "Unitate honek ez du nahiko mugimendu puntu eraso egiteko.",
         "warning",
       );
       return;
@@ -492,7 +492,7 @@
     // Buscar enemigos en rango
     checkForAttackTargets(unit);
     if (attackTargets.length === 0) {
-      showToastNotification("No hay enemigos al alcance para atacar.", "info");
+      showToastNotification("Ez dago erasotzeko helburuak barrutian.", "info");
       showAttackOptions = false;
     } else {
       showAttackOptions = true;
@@ -554,7 +554,7 @@
   function openNegotiation(unit) {
     if (!canNegotiate(unit)) {
       showToastNotification(
-        "Necesitas estar a 2 casillas de una unidad enemiga para negociar.",
+        "Etsai unitate batetik 2 laukira egon behar zara negoziatzeko.",
         "warning",
       );
       return;
@@ -582,7 +582,7 @@
           ceasefireActive =
             !!updatedGame.ceasefire_active && ceasefireTurns > 0;
           showToastNotification(
-            `¡Negociación exitosa! Alto el fuego durante ${ceasefireTurns} turnos.`,
+            `¡Negoziaketa arrakastatsua! Su-etena ${ceasefireTurns} txanda zehar.`,
             "success",
           );
         }
@@ -598,9 +598,9 @@
     aiActions = actions;
     aiActionIndex = 0;
     aiTurnReasoning =
-      reasoning || "La IA está realizando movimientos estratégicos";
+      reasoning || "IA mugimendu estrategikoak egiten ari da";
 
-    showToastNotification("Observando el turno de la IA...", "info", 2000);
+    showToastNotification("IA txanda ikusten...", "info", 2000);
 
     // Save current fog of war state and disable it for AI turn
     const previousFogState = showFogOfWar;
@@ -693,7 +693,7 @@
 
     processingAITurn = false;
     currentAIAction = null;
-    showToastNotification("La IA ha completado su turno", "success");
+    showToastNotification("IAk bere txanda amaitu du", "success");
   }
 
   async function centerOnPlayerPosition() {
@@ -735,7 +735,7 @@
       if (!action || !action.type) {
         console.warn("AI action missing type:", action);
         showToastNotification(
-          "Acción de IA inválida (sin tipo)",
+          "IA ekintza baliogabea (mota gabe)",
           "warning",
           1500,
         );
@@ -788,12 +788,12 @@
 
           if (unitIndex === -1) {
             console.warn(
-              `[AI] Unidad para mover no encontrada: id=${action.unit_id}, pos=${JSON.stringify(
+              `[AI] Mugitzeko unitatea ez da aurkitu: id=${action.unit_id}, pos=${JSON.stringify(
                 action.position,
               )}`,
             );
             showToastNotification(
-              "La IA intentó mover una unidad que no existe",
+              "IAk ez dagoen unitate bat mugitu nahi izan du",
               "info",
               1500,
             );
@@ -808,9 +808,9 @@
             !Array.isArray(action.target_position) ||
             action.target_position.length < 2
           ) {
-            console.warn("[AI] Movimiento sin target_position válido:", action);
+            console.warn("[AI] Mugimendua target_position baliogabearekin:", action);
             showToastNotification(
-              "La IA intentó mover una unidad a una posición inválida",
+              "IAk unitate bat mugitu nahi izan du posizio baliogabe batera",
               "warning",
               1500,
             );
@@ -827,10 +827,10 @@
             targetY >= mapHeight
           ) {
             console.warn(
-              `[AI] Movimiento fuera de límites: [${targetX},${targetY}]`,
+              `[AI] Mugimendua mugatik kanpo: [${targetX},${targetY}]`,
             );
             showToastNotification(
-              "La IA intentó mover una unidad fuera del mapa",
+              "IAk unitate bat mugitu nahi izan du mapatik kanpo",
               "warning",
               1500,
             );
@@ -843,10 +843,10 @@
             terrain[targetY][targetX] === TERRAIN_TYPES.WATER
           ) {
             console.warn(
-              `[AI] Movimiento a casilla de agua: [${targetX},${targetY}]`,
+              `[AI] Mugimendua ur laukira: [${targetX},${targetY}]`,
             );
             showToastNotification(
-              "La IA intentó mover una unidad al agua",
+              "IAk unitate bat mugitu nahi izan du ur gainean",
               "info",
               1500,
             );
@@ -864,10 +864,10 @@
           );
           if (occupied) {
             console.warn(
-              `[AI] Movimiento a casilla ocupada: [${targetX},${targetY}]`,
+              `[AI] Mugimendua okupatutako laukira: [${targetX},${targetY}]`,
             );
             showToastNotification(
-              "La IA intentó mover una unidad a una casilla ocupada",
+              "IAk unitate bat mugitu nahi izan du laukira okupatu batera",
               "info",
               1500,
             );
@@ -884,10 +884,10 @@
           );
           if (cityAtTarget) {
             console.warn(
-              `[AI] Movimiento a casilla con ciudad: [${targetX},${targetY}]`,
+              `[AI] Mugimendua hiria duen laukira: [${targetX},${targetY}]`,
             );
             showToastNotification(
-              "La IA intentó mover una unidad a una ciudad",
+              "IAk unitate bat mugitu nahi izan du hiria duen laukira",
               "info",
               1500,
             );
@@ -952,11 +952,11 @@
 
           if (attackerIndex === -1 || targetIndex === -1) {
             console.warn(
-              `[AI] No se encontró atacante o defensor para ataque:`,
+              `[AI] Erasotzaile edo defendatzailea ez da aurkitu erasoan:`,
               action,
             );
             showToastNotification(
-              "La IA intentó atacar pero no se encontró la unidad",
+              "IAk eraso egin nahi izan du baina unitatea ez da aurkitu",
               "info",
               1500,
             );
@@ -980,15 +980,15 @@
             defender.health = action.target_state_after.health;
             if (defender.health <= 0) {
               units.splice(targetIndex, 1);
-              showToastNotification("¡Tu unidad ha sido destruida!", "error");
+              showToastNotification("Zure unitatea suntsitu da!", "error");
             } else {
               showToastNotification(
-                `¡Tu unidad ha sido atacada! Salud restante: ${defender.health}`,
+                `Zure unitatea erasotu da! Osasun geratzen: ${defender.health}`,
                 "warning",
               );
             }
           } else {
-            showToastNotification("¡La IA ha atacado!", "warning");
+            showToastNotification("IAk erasotu du!", "warning");
           }
 
           units = [...units];
@@ -1021,11 +1021,11 @@
           }
           if (builderIndex === -1) {
             console.warn(
-              "[AI] No se encontró colono para fundar ciudad:",
+              "[AI] Ez da aurkitu hiria sortzeko kolonoa:",
               action,
             );
             showToastNotification(
-              "La IA intentó fundar ciudad sin colono",
+              "IAk hiria sortu nahi izan du kolono gabe",
               "info",
               1500,
             );
@@ -1043,11 +1043,11 @@
           );
           if (cityExists) {
             console.warn(
-              "[AI] Ya existe ciudad en esa posición:",
+              "[AI] Jada hiria dago posizio horretan:",
               action.position,
             );
             showToastNotification(
-              "La IA intentó fundar ciudad donde ya hay una",
+              "IAk hiria sortu nahi izan du jada hiria dagoen lekuan",
               "info",
               1500,
             );
@@ -1057,7 +1057,7 @@
           // Crear ciudad
           const newCity = {
             id: `city_${Date.now()}`,
-            name: action.city_name || `IA City ${Date.now()}`,
+            name: action.city_name || `IA Hiria ${Date.now()}`,
             position: [cityX, cityY],
             owner: "ia",
             population: 1,
@@ -1070,7 +1070,7 @@
             gameData.ia.cities = [...gameData.ia.cities, newCity];
           }
           showToastNotification(
-            `La IA ha fundado una ciudad: ${newCity.name}`,
+            `IAk hiria sortu du: ${newCity.name}`,
             "info",
           );
           break;
@@ -1079,9 +1079,9 @@
         case "city_production": {
           // Robustez: verificar campos mínimos
           if (!action.city_id || !action.action || !action.item_id) {
-            console.warn("[AI] Acción city_production incompleta:", action);
+            console.warn("[AI] Ekintza city_production osatu gabe:", action);
             showToastNotification(
-              "La IA envió una producción de ciudad incompleta",
+              "IAk hiriko ekoizpen osatu gabea bidali du",
               "info",
               1500,
             );
@@ -1099,11 +1099,11 @@
           );
           if (!city) {
             console.warn(
-              "[AI] Ciudad de IA no encontrada para producción:",
+              "[AI] IA hiria ez da aurkitu ekoizpenerako:",
               action,
             );
             showToastNotification(
-              "La IA intentó producir en una ciudad que no existe",
+              "IAk ekoiztu nahi izan du existitzen ez den hirian",
               "info",
               1500,
             );
@@ -1111,20 +1111,52 @@
           }
           // El resto igual que tu lógica actual...
           // (puedes copiar el bloque de city_production robusto de tu código actual)
+          // Actualizar ciudad y producción
+          let turns_remaining = 0;
+          if (action.action == "train") {
+            turns_remaining = gameAPI.getTroopType(action.item_id).turns;
+          } else if (action == "build") {
+            turns_remaining = gameAPI.getBuildingCost(action.item_id).turns;
+          } else if (action.action == "research") {
+            turns_remaining = gameAPI.getTechnologyCost(action.item_id).turns;
+          } else {
+            console.warn(
+              "[AI] Ekoizpen ekintza ez da onartzen:",
+              action.action,
+            );
+            showToastNotification(
+              "IAk ekoizpen ekintza ez onartua egin nahi izan du",
+              "info",
+              1500,
+            );
+            return;
+          }
+          city.production = {
+            current_item: action.item_id,
+            turns_remaining: turns_remaining || 3,
+          };
+          cities = cities.filter((c) => c.id !== city.id);
+          cities = [...cities, city];
+          gameData.ia.cities = gameData.ia.cities.filter(
+            (c) => c.id !== city.id,
+          );
+          gameData.ia.cities = [...gameData.ia.cities, city];
+          gameAPI.updateGameSession(gameData);
+          console.log("Hiriaren ekoizpena eguneratua:", city);
           break;
         }
 
         default:
-          console.warn("[AI] Acción no soportada:", action.type, action);
+          console.warn("[AI] Ekintza ez da onartzen:", action.type, action);
           showToastNotification(
-            `La IA realizó una acción desconocida: ${action.type}`,
+            `IAk ekintza ezezaguna egin du: ${action.type}`,
             "info",
             1500,
           );
       }
     } catch (error) {
       console.error("Error visualizing AI action:", error, action);
-      showToastNotification("Error al procesar acción de la IA", "error", 2000);
+      showToastNotification("Errorea IA ekintza prozesatzean", "error", 2000);
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -1155,30 +1187,30 @@
 
         if (unitAtPosition) {
           // Prioritize showing the unit type in the UI
-          const unitType = unitAtPosition.type_id || "desconocida";
+          const unitType = unitAtPosition.type_id || "ezezaguna";
 
           // Return a user-friendly name based on unit type
           switch (unitType.toLowerCase()) {
             case "warrior":
-              return "guerrero";
+              return "gerraria";
             case "archer":
-              return "arquero";
+              return "arkularia";
             case "settler":
-              return "colono";
+              return "kolonoa";
             case "cavalry":
-              return "caballería";
+              return "zaldizkoa";
             case "builder":
-              return "constructor";
+              return "eraikitzailea";
             default:
               return unitType;
           }
         }
 
         // Fallback to generic description without showing coordinates
-        return "unidad";
+        return "unitatea";
       }
 
-      return "unidad desconocida";
+      return "unitate ezezaguna";
     }
 
     switch (action.type) {
@@ -1258,7 +1290,7 @@
     // Block turn end if there's a unit awaiting placement
     if (awaitingUnitPlacement && newlyProducedUnit) {
       showToastNotification(
-        "Debes colocar tu unidad antes de finalizar el turno",
+        "Unitatea kokatu behar duzu txanda amaitu aurretik",
         "warning",
         5000,
       );
@@ -1290,7 +1322,7 @@
       // If we just completed a production that requires unit placement, block turn end
       if (awaitingUnitPlacement && newlyProducedUnit) {
         showToastNotification(
-          "Nueva unidad producida. Debes colocarla antes de finalizar el turno",
+          "Unitate berria ekoiztu da. Kokatu behar duzu txanda amaitu aurretik",
           "success",
           5000,
         );
@@ -1323,7 +1355,7 @@
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       gameData.player = gameAPI.increaseCityPopulation(gameData.player);
-      cities = [...gameData.player.cities];
+      cities = [...gameData.player.cities, ...gameData.ia.cities];
 
       // --- NUEVO: Decrementar alto el fuego ---
       if (ceasefireActive && ceasefireTurns > 0) {
@@ -1335,14 +1367,14 @@
             gameData.ceasefire_turns = 0;
             gameData.ceasefire_active = false;
           }
-          showToastNotification("El alto el fuego ha terminado.", "info");
+          showToastNotification("Su-etena amaitu da.", "info");
         } else {
           if (gameData) {
             gameData.ceasefire_turns = ceasefireTurns;
             gameData.ceasefire_active = true;
           }
           showToastNotification(
-            `Quedan ${ceasefireTurns} turnos de alto el fuego.`,
+            `Su-etena geratzen ${ceasefireTurns} txanda.`,
             "info",
           );
         }
@@ -1351,7 +1383,7 @@
       gameData.current_player = "ia";
       currentPlayer.set(gameData.current_player);
       gameAPI.updateGameSession(gameData);
-      showToastNotification("IA's Turn - Processing...", "info");
+      showToastNotification("IA Txanda - Prozesatzen...", "info");
 
       // Process AI city production before AI actions
       const aiCompletedProductions = await processAICityProduction();
@@ -1365,7 +1397,7 @@
           // Show AI production notifications if there were any
           if (aiCompletedProductions && aiCompletedProductions.length > 0) {
             showToastNotification(
-              `La IA ha completado ${aiCompletedProductions.length} producciones`,
+              `IAk ${aiCompletedProductions.length} ekoizpen amaitu ditu`,
               "info",
               3000,
             );
@@ -1374,14 +1406,14 @@
           await processAIActions(aiResponse.actions, aiResponse.reasoning);
         } else {
           showToastNotification(
-            "La IA ha completado su turno (sin acciones)",
+            "IAk bere txanda amaitu du (ekintzarik gabe)",
             "info",
           );
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
         console.error("Error getting AI action:", error);
-        showToastNotification("Error processing AI turn", "error");
+        showToastNotification("Errorea IA txanda prozesatzean", "error");
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
@@ -1452,17 +1484,17 @@
       try {
         await gameAPI.updateGameSession(gameData);
         console.log(`Game session updated for Turn ${gameData.turn}.`);
-        showToastNotification(`Turno ${gameData.turn} - Tu turno`, "success");
+        showToastNotification(`Txanda ${gameData.turn} - Zure txanda`, "success");
       } catch (error) {
         console.error(
           "Failed to update game session after ending turn:",
           error,
         );
-        showToastNotification("Error saving turn data to server.", "error");
+        showToastNotification("Errorea txanda datuak zerbitzarian gordetzean.", "error");
       }
     } catch (error) {
       console.error("Unexpected error during end turn:", error);
-      showToastNotification("Error inesperado al finalizar turno", "error");
+      showToastNotification("Errore ezustekoa txanda amaitzean", "error");
     } finally {
       // Always re-enable the button when done, regardless of whether there was an error
       processingAITurn = false;
@@ -1558,7 +1590,7 @@
               calculateCityArea(city);
 
               // Show very prominent notification
-              const notificationMessage = `${city.name} ha completado la producción de ${tempUnit.name || itemId}. ¡Coloca la unidad en el mapa!`;
+              const notificationMessage = `${city.name} unitatearen ekoizpena amaitu du ${tempUnit.name || itemId}. Kokatu unitatea mapan!`;
               showToastNotification(notificationMessage, "success", 8000);
 
               // Center map on city to help player see where to place unit
@@ -1613,7 +1645,7 @@
                 city.buildings.push(newBuilding);
 
                 // Show prominent notification for building completion
-                const notificationMessage = `${city.name} ha completado la construcción de ${buildingDetails.name || itemId}.`;
+                const notificationMessage = `${city.name} eraikinaren ekoizpena amaitu du ${buildingDetails.name || itemId}.`;
                 showToastNotification(notificationMessage, "success", 6000);
 
                 // Add to completed productions
@@ -1652,7 +1684,7 @@
                     `Could not find a building of type ${itemId} to upgrade in city ${city.name}`,
                   );
                   showToastNotification(
-                    `Error: No se encontró un edificio para mejorar en ${city.name}`,
+                    `Errorea: Eraikin bat ez da aurkitu ${city.name} hobetzeko`,
                     "error",
                   );
                 } else {
@@ -1679,203 +1711,39 @@
                   city.buildings[buildingIndex] = upgradedBuilding;
 
                   // Show a prominent notification
-                  const notificationMessage = `¡${city.name} ha completado la investigación de ${technologyInfo.name}!`;
+                  const notificationMessage = `¡${city.name} eraikinaren hobekuntza amaitu du ${upgradedBuilding.name}!`;
                   showToastNotification(notificationMessage, "success", 8000);
 
                   // Add to completed productions for reference
                   completedProductions.push({
-                    type: "technology",
-                    name: technologyInfo.name,
+                    type: "building",
+                    name: upgradedBuilding.name,
                     city: city.name,
                     message: notificationMessage,
                   });
                 }
 
-                // Clear the library's production
+                // Clear the city's production
                 city.production = {
                   current_item: null,
                   turns_remaining: 0,
                   itemType: null,
                   production_type: null,
                 };
-
-                // Also clear city.research for backward compatibility
-                if (city.research) {
-                  city.research = {
-                    current_technology: null,
-                    turns_remaining: 0,
-                  };
-                }
-
-                // Update game state immediately
-                await gameAPI.updateGameSession(gameData);
               }
             }
           } catch (error) {
             console.error(
-              `Error completing research in ${city.name} library:`,
+              `Error completing production in ${city.name}:`,
               error,
             );
-            // In case of error, still clear the research
+            // In case of error, still clear the production
             city.production = {
               current_item: null,
               turns_remaining: 0,
               itemType: null,
               production_type: null,
             };
-            if (city.research) {
-              city.research.current_technology = null;
-              city.research.turns_remaining = 0;
-            }
-          }
-          city.production = {
-            current_item: null,
-            turns_remaining: 0,
-            itemType: null,
-            production_type: null,
-          };
-        }
-      }
-
-      // Process library research
-      if (city.buildings && city.buildings.length > 0) {
-        // Check each building for libraries with active research
-        for (let i = 0; i < city.buildings.length; i++) {
-          const building = city.buildings[i];
-
-          // Check if this is a library (handling both string and object representations)
-          const isLibrary =
-            (typeof building === "string" &&
-              building.toLowerCase() === "library") ||
-            building.type_id === "library" ||
-            building.name?.toLowerCase() === "library" ||
-            building.type?.toLowerCase() === "library";
-
-          if (!isLibrary) continue;
-
-          // Convert string building to object if needed
-          if (typeof building === "string") {
-            city.buildings[i] = {
-              id: `library-${Date.now()}`,
-              type_id: "library",
-              name: "Library",
-              production: null,
-            };
-            continue; // Skip this iteration after conversion
-          }
-
-          // Check if the library has active research
-          if (
-            building.production &&
-            building.production.current_technology &&
-            building.production.turns_remaining > 0
-          ) {
-            // Decrease turns remaining
-            building.production.turns_remaining--;
-
-            // For backward compatibility, also update city.research if it exists
-            if (
-              city.research &&
-              city.research.current_technology ===
-                building.production.current_technology
-            ) {
-              city.research.turns_remaining =
-                building.production.turns_remaining;
-            }
-
-            console.log(
-              `${city.name} library research progress: ${building.production.turns_remaining} turns remaining`,
-            );
-
-            // If research is complete
-            if (building.production.turns_remaining <= 0) {
-              try {
-                const technologyId = building.production.current_technology;
-
-                // Get complete technology info from API
-                let technologyInfo = null;
-                try {
-                  technologyInfo =
-                    await gameAPI.getTechnologyType(technologyId);
-                  console.log(
-                    `Technology ${technologyId} research completed:`,
-                    technologyInfo,
-                  );
-                  gameData.player.technologies.push(technologyInfo);
-                } catch (e) {
-                  console.warn(
-                    `Could not get technology info for ${technologyId} from API, using defaults`,
-                    e,
-                  );
-                  technologyInfo = {
-                    id: technologyId,
-                    name:
-                      building.production.technology_name ||
-                      `Technology ${technologyId}`,
-                    description: "Advanced technology",
-                    production_bonus: 10,
-                    defense_bonus: 5,
-                  };
-                }
-
-                // Add technology to player's technologies
-                if (!gameData.player.technologies) {
-                  gameData.player.technologies = [];
-                }
-
-                // Check if technology already exists to avoid duplicates
-                const existingTechIndex =
-                  gameData.player.technologies.findIndex(
-                    (tech) =>
-                      (typeof tech === "string" && tech === technologyId) ||
-                      (typeof tech === "object" && tech.id === technologyId),
-                  );
-
-                if (existingTechIndex === -1) {
-                  // Add the technology to the player's technologies
-                  gameData.player.technologies.push({
-                    id: technologyId,
-                    name: technologyInfo.name,
-                    acquired_at: gameData.turn,
-                    ...technologyInfo,
-                  });
-
-                  // Show a prominent notification
-                  const notificationMessage = `¡${city.name} ha completado la investigación de ${technologyInfo.name}!`;
-                  showToastNotification(notificationMessage, "success", 8000);
-
-                  // Add to completed productions for reference
-                  completedProductions.push({
-                    type: "technology",
-                    name: technologyInfo.name,
-                    city: city.name,
-                    message: notificationMessage,
-                  });
-                }
-
-                // Clear the library's production
-                building.production = null;
-
-                // Also clear city.research for backward compatibility
-                if (city.research) {
-                  city.research = {
-                    current_technology: null,
-                    turns_remaining: 0,
-                  };
-                }
-              } catch (error) {
-                console.error(
-                  `Error completing research in ${city.name} library:`,
-                  error,
-                );
-                // In case of error, still clear the research
-                building.production = null;
-                if (city.research) {
-                  city.research.current_technology = null;
-                  city.research.turns_remaining = 0;
-                }
-              }
-            }
           }
         }
       }
@@ -1986,7 +1854,7 @@
                 type: "troop",
                 name: troopInfo.name || itemId,
                 city: city.name,
-                message: `La ciudad ${city.name} de la IA ha producido ${troopInfo.name || itemId}`,
+                message: `IA hiriak unitatearen ekoizpena amaitu du ${troopInfo.name || itemId}`,
               });
             } else if (itemType === "building") {
               // Get complete building details
@@ -2021,7 +1889,7 @@
                 type: "building",
                 name: buildingDetails.name || itemId,
                 city: city.name,
-                message: `La ciudad ${city.name} de la IA ha construido ${buildingDetails.name || itemId}`,
+                message: `IA hiriak eraikinaren ekoizpena amaitu du ${buildingDetails.name || itemId}`,
               });
             }
 
@@ -2052,7 +1920,7 @@
     // Only show notifications for the human player
     if (playerType !== "player") return;
 
-    let resourceMessage = "Recursos generados: ";
+    let resourceMessage = "Sortutako baliabideak: ";
     let hasResources = false;
 
     if (resources.food > 0) {
@@ -2333,7 +2201,7 @@
 
         console.log("Game saved and session persisted.");
 
-        showToastNotification("Your game has been saved successfully!");
+        showToastNotification("Zure jokoa arrakastaz gorde da!");
 
         setTimeout(() => {
           endGame();
@@ -2347,7 +2215,7 @@
       console.error("Error saving and exiting game:", error);
 
       showToastNotification(
-        `Error saving game: ${error.message}. Trying again...`,
+        `Errorea jokoa gordetzean: ${error.message}. Berriro saiatzen...`,
         "error",
         2000,
       );
@@ -2355,7 +2223,7 @@
       try {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         await gameAPI.saveCurrentGameSession();
-        showToastNotification("Game saved successfully on retry!", "success");
+        showToastNotification("Jokoa arrakastaz gorde da berriro saiatzean!", "success");
 
         setTimeout(() => {
           endGame();
@@ -2363,7 +2231,7 @@
         }, 1500);
       } catch (retryError) {
         showToastNotification(
-          `Unable to save game. Exiting without saving.`,
+          `Ezin da jokoa gorde. Irten gabe gordetzean.`,
           "error",
           2000,
         );
@@ -2378,7 +2246,7 @@
   function exitWithoutSaving() {
     if (
       confirm(
-        "¿Estás seguro de que quieres salir sin guardar? Se perderá todo el progreso.",
+        "Ziur zaude gorde gabe irten nahi duzula? Aurrerapen guztia galduko da.",
       )
     ) {
       endGame();
@@ -2471,7 +2339,7 @@
 
     if (occupyingUnit) {
       showToastNotification(
-        `No puedes mover a la casilla (${targetX}, ${targetY}). Está ocupada por otra unidad.`,
+        `Ezin duzu unitatea mugitu laukira (${targetX}, ${targetY}). Beste unitate batek okupatzen du.`,
         "error",
       );
       return;
@@ -2488,7 +2356,7 @@
 
     if (cityAtPosition) {
       showToastNotification(
-        `No puedes mover a la casilla (${targetX}, ${targetY}). Hay una ciudad en esa posición.`,
+        `Ezin duzu unitatea mugitu laukira (${targetX}, ${targetY}). Hiri bat dago posizio horretan.`,
         "error",
       );
       return;
@@ -2536,7 +2404,7 @@
         const originalPosition = [...unitToMove.position];
 
         console.log(
-          `Moving unit ${unitToMove.type_id}  from [${originalPosition}] to [${targetX},${targetY}]`,
+          `Unitatea mugitzen ${unitToMove.type_id} [${originalPosition}] posiziotik [${targetX},${targetY}] posiziora`,
         );
 
         // Calculate the movement cost
@@ -2553,7 +2421,7 @@
           unitToMove.remainingMovement < movementCost
         ) {
           showToastNotification(
-            "Movimiento ilegal: no hay suficientes puntos de movimiento",
+            "Mugimendu baliogabea: ez dago nahiko mugimendu puntu",
             "error",
           );
           movementInProgress = false;
@@ -2650,13 +2518,13 @@
       } else {
         console.error("Could not find unit to move in the units array");
         showToastNotification(
-          "Error al mover la unidad: unidad no encontrada",
+          "Errorea unitatea mugitzean: unitatea ez da aurkitu",
           "error",
         );
       }
     } catch (error) {
       console.error("Error moving unit:", error);
-      showToastNotification("Error al mover la unidad", "error");
+      showToastNotification("Errorea unitatea mugitzean", "error");
     } finally {
       movementInProgress = false;
     }
@@ -2707,6 +2575,20 @@
     );
 
     if (cityAtPosition) {
+      if (
+        cityAtPosition.owner === "ia" &&
+        showFogOfWar &&
+        grid[y] &&
+        grid[y][x] !== FOG_OF_WAR.VISIBLE
+      ) {
+        // No mostrar nada, ni seleccionar la ciudad
+        selectedCityInfo = null;
+        selectedTile = null;
+        selectedUnit = null;
+        selectedUnitInfo = null;
+        validMoveTargets = [];
+        return;
+      }
       selectedCityInfo = cityAtPosition;
       selectedTile = null;
       selectedUnit = null;
@@ -2737,7 +2619,7 @@
 
       if (unitAtPosition.owner === "ia") {
         showToastNotification(
-          "Esta es una unidad enemiga. No puedes controlarla.",
+          "Hau etsai unitate bat da. Ezin duzu kontrolatu.",
           "warning",
         );
         selectedUnit = null;
@@ -2747,7 +2629,7 @@
 
       if (unitAtPosition.status === "exhausted") {
         showToastNotification(
-          "Esta unidad ya ha agotado sus movimientos este turno.",
+          "Unitate honek dagoeneko agortu ditu bere mugimenduak txanda honetan.",
           "warning",
         );
         selectedUnit = null;
@@ -2768,19 +2650,14 @@
       selectedTile = {
         x,
         y,
-        terrainName: "Desconocido (no explorado)",
+        terrainName: "Ezezaguna (ez esploratua)",
         isExplored: false,
       };
-    } else {
-      const terrainType = terrain[y] ? terrain[y][x] : TERRAIN_TYPES.NORMAL;
-
-      selectedTile = {
-        x,
-        y,
-        terrain: terrainType,
-        terrainName: getTerrainName(terrainType),
-        isExplored: grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE,
-      };
+      selectedUnit = null;
+      selectedUnitInfo = null;
+      selectedCityInfo = null;
+      validMoveTargets = [];
+      return; // IMPORTANTE: salir aquí para no seguir con la lógica normal
     }
   }
 
@@ -2835,7 +2712,7 @@
       // Check if the target position is valid
       if (!isValidPlacementPosition(x, y)) {
         showToastNotification(
-          "No puedes colocar la unidad en esa posición. Elige otra casilla dentro del área de la ciudad.",
+          "Ezin duzu unitatea posizio horretan kokatu. Aukeratu beste laukia hiriaren eremuan.",
           "error",
         );
         return;
@@ -2913,7 +2790,7 @@
 
       // Show a success notification
       showToastNotification(
-        `¡${newlyProducedUnit.name} colocado con éxito!`,
+        `¡${newlyProducedUnit.name} arrakastaz kokatu da!`,
         "success",
         4000,
       );
@@ -2925,7 +2802,7 @@
       cityAreaTiles = [];
     } catch (error) {
       console.error("Error placing new unit:", error);
-      showToastNotification("Error al colocar la unidad", "error");
+      showToastNotification("Errorea unitatea kokatzean", "error");
     }
   }
 
@@ -2974,8 +2851,8 @@
     try {
       document.body.classList.add("map-active");
       document.documentElement.classList.add("map-active");
-      document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('keydown', handleFirstInteraction);
+      document.addEventListener("click", handleFirstInteraction);
+      document.addEventListener("keydown", handleFirstInteraction);
 
       if (!$user) {
         navigate("/");
@@ -2996,8 +2873,8 @@
         document.body.classList.remove("map-active");
         document.documentElement.classList.remove("map-active");
         window.removeEventListener("keydown", handleKeyPress);
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('keydown', handleFirstInteraction);
+        document.removeEventListener("click", handleFirstInteraction);
+        document.removeEventListener("keydown", handleFirstInteraction);
       };
     } catch (err) {
       console.error("Error mounting Map component:", err);
@@ -3060,10 +2937,10 @@
           // Save changes to session
           await gameAPI.updateGameSession(gameData);
 
-          cheatResult = "Niebla de guerra desactivada";
+          cheatResult = "Gerra lainoa desaktibatuta";
           cheatResultType = "success";
         } else {
-          cheatResult = "La niebla de guerra ya está desactivada";
+          cheatResult = "Gerra lainoa jada desaktibatuta dago";
           cheatResultType = "info";
         }
       } else if (command === "unlimitedMovements") {
@@ -3107,7 +2984,7 @@
         await gameAPI.updateGameSession(gameData);
 
         cheatResult =
-          "¡Movimientos ilimitados activados! Tus tropas pueden moverse sin restricciones";
+          "Mugimendu mugagabeak aktibatuta! Zure tropak mugarik gabe mugitu daitezke";
         cheatResultType = "success";
       } else if (command === "unlimitedResources") {
         // --- NUEVO: Da 99999 de cada recurso y guarda en sesión ---
@@ -3129,18 +3006,18 @@
         await gameAPI.updateGameSession(gameData);
 
         cheatResult =
-          "¡Recursos ilimitados activados! 99999 de cada recurso añadido";
+          "Baliabide mugagabeak aktibatuta! 99999 baliabide bakoitzetik gehituta";
         cheatResultType = "success";
       } else {
         // Invalid command
-        cheatResult = `Comando inválido: ${command}`;
+        cheatResult = `Komando baliogabea: ${command}`;
         cheatResultType = "error";
       }
 
       console.log(`Cheat processed: ${command} - Result: ${cheatResult}`);
     } catch (error) {
       console.error("Error processing cheat:", error);
-      cheatResult = `Error: ${error.message}`;
+      cheatResult = `Errorea: ${error.message}`;
       cheatResultType = "error";
     }
   }
@@ -3196,7 +3073,7 @@
             gameData.player &&
             Array.isArray(gameData.player.cities)
           ) {
-            cities = [...gameData.player.cities];
+            cities = [...gameData.player.cities, ...gameData.ia.cities];
             console.log("Loaded cities:", cities.length);
           } else {
             cities = [];
@@ -3233,7 +3110,7 @@
 
       setTimeout(centerMapOnStartPoint, 200);
     } catch (error) {
-      loadingError = error.message || "Error desconocido al iniciar el juego.";
+      loadingError = error.message || "Errore ezezaguna jokoa hasieratzean.";
       isLoading = false;
     }
   }
@@ -3402,19 +3279,19 @@
   function getTerrainName(terrainType) {
     switch (terrainType) {
       case TERRAIN_TYPES.WATER:
-        return "Agua";
+        return "Ura";
       case 2:
-        return "Oro";
+        return "Urrea";
       case 3:
-        return "Hierro";
+        return "Burdina";
       case 4:
-        return "Madera";
+        return "Egurra";
       case 5:
-        return "Piedra";
+        return "Harria";
       case TERRAIN_TYPES.NORMAL:
-        return "Tierra";
+        return "Lurra";
       default:
-        return "Desconocido";
+        return "Ezezaguna";
     }
   }
 
@@ -3461,7 +3338,7 @@
     // Skip the remaining movement check if unlimited movements cheat is active
     if (!unlimitedMovementsActive && remainingMovement <= 0) {
       showToastNotification(
-        "Esta unidad ya ha agotado sus movimientos este turno.",
+        "Unitate honek dagoeneko agortu ditu bere mugimenduak txanda honetan.",
         "warning",
       );
       selectedUnit = null;
@@ -3477,7 +3354,7 @@
   function handleUnitClick(unit) {
     if (unit.owner !== "player") {
       showToastNotification(
-        "Esta es una unidad enemiga. No puedes controlarla.",
+        "Hau etsai unitate bat da. Ezin duzu kontrolatu.",
         "warning",
       );
       return;
@@ -3488,7 +3365,7 @@
     // If the unit can attack, highlight this information
     if (canAttack(unit)) {
       showToastNotification(
-        "¡Esta unidad puede atacar a enemigos cercanos!",
+        "¡Unitate honek inguruko etsaiak erasotu ditzake!",
         "info",
       );
     }
@@ -3501,14 +3378,14 @@
     // If the unit can attack, highlight this information
     if (canAttack(unit)) {
       showToastNotification(
-        "¡Esta unidad puede atacar a enemigos cercanos!",
+        "¡Unitate honek inguruko etsaiak erasotu ditzake!",
         "info",
       );
     }
 
     if (unit.status === "exhausted") {
       showToastNotification(
-        "Esta unidad ya ha agotado sus movimientos este turno.",
+        "Unitate honek dagoeneko agortu ditu bere mugimenduak txanda honetan.",
         "warning",
       );
       selectedUnit = null;
@@ -3521,7 +3398,7 @@
   // Update the enterCity function to be more reliable
   async function enterCity(city) {
     if (!gameData || !city) {
-      showToastNotification("Error al acceder a la ciudad", "error");
+      showToastNotification("Errorea hirira sartzean", "error");
       return;
     }
 
@@ -3537,7 +3414,7 @@
 
       // Make sure cityId is valid
       if (!cityId) {
-        showToastNotification("ID de ciudad no válido", "error");
+        showToastNotification("Hiriaren ID baliogabea", "error");
         return;
       }
 
@@ -3551,7 +3428,7 @@
     } catch (error) {
       console.error("Error entering city:", error);
       showToastNotification(
-        "Error al acceder a la ciudad: " + error.message,
+        "Errorea hirira sartzean: " + error.message,
         "error",
       );
     }
@@ -3607,38 +3484,38 @@
 </script>
 
 <svelte:head>
-  <title>Map - Civilization Game</title>
+  <title>Mapa - Zibilizazio Jokoa</title>
 </svelte:head>
 
 <div class="map-page">
-    <AudioPlayer bind:this={audioPlayer} />
+  <AudioPlayer bind:this={audioPlayer} />
 
   {#if isLoading}
     <div class="loading">
       <div class="loading-spinner"></div>
-      <h2>Inicializando juego...</h2>
+      <h2>Jokoa hasieratzen...</h2>
       {#if loadingError}
-        <div class="error-message">Error: {loadingError}</div>
+        <div class="error-message">Errorea: {loadingError}</div>
         <button class="retry-button" on:click={initializeGame}
-          >Reintentar</button
+          >Saiatu berriro</button
         >
       {/if}
     </div>
   {:else if loadingError}
     <div class="error">
-      <h2>Error al cargar el juego</h2>
+      <h2>Errorea jokoa kargatzean</h2>
       <p>{loadingError}</p>
       <button on:click={() => navigate("/new-game")}
-        >Volver a Nueva Partida</button
+        >Partida Berrira Itzuli</button
       >
     </div>
   {:else}
     <div class="map-controls">
       <div class="left-controls">
-        <button class="menu-button" on:click={togglePauseMenu}>☰ Menú</button>
+        <button class="menu-button" on:click={togglePauseMenu}>☰ Menua</button>
         <span class="game-info">
-          Turno: {$currentTurn} | Jugador: {$currentPlayer} | Mapa: {mapWidth}x{mapHeight}
-          | Dificultad: {difficulty}
+          Txanda: {$currentTurn} | Jokalaria: {$currentPlayer} | Mapa: {mapWidth}x{mapHeight}
+          | Zailtasuna: {difficulty}
         </span>
       </div>
       <div class="right-controls">
@@ -3646,16 +3523,16 @@
           class="end-turn-button"
           on:click={endTurn}
           title={processingAITurn
-            ? "Procesando turno de la IA..."
-            : "Finalizar Turno"}
+            ? "IA txanda prozesatzen..."
+            : "Txanda Amaitu"}
           disabled={processingAITurn}
           class:processing={processingAITurn}
         >
-          {processingAITurn ? "IA pensando..." : "Terminar Turno"}
+          {processingAITurn ? "IA pentsatzen..." : "Txanda Amaitu"}
         </button>
-        <button on:click={zoomIn} title="Aumentar zoom">+</button>
-        <button on:click={zoomOut} title="Reducir zoom">-</button>
-        <button on:click={centerMapOnStartPoint} title="Centrar mapa">⌖</button>
+        <button on:click={zoomIn} title="Zooma handitu">+</button>
+        <button on:click={zoomOut} title="Zooma txikitu">-</button>
+        <button on:click={centerMapOnStartPoint} title="Mapa zentratu">⌖</button>
       </div>
     </div>
 
@@ -3767,10 +3644,10 @@
               {/if}
 
               {#each cities as city}
-                {#if (city.position.x === x && city.position.y === y) || (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)}
+                {#if ((city.position.x === x && city.position.y === y) || (Array.isArray(city.position) && city.position[0] === x && city.position[1] === y)) && (!showFogOfWar || (grid[y] && grid[y][x] === FOG_OF_WAR.VISIBLE) || city.owner !== "ia")}
                   <div
                     class="city-marker"
-                    title="{city.name} (Población: {city.population || 0})"
+                    title="{city.name} (Biztanleria: {city.population || 0})"
                   >
                     <span class="city-icon">
                       {#if getCityIcon(city).type === "emoji"}
@@ -3795,7 +3672,7 @@
                   class:enemy={unitAtPosition.owner === "ia"}
                   title="{unitAtPosition.name ||
                     unitAtPosition.type_id} {unitAtPosition.owner === 'ia'
-                    ? '(Enemy)'
+                    ? '(Etsaia)'
                     : ''} {unitAtPosition.status
                     ? '(' + unitAtPosition.status + ')'
                     : ''}"
@@ -3823,14 +3700,14 @@
       <div class="tile-info-overlay">
         <div class="tile-info-card">
           <div class="tile-info-header">
-            <h4>Casilla ({selectedTile.x}, {selectedTile.y})</h4>
+            <h4>Laukia ({selectedTile.x}, {selectedTile.y})</h4>
             <button class="close-button" on:click={() => (selectedTile = null)}
               >×</button
             >
           </div>
 
           <div class="terrain-info">
-            <h5>Terreno: {selectedTile.terrainName}</h5>
+            <h5>Lurraldea: {selectedTile.terrainName}</h5>
             {#if selectedTile.isExplored !== false}
               <div
                 class="terrain-sample"
@@ -3843,17 +3720,16 @@
 
           {#if startPoint && startPoint[0] === selectedTile.x && startPoint[1] === selectedTile.y}
             <div class="start-info">
-              <h5>Punto de inicio del mapa</h5>
+              <h5>Maparen hasierako puntua</h5>
               <p>
-                Esta es la posición inicial recomendada para comenzar la
-                partida.
+                Hau da partida hasteko gomendatutako hasierako posizioa.
               </p>
             </div>
           {/if}
 
           {#if selectedTile.isExplored === false}
             <div class="fog-info">
-              <p>Esta zona no ha sido explorada todavía.</p>
+              <p>Eremu hau ez da oraindik esploratu.</p>
             </div>
           {/if}
         </div>
@@ -3861,126 +3737,128 @@
     {/if}
 
     {#if selectedUnitInfo && !showPauseMenu}
-      <div class="unit-info-overlay">
-        <div
-          class="unit-info-card"
-          class:enemy-unit={selectedUnitInfo.owner === "ia"}
-        >
-          <div class="unit-info-header">
-            <h4>
-              {selectedUnitInfo.name || selectedUnitInfo.type_id || "Unidad"}
-            </h4>
-            <button
-              class="close-button"
-              on:click={() => {
-                selectedUnitInfo = null;
-              }}>×</button
-            >
-          </div>
-
-          <div class="unit-details">
-            <div class="unit-image-container">
-              {#if selectedUnitInfo.type_id && getUnitImageUrl(selectedUnitInfo.type_id)}
-                <img
-                  src={getUnitImageUrl(selectedUnitInfo.type_id)}
-                  alt={selectedUnitInfo.type_id}
-                  class="unit-portrait"
-                />
-              {:else}
-                <div class="unit-icon-large">
-                  {selectedUnitInfo.type_id
-                    ? getUnitIcon(selectedUnitInfo.type_id)
-                    : "❓"}
-                </div>
-              {/if}
+      {#if !showFogOfWar || (selectedUnitInfo.position && grid[selectedUnitInfo.position[1]] && grid[selectedUnitInfo.position[1]][selectedUnitInfo.position[0]] === FOG_OF_WAR.VISIBLE)}
+        <div class="unit-info-overlay">
+          <div
+            class="unit-info-card"
+            class:enemy-unit={selectedUnitInfo.owner === "ia"}
+          >
+            <div class="unit-info-header">
+              <h4>
+                {selectedUnitInfo.name || selectedUnitInfo.type_id || "Unitatea"}
+              </h4>
+              <button
+                class="close-button"
+                on:click={() => {
+                  selectedUnitInfo = null;
+                }}>×</button
+              >
             </div>
 
-            <div class="unit-stats">
-              <p>
-                <strong>Tipo:</strong>
-                {selectedUnitInfo.type_id || "Desconocido"}
-              </p>
-              <p>
-                <strong>Facción:</strong>
-                {selectedUnitInfo.owner === "ia" ? "Enemigo" : "Jugador"}
-              </p>
-              <p>
-                <strong>Estado:</strong>
-                {selectedUnitInfo.status || "ready"}
-              </p>
-              <p>
-                <strong>Movimientos:</strong>
-                {selectedUnitInfo.remainingMovement !== undefined
-                  ? selectedUnitInfo.remainingMovement
-                  : selectedUnitInfo.movement ||
-                    2}/{selectedUnitInfo.movement || 2}
-              </p>
-              {#if selectedUnitInfo.position && Array.isArray(selectedUnitInfo.position) && selectedUnitInfo.position.length >= 2}
+            <div class="unit-details">
+              <div class="unit-image-container">
+                {#if selectedUnitInfo.type_id && getUnitImageUrl(selectedUnitInfo.type_id)}
+                  <img
+                    src={getUnitImageUrl(selectedUnitInfo.type_id)}
+                    alt={selectedUnitInfo.type_id}
+                    class="unit-portrait"
+                  />
+                {:else}
+                  <div class="unit-icon-large">
+                    {selectedUnitInfo.type_id
+                      ? getUnitIcon(selectedUnitInfo.type_id)
+                      : "❓"}
+                  </div>
+                {/if}
+              </div>
+
+              <div class="unit-stats">
                 <p>
-                  <strong>Posición:</strong> [{selectedUnitInfo.position[0]}, {selectedUnitInfo
-                    .position[1]}]
+                  <strong>Mota:</strong>
+                  {selectedUnitInfo.type_id || "Ezezaguna"}
                 </p>
-              {/if}
+                <p>
+                  <strong>Taldea:</strong>
+                  {selectedUnitInfo.owner === "ia" ? "Etsaia" : "Jokalaria"}
+                </p>
+                <p>
+                  <strong>Egoera:</strong>
+                  {selectedUnitInfo.status || "ready"}
+                </p>
+                <p>
+                  <strong>Mugimenduak:</strong>
+                  {selectedUnitInfo.remainingMovement !== undefined
+                    ? selectedUnitInfo.remainingMovement
+                    : selectedUnitInfo.movement ||
+                      2}/{selectedUnitInfo.movement || 2}
+                </p>
+                {#if selectedUnitInfo.position && Array.isArray(selectedUnitInfo.position) && selectedUnitInfo.position.length >= 2}
+                  <p>
+                    <strong>Kokapena:</strong> [{selectedUnitInfo.position[0]}, {selectedUnitInfo
+                      .position[1]}]
+                  </p>
+                {/if}
 
-              {#if selectedUnitInfo.health !== undefined}
-                <p><strong>Salud:</strong> {selectedUnitInfo.health}</p>
-              {/if}
+                {#if selectedUnitInfo.health !== undefined}
+                  <p><strong>Osasuna:</strong> {selectedUnitInfo.health}</p>
+                {/if}
 
-              {#if selectedUnitInfo.attack !== undefined}
-                <p><strong>Ataque:</strong> {selectedUnitInfo.attack}</p>
-              {/if}
+                {#if selectedUnitInfo.attack !== undefined}
+                  <p><strong>Erasoa:</strong> {selectedUnitInfo.attack}</p>
+                {/if}
 
-              {#if selectedUnitInfo.defense !== undefined}
-                <p><strong>Defensa:</strong> {selectedUnitInfo.defense}</p>
-              {/if}
+                {#if selectedUnitInfo.defense !== undefined}
+                  <p><strong>Defentsa:</strong> {selectedUnitInfo.defense}</p>
+                {/if}
+              </div>
             </div>
-          </div>
 
-          {#if selectedUnitInfo.owner !== "ia" && selectedUnitInfo.status !== "exhausted"}
-            <div class="unit-actions">
-              <button
-                class="action-button"
-                on:click={() => selectUnit(selectedUnitInfo)}>Mover</button
-              >
-
-              {#if selectedUnitInfo.type_id === "settler"}
+            {#if selectedUnitInfo.owner !== "ia" && selectedUnitInfo.status !== "exhausted"}
+              <div class="unit-actions">
                 <button
-                  class="action-button found-city-button"
-                  on:click={() => showFoundCityDialog(selectedUnitInfo)}
+                  class="action-button"
+                  on:click={() => selectUnit(selectedUnitInfo)}>Mugitu</button
                 >
-                  Fundar Ciudad
+
+                {#if selectedUnitInfo.type_id === "settler"}
+                  <button
+                    class="action-button found-city-button"
+                    on:click={() => showFoundCityDialog(selectedUnitInfo)}
+                  >
+                    Hiria Sortu
+                  </button>
+                {/if}
+
+                <button
+                  class="action-button attack-button"
+                  on:click={() => tryAttackFromCard(selectedUnitInfo)}
+                >
+                  Eraso
                 </button>
-              {/if}
 
-              <button
-                class="action-button attack-button"
-                on:click={() => tryAttackFromCard(selectedUnitInfo)}
-              >
-                Atacar
-              </button>
-
-              <button
-                class="action-button negotiate-button"
-                on:click={() => openNegotiation(selectedUnitInfo)}
-                disabled={!canNegotiate(selectedUnitInfo)}
-                title={canNegotiate(selectedUnitInfo)
-                  ? "Negociar con la IA"
-                  : "Necesitas estar a 2 casillas de una unidad enemiga para negociar"}
-              >
-                Negociar
-              </button>
-            </div>
-          {:else if selectedUnitInfo.owner === "ia"}
-            <div class="unit-enemy-message">
-              <p>Esta es una unidad enemiga. No puedes controlarla.</p>
-            </div>
-          {:else}
-            <div class="unit-exhausted-message">
-              <p>Esta unidad ya ha agotado sus movimientos este turno.</p>
-            </div>
-          {/if}
+                <button
+                  class="action-button negotiate-button"
+                  on:click={() => openNegotiation(selectedUnitInfo)}
+                  disabled={!canNegotiate(selectedUnitInfo)}
+                  title={canNegotiate(selectedUnitInfo)
+                    ? "IArekin negoziatu"
+                    : "Etsai unitate batetik 2 laukira egon behar zara negoziatzeko"}
+                >
+                  Negoziatu
+                </button>
+              </div>
+            {:else if selectedUnitInfo.owner === "ia"}
+              <div class="unit-enemy-message">
+                <p>Hau etsai unitate bat da. Ezin duzu kontrolatu.</p>
+              </div>
+            {:else}
+              <div class="unit-exhausted-message">
+                <p>Unitate honek dagoeneko agortu ditu bere mugimenduak txanda honetan.</p>
+              </div>
+            {/if}
+          </div>
         </div>
-      </div>
+      {/if}
     {/if}
 
     {#if selectedCityInfo && !showPauseMenu}
@@ -3990,7 +3868,7 @@
           class:enemy-city-card={selectedCityInfo.owner === "ia"}
         >
           <div class="city-info-header">
-            <h4>{selectedCityInfo.name || "Ciudad"}</h4>
+            <h4>{selectedCityInfo.name || "Hiria"}</h4>
             <button
               class="close-button"
               on:click={() => {
@@ -4016,12 +3894,12 @@
 
             <div class="city-stats">
               <p>
-                <strong>Población:</strong>
+                <strong>Biztanleria:</strong>
                 {selectedCityInfo.population || 0}
               </p>
               {#if selectedCityInfo.position}
                 <p>
-                  <strong>Posición:</strong>
+                  <strong>Kokapena:</strong>
                   {Array.isArray(selectedCityInfo.position)
                     ? `[${selectedCityInfo.position[0]}, ${selectedCityInfo.position[1]}]`
                     : `[${selectedCityInfo.position.x}, ${selectedCityInfo.position.y}]`}
@@ -4030,18 +3908,18 @@
 
               {#if selectedCityInfo.buildings && selectedCityInfo.buildings.length > 0}
                 <p>
-                  <strong>Edificios:</strong>
+                  <strong>Eraikinak:</strong>
                   {selectedCityInfo.buildings.length}
                 </p>
               {/if}
 
               {#if selectedCityInfo.production && selectedCityInfo.production.current_item}
                 <p>
-                  <strong>Producción actual:</strong>
+                  <strong>Ekoizpena:</strong>
                   {selectedCityInfo.production.current_item}
                 </p>
                 <p>
-                  <strong>Turnos restantes:</strong>
+                  <strong>Geratzen diren txandak:</strong>
                   {selectedCityInfo.production.turns_remaining}
                 </p>
               {/if}
@@ -4053,7 +3931,7 @@
               class="action-button enter-city-button"
               on:click={() => enterCity(selectedCityInfo)}
             >
-              Entrar a la Ciudad
+              Hirian Sartu
             </button>
           </div>
         </div>
@@ -4063,24 +3941,24 @@
     {#if showCityFoundingModal}
       <div class="modal-overlay">
         <div class="modal-content">
-          <h3>Fundar Nueva Ciudad</h3>
+          <h3>Hiri Berria Sortu</h3>
           <p>
-            Vas a fundar una nueva ciudad en la posición [{settlerToFoundCity
+            Hiri berri bat sortuko duzu kokaleku honetan [{settlerToFoundCity
               ?.position[0] || 0}, {settlerToFoundCity?.position[1] || 0}].
           </p>
 
           <div class="form-group">
-            <label for="city-name">Nombre de la Ciudad:</label>
+            <label for="city-name">Hiriaren Izena:</label>
             <input
               type="text"
               id="city-name"
               bind:value={newCityName}
-              placeholder="Introduce un nombre para tu ciudad"
+              placeholder="Sartu zure hiriarentzat izen bat"
             />
           </div>
 
           <div class="resource-requirements">
-            <h4>Recursos necesarios:</h4>
+            <h4>Beharrezko baliabideak:</h4>
             <div class="resource wood">
               <div class="resource-icon">
                 <img
@@ -4105,10 +3983,10 @@
 
           <div class="modal-actions">
             <button class="cancel-button" on:click={cancelCityFounding}
-              >Cancelar</button
+              >Utzi</button
             >
             <button class="confirm-button" on:click={foundCity}
-              >Fundar Ciudad</button
+              >Hiria Sortu</button
             >
           </div>
         </div>
@@ -4119,28 +3997,28 @@
       <div class="pause-menu-overlay">
         <div class="pause-menu">
           <div class="pause-header">
-            <h2>Juego Pausado</h2>
+            <h2>Jokoa Pausatua</h2>
             <button class="close-button" on:click={togglePauseMenu}>×</button>
           </div>
 
           <div class="menu-options">
             <button class="menu-option primary" on:click={togglePauseMenu}>
-              Continuar Partida
+              Partidarekin Jarraitu
             </button>
 
             <button class="menu-option" on:click={saveAndExit}>
-              Guardar y Salir
+              Gorde eta Irten
             </button>
 
             <button class="menu-option danger" on:click={exitWithoutSaving}>
-              Salir sin Guardar
+              Gorde Gabe Irten
             </button>
           </div>
 
           <div class="game-details">
-            <p>Nombre: {$gameState.gameName || "Mi Partida"}</p>
-            <p>Dificultad: {difficulty}</p>
-            <p>Tamaño del mapa: {mapWidth}x{mapHeight}</p>
+            <p>Izena: {$gameState.gameName || "Nire Partida"}</p>
+            <p>Zailtasuna: {difficulty}</p>
+            <p>Mapa-tamaina: {mapWidth}x{mapHeight}</p>
           </div>
         </div>
       </div>
@@ -4218,7 +4096,7 @@
     <div class="ai-action-overlay">
       <div class="ai-action-card">
         <div class="ai-action-header">
-          <h4>Acción de la IA {aiActionIndex + 1}/{aiActions.length}</h4>
+          <h4>IA Ekintza {aiActionIndex + 1}/{aiActions.length}</h4>
         </div>
 
         <div class="ai-action-content">
@@ -4250,7 +4128,7 @@
   {#if processingAITurn && aiActionIndex === aiActions.length - 1 && aiTurnReasoning}
     <div class="ai-reasoning-overlay">
       <div class="ai-reasoning-card">
-        <h4>Estrategia de la IA</h4>
+        <h4>IA Estrategia</h4>
         <p>{aiTurnReasoning}</p>
       </div>
     </div>
@@ -4261,7 +4139,7 @@
     <div class="attack-targets-overlay">
       <div class="attack-targets-card">
         <div class="attack-targets-header">
-          <h4>Selecciona objetivo a atacar</h4>
+          <h4>Aukeratu erasotzeko helburua</h4>
           <button
             class="close-button"
             on:click={() => (showAttackOptions = false)}>×</button
@@ -4283,10 +4161,10 @@
               </div>
               <div class="target-info">
                 <h5>{target.name || target.type_id}</h5>
-                <p>Salud: {target.health || 100}</p>
-                <p>Posición: [{target.position[0]}, {target.position[1]}]</p>
+                <p>Osasuna: {target.health || 100}</p>
+                <p>Kokapena: [{target.position[0]}, {target.position[1]}]</p>
               </div>
-              <button class="attack-button">Atacar</button>
+              <button class="attack-button">Eraso</button>
             </div>
           {/each}
         </div>
@@ -4304,10 +4182,10 @@
 
   {#if ceasefireActive && ceasefireTurns > 0}
     <div class="ceasefire-banner">
-      🕊️ Alto el fuego activo: No se puede atacar durante {ceasefireTurns} turno{ceasefireTurns ===
+      🕊️ Su-etena aktibo: Ezin da eraso egin geratzen {ceasefireTurns} txanda{ceasefireTurns ===
       1
         ? ""
-        : "s"} restantes.
+        : "k"}.
     </div>
   {/if}
 </div>

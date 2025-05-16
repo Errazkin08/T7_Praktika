@@ -153,11 +153,11 @@
 </script>
 
 <div class="load-game-page">
+  <button class="back-button-inline" on:click={() => navigate('/home')}>
+    Volver al Inicio
+  </button>
   <div class="page-header">
     <h1>Cargar Partida</h1>
-    <button class="back-button" on:click={() => navigate('/home')}>
-      Volver al Inicio
-    </button>
   </div>
   
   <div class="games-container">
@@ -244,25 +244,24 @@
   .load-game-page {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 2rem 1rem;
+    padding: 2rem 1rem 1rem 1rem;
+    margin-top: 0;
   }
   
   .page-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.8rem;
     margin-bottom: 2rem;
+    margin-top: 0; /* Elimina margen superior aquí */
+    min-height: 80px; /* Garantiza espacio mínimo para el header */
   }
-  
-  .back-button {
-    padding: 0.5rem 1rem;
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+
+  .page-header h1 {
+    margin-bottom: 0;
   }
-  
+
   .games-container {
     background-color: #f8f9fa;
     border-radius: 8px;
@@ -456,5 +455,28 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+  }
+
+  .back-button-inline {
+    margin-bottom: 1.2rem;
+    margin-top: 0;
+    padding: 0.5rem 1.1rem;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+    display: inline-block;
+  }
+  .back-button-inline:hover {
+    background-color: #495057;
+  }
+
+  /* Elimina el botón fixed */
+  .back-button-fixed {
+    display: none !important;
   }
 </style>

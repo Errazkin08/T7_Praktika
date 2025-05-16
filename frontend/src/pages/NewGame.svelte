@@ -311,6 +311,9 @@
 </script>
 
 <div class="new-game-page">
+  <button class="back-button-inline" on:click={() => navigate('/home')}>
+    Volver al Inicio
+  </button>
   {#if error}
     <div class="error-message">
       <p>{error}</p>
@@ -320,9 +323,6 @@
   
   <div class="page-header">
     <h1>Nueva Partida</h1>
-    <button class="back-button" on:click={() => navigate('/home')}>
-      Volver al Inicio
-    </button>
   </div>
   
   {#if isLoading}
@@ -535,7 +535,8 @@
   .new-game-page {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 2rem 1rem;
+    padding: 2rem 1rem 1rem 1rem;
+    /* Sin margin-top ni hueco arriba */
   }
   
   .page-header {
@@ -543,15 +544,30 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    margin-top: 0;
   }
   
-  .back-button {
-    padding: 0.5rem 1rem;
+  .back-button-inline {
+    margin-bottom: 1.2rem;
+    margin-top: 0;
+    padding: 0.5rem 1.1rem;
     background-color: #6c757d;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+    display: inline-block;
+  }
+  
+  .back-button-inline:hover {
+    background-color: #495057;
+  }
+  
+  .back-button-fixed {
+    display: none !important;
   }
   
   .loading {

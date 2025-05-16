@@ -2918,7 +2918,128 @@
     const command = event.detail.command;
 
     try {
-      // Process the different cheat commands
+      // Check if this is an insert troop command
+      if (command.startsWith("insert_")) {
+        const parts = command.split("_");
+        if (parts.length !== 4) {
+          cheatResult = "Formatu baliogabea. Erabili: insert_[troop]_[cordX]_[cordY]";
+          cheatResultType = "error";
+          return;
+        }
+        
+        const troopType = parts[1];
+        const cordX = parseInt(parts[2], 10);
+        const cordY = parseInt(parts[3], 10);
+        
+        // Validate coordinates
+        if (isNaN(cordX) || isNaN(cordY) || 
+            cordX < 0 || cordY < 0 || 
+            cordX >= mapWidth || cordY >= mapHeight) {
+          cheatResult = `Koordenatu baliogabeak. Kokapenak ${mapWidth}x${mapHeight} artekoa izan behar du`;
+          cheatResultType = "error";
+          return;
+        }
+        
+        // Check if position is water
+        if (terrain[cordY] && terrain[cordY][cordX] === TERRAIN_TYPES.WATER) {
+          cheatResult = "Ezin duzu tropa bat ur gainean kokatu";
+          cheatResultType = "error";
+          return;
+        }
+        
+        // Check if the position is occupied
+        const isOccupied = units.some(u => 
+          u.position && 
+          Array.isArray(u.position) && 
+          u.position[0] === cordX && 
+          u.position[1] === cordY
+        );
+        
+        if (isOccupied) {
+          cheatResult = "Kokapena okupatuta dago jada";
+          cheatResultType = "error";
+          return;
+        }
+        
+        // Check if there's a city at that position
+        const cityAtPosition = cities.find(
+          (city) =>
+            (city.position.x === cordX && city.position.y === cordY) ||
+            (Array.isArray(city.position) &&
+              city.position[0] === cordX &&
+              city.position[1] === cordY)
+        );
+        
+        if (cityAtPosition) {
+          cheatResult = "Ezin duzu tropa bat hiriko laukian kokatu";
+          cheatResultType = "error";
+          return;
+        }
+        
+        // Fetch troop type from API to validate it exists
+        try {
+          // Create position array for the API call
+          const position = [cordX, cordY];
+          const troopInfo = await gameAPI.getTroopType(troopType, position);
+          
+          // If no error was thrown, the troop type exists
+          // Create unique ID for the new unit
+          const unitId = `cheat-unit-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          
+          // Create the new unit
+          const newUnit = {
+            ...troopInfo,
+            id: unitId,
+            type_id: troopType,
+            position: [cordX, cordY],
+            owner: "player",
+            status: "ready",
+            movement: troopInfo.movement || 2,
+            remainingMovement: troopInfo.movement || 2,
+            health: troopInfo.health || 100,
+            attack: troopInfo.attack || 10,
+            defense: troopInfo.defense || 5
+          };
+          
+          // Add unit to game data and units array
+          if (!gameData.player.units) {
+            gameData.player.units = [];
+          }
+          
+          gameData.player.units.push(newUnit);
+          units = [...units, newUnit];
+          
+          // Update fog of war around new unit
+          updateFogOfWarAroundPosition(cordX, cordY, 2);
+          
+          // Save changes to game session
+          await gameAPI.updateGameSession(gameData);
+          
+          // Make sure the cheats_used array exists
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used.includes("insert_troop")) {
+            gameData.cheats_used.push("insert_troop");
+          }
+          
+          cheatResult = `'${troopInfo.name || troopType}' tropa [${cordX}, ${cordY}] kokapenean gehitu da`;
+          cheatResultType = "success";
+          
+          // Center the map on the new unit
+          centerMapOnPosition(cordX, cordY);
+          
+        } catch (error) {
+          console.error("Error validating troop type:", error);
+          cheatResult = `'${troopType}' tropa mota ez da existitzen`;
+          cheatResultType = "error";
+          return;
+        }
+        return;
+      }
+      
+      // Process the other existing cheat commands
       if (command === "fogOfWar_Off") {
         if (showFogOfWar) {
           // Disable fog of war

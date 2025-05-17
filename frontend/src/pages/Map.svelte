@@ -897,7 +897,7 @@
             action.state_after?.remainingMovement ?? unitToMove.movement ?? 2;
           unitToMove.status = action.state_after?.status ?? "moved";
           units[unitIndex] = unitToMove;
-          console.warn("EPAAAAAAAAA")
+          console.warn("EPAAAAAAAAA");
           const iaUnitIndex = gameData.ia.units.findIndex(
             (u) =>
               Array.isArray(u.position) &&
@@ -1078,9 +1078,29 @@
             population: 1,
           };
           cities = [...cities, newCity];
+          const settlerUnit = units[builderIndex];
           units.splice(builderIndex, 1);
           units = [...units];
           updateFogOfWarAroundPosition(cityX, cityY, 3);
+          if (gameData.ia && Array.isArray(gameData.ia.units)) {
+            // Find the settler in gameData by matching position or ID
+            const gameDataSettlerIndex = gameData.ia.units.findIndex(
+              (u) =>
+                // Match by ID if available
+                (settlerUnit.id && u.id === settlerUnit.id) ||
+                // Or match by position
+                (Array.isArray(u.position) &&
+                  u.position[0] === cityX &&
+                  u.position[1] === cityY &&
+                  (u.type_id === "settler" ||
+                    u.name?.toLowerCase() === "settler")),
+            );
+
+            if (gameDataSettlerIndex !== -1) {
+              // Remove settler from gameData
+              gameData.ia.units.splice(gameDataSettlerIndex, 1);
+            }
+          }
           if (gameData.ia && Array.isArray(gameData.ia.cities)) {
             gameData.ia.cities = [...gameData.ia.cities, newCity];
           }

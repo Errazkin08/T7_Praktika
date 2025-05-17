@@ -382,7 +382,8 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
             - TECHNOLOGY research sequence:
                 a) Begin with "medium" technology (10 turns) when you have a library
                 b) Later research "advanced" technology (20 turns) when population reaches 100
-
+                
+             IMPORTANT:
             7. CITY PRODUCTION ACTIONS:
             - Include in your response construction actions with format:
                 {
@@ -485,7 +486,7 @@ def iaDeitu(prompt: str = None, game_state: dict = None) -> str:
         d) Start researching "medium" technology once you have a Library
         e) Train units when defenses are needed or for expansion
 
-
+        IMPORTANT: Prioritize building cities in resource-rich areas when you have settlers
         CRITICAL: Always verify x coordinates are between 0 and {filtered_game_state["map_size"]["width"]-1} and y coordinates are between 0 and {filtered_game_state["map_size"]["height"]-1}.
         """
 

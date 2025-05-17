@@ -171,10 +171,7 @@
     try {
       const [x, y] = settlerToFoundCity.position;
       if (terrain[y] && terrain[y][x] === TERRAIN_TYPES.WATER) {
-        showToastNotification(
-          "Ezin da hiria sortu ur gainean",
-          "error",
-        );
+        showToastNotification("Ezin da hiria sortu ur gainean", "error");
         return;
       }
 
@@ -597,8 +594,7 @@
     processingAITurn = true;
     aiActions = actions;
     aiActionIndex = 0;
-    aiTurnReasoning =
-      reasoning || "IA mugimendu estrategikoak egiten ari da";
+    aiTurnReasoning = reasoning || "IA mugimendu estrategikoak egiten ari da";
 
     showToastNotification("IA txanda ikusten...", "info", 2000);
 
@@ -808,7 +804,10 @@
             !Array.isArray(action.target_position) ||
             action.target_position.length < 2
           ) {
-            console.warn("[AI] Mugimendua target_position baliogabearekin:", action);
+            console.warn(
+              "[AI] Mugimendua target_position baliogabearekin:",
+              action,
+            );
             showToastNotification(
               "IAk unitate bat mugitu nahi izan du posizio baliogabe batera",
               "warning",
@@ -842,9 +841,7 @@
             terrain[targetY] &&
             terrain[targetY][targetX] === TERRAIN_TYPES.WATER
           ) {
-            console.warn(
-              `[AI] Mugimendua ur laukira: [${targetX},${targetY}]`,
-            );
+            console.warn(`[AI] Mugimendua ur laukira: [${targetX},${targetY}]`);
             showToastNotification(
               "IAk unitate bat mugitu nahi izan du ur gainean",
               "info",
@@ -899,7 +896,28 @@
           unitToMove.remainingMovement =
             action.state_after?.remainingMovement ?? unitToMove.movement ?? 2;
           unitToMove.status = action.state_after?.status ?? "moved";
-          units = [...units];
+          units[unitIndex] = unitToMove;
+          console.warn("EPAAAAAAAAA")
+          const iaUnitIndex = gameData.ia.units.findIndex(
+            (u) =>
+              Array.isArray(u.position) &&
+              Array.isArray(action.state_before.position) &&
+              u.position[0] === action.state_before.position[0] &&
+              u.position[1] === action.state_before.position[1],
+          );
+
+          if (iaUnitIndex !== -1) {
+            gameData.ia.units[iaUnitIndex].position = [targetX, targetY];
+            gameData.ia.units[iaUnitIndex].remainingMovement =
+              unitToMove.remainingMovement;
+            gameData.ia.units[iaUnitIndex].status = unitToMove.status;
+          } else {
+            console.warn(
+              "Could not find AI unit to update in gameData.ia.units",
+            );
+          }
+
+          console.log("IAren txanda, hemen dago gameData:", gameData);
 
           updateFogOfWarAroundPosition(targetX, targetY, 2);
           refreshSelectedUnitInfo();
@@ -1020,10 +1038,7 @@
             );
           }
           if (builderIndex === -1) {
-            console.warn(
-              "[AI] Ez da aurkitu hiria sortzeko kolonoa:",
-              action,
-            );
+            console.warn("[AI] Ez da aurkitu hiria sortzeko kolonoa:", action);
             showToastNotification(
               "IAk hiria sortu nahi izan du kolono gabe",
               "info",
@@ -1069,10 +1084,7 @@
           if (gameData.ia && Array.isArray(gameData.ia.cities)) {
             gameData.ia.cities = [...gameData.ia.cities, newCity];
           }
-          showToastNotification(
-            `IAk hiria sortu du: ${newCity.name}`,
-            "info",
-          );
+          showToastNotification(`IAk hiria sortu du: ${newCity.name}`, "info");
           break;
         }
 
@@ -1098,10 +1110,7 @@
                   c.position[1] === action.position[1])),
           );
           if (!city) {
-            console.warn(
-              "[AI] IA hiria ez da aurkitu ekoizpenerako:",
-              action,
-            );
+            console.warn("[AI] IA hiria ez da aurkitu ekoizpenerako:", action);
             showToastNotification(
               "IAk ekoiztu nahi izan du existitzen ez den hirian",
               "info",
@@ -1109,13 +1118,10 @@
             );
             return;
           }
-          // El resto igual que tu lógica actual...
-          // (puedes copiar el bloque de city_production robusto de tu código actual)
-          // Actualizar ciudad y producción
           let turns_remaining = 0;
           if (action.action == "train") {
             turns_remaining = gameAPI.getTroopType(action.item_id).turns;
-          } else if (action == "build") {
+          } else if (action.action == "build") {
             turns_remaining = gameAPI.getBuildingCost(action.item_id).turns;
           } else if (action.action == "research") {
             turns_remaining = gameAPI.getTechnologyCost(action.item_id).turns;
@@ -1367,14 +1373,14 @@
             gameData.ceasefire_turns = 0;
             gameData.ceasefire_active = false;
           }
-          showToastNotification("Su-etena amaitu da.", "info");
+          showToastNotification("Bakea amaitu da.", "info");
         } else {
           if (gameData) {
             gameData.ceasefire_turns = ceasefireTurns;
             gameData.ceasefire_active = true;
           }
           showToastNotification(
-            `Su-etena geratzen ${ceasefireTurns} txanda.`,
+            `Bakea geratzen ${ceasefireTurns} txanda.`,
             "info",
           );
         }
@@ -1484,13 +1490,19 @@
       try {
         await gameAPI.updateGameSession(gameData);
         console.log(`Game session updated for Turn ${gameData.turn}.`);
-        showToastNotification(`Txanda ${gameData.turn} - Zure txanda`, "success");
+        showToastNotification(
+          `Txanda ${gameData.turn} - Zure txanda`,
+          "success",
+        );
       } catch (error) {
         console.error(
           "Failed to update game session after ending turn:",
           error,
         );
-        showToastNotification("Errorea txanda datuak zerbitzarian gordetzean.", "error");
+        showToastNotification(
+          "Errorea txanda datuak zerbitzarian gordetzean.",
+          "error",
+        );
       }
     } catch (error) {
       console.error("Unexpected error during end turn:", error);
@@ -2223,7 +2235,10 @@
       try {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         await gameAPI.saveCurrentGameSession();
-        showToastNotification("Jokoa arrakastaz gorde da berriro saiatzean!", "success");
+        showToastNotification(
+          "Jokoa arrakastaz gorde da berriro saiatzean!",
+          "success",
+        );
 
         setTimeout(() => {
           endGame();
@@ -2922,70 +2937,77 @@
       if (command.startsWith("insert_")) {
         const parts = command.split("_");
         if (parts.length !== 4) {
-          cheatResult = "Formatu baliogabea. Erabili: insert_[troop]_[cordX]_[cordY]";
+          cheatResult =
+            "Formatu baliogabea. Erabili: insert_[troop]_[cordX]_[cordY]";
           cheatResultType = "error";
           return;
         }
-        
+
         const troopType = parts[1];
         const cordX = parseInt(parts[2], 10);
         const cordY = parseInt(parts[3], 10);
-        
+
         // Validate coordinates
-        if (isNaN(cordX) || isNaN(cordY) || 
-            cordX < 0 || cordY < 0 || 
-            cordX >= mapWidth || cordY >= mapHeight) {
+        if (
+          isNaN(cordX) ||
+          isNaN(cordY) ||
+          cordX < 0 ||
+          cordY < 0 ||
+          cordX >= mapWidth ||
+          cordY >= mapHeight
+        ) {
           cheatResult = `Koordenatu baliogabeak. Kokapenak ${mapWidth}x${mapHeight} artekoa izan behar du`;
           cheatResultType = "error";
           return;
         }
-        
+
         // Check if position is water
         if (terrain[cordY] && terrain[cordY][cordX] === TERRAIN_TYPES.WATER) {
           cheatResult = "Ezin duzu tropa bat ur gainean kokatu";
           cheatResultType = "error";
           return;
         }
-        
+
         // Check if the position is occupied
-        const isOccupied = units.some(u => 
-          u.position && 
-          Array.isArray(u.position) && 
-          u.position[0] === cordX && 
-          u.position[1] === cordY
+        const isOccupied = units.some(
+          (u) =>
+            u.position &&
+            Array.isArray(u.position) &&
+            u.position[0] === cordX &&
+            u.position[1] === cordY,
         );
-        
+
         if (isOccupied) {
           cheatResult = "Kokapena okupatuta dago jada";
           cheatResultType = "error";
           return;
         }
-        
+
         // Check if there's a city at that position
         const cityAtPosition = cities.find(
           (city) =>
             (city.position.x === cordX && city.position.y === cordY) ||
             (Array.isArray(city.position) &&
               city.position[0] === cordX &&
-              city.position[1] === cordY)
+              city.position[1] === cordY),
         );
-        
+
         if (cityAtPosition) {
           cheatResult = "Ezin duzu tropa bat hiriko laukian kokatu";
           cheatResultType = "error";
           return;
         }
-        
+
         // Fetch troop type from API to validate it exists
         try {
           // Create position array for the API call
           const position = [cordX, cordY];
           const troopInfo = await gameAPI.getTroopType(troopType, position);
-          
+
           // If no error was thrown, the troop type exists
           // Create unique ID for the new unit
           const unitId = `cheat-unit-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          
+
           // Create the new unit
           const newUnit = {
             ...troopInfo,
@@ -2998,23 +3020,23 @@
             remainingMovement: troopInfo.movement || 2,
             health: troopInfo.health || 100,
             attack: troopInfo.attack || 10,
-            defense: troopInfo.defense || 5
+            defense: troopInfo.defense || 5,
           };
-          
+
           // Add unit to game data and units array
           if (!gameData.player.units) {
             gameData.player.units = [];
           }
-          
+
           gameData.player.units.push(newUnit);
           units = [...units, newUnit];
-          
+
           // Update fog of war around new unit
           updateFogOfWarAroundPosition(cordX, cordY, 2);
-          
+
           // Save changes to game session
           await gameAPI.updateGameSession(gameData);
-          
+
           // Make sure the cheats_used array exists
           if (!gameData.cheats_used) {
             gameData.cheats_used = [];
@@ -3023,13 +3045,12 @@
           if (!gameData.cheats_used.includes("insert_troop")) {
             gameData.cheats_used.push("insert_troop");
           }
-          
+
           cheatResult = `'${troopInfo.name || troopType}' tropa [${cordX}, ${cordY}] kokapenean gehitu da`;
           cheatResultType = "success";
-          
+
           // Center the map on the new unit
           centerMapOnPosition(cordX, cordY);
-          
         } catch (error) {
           console.error("Error validating troop type:", error);
           cheatResult = `'${troopType}' tropa mota ez da existitzen`;
@@ -3038,7 +3059,7 @@
         }
         return;
       }
-      
+
       // Process the other existing cheat commands
       if (command === "fogOfWar_Off") {
         if (showFogOfWar) {
@@ -3653,7 +3674,8 @@
         </button>
         <button on:click={zoomIn} title="Zooma handitu">+</button>
         <button on:click={zoomOut} title="Zooma txikitu">-</button>
-        <button on:click={centerMapOnStartPoint} title="Mapa zentratu">⌖</button>
+        <button on:click={centerMapOnStartPoint} title="Mapa zentratu">⌖</button
+        >
       </div>
     </div>
 
@@ -3842,9 +3864,7 @@
           {#if startPoint && startPoint[0] === selectedTile.x && startPoint[1] === selectedTile.y}
             <div class="start-info">
               <h5>Maparen hasierako puntua</h5>
-              <p>
-                Hau da partida hasteko gomendatutako hasierako posizioa.
-              </p>
+              <p>Hau da partida hasteko gomendatutako hasierako posizioa.</p>
             </div>
           {/if}
 
@@ -3866,7 +3886,9 @@
           >
             <div class="unit-info-header">
               <h4>
-                {selectedUnitInfo.name || selectedUnitInfo.type_id || "Unitatea"}
+                {selectedUnitInfo.name ||
+                  selectedUnitInfo.type_id ||
+                  "Unitatea"}
               </h4>
               <button
                 class="close-button"
@@ -3974,7 +3996,10 @@
               </div>
             {:else}
               <div class="unit-exhausted-message">
-                <p>Unitate honek dagoeneko agortu ditu bere mugimenduak txanda honetan.</p>
+                <p>
+                  Unitate honek dagoeneko agortu ditu bere mugimenduak txanda
+                  honetan.
+                </p>
               </div>
             {/if}
           </div>

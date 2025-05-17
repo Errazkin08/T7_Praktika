@@ -329,42 +329,42 @@
 <div class="new-game-page">
   <AudioPlayer bind:this={audioPlayer} />
   <button class="back-button-inline" on:click={() => navigate('/home')}>
-    Volver al Inicio
+    Hasierara Itzuli
   </button>
   {#if error}
     <div class="error-message">
       <p>{error}</p>
-      <button on:click={() => { error = null; }}>Cerrar</button>
+      <button on:click={() => { error = null; }}>Itxi</button>
     </div>
   {/if}
   
   <div class="page-header">
-    <h1>Nueva Partida</h1>
+    <h1>Partida Berria</h1>
   </div>
   
   {#if isLoading}
     <div class="loading">
       <div class="loading-spinner"></div>
-      <p>Cargando...</p>
+      <p>Kargatzen...</p>
     </div>
   {:else}
     <div class="game-configuration">
       <div class="config-section">
-        <h2>Configuración de la Partida</h2>
+        <h2>Partidaren Konfigurazioa</h2>
         
         <div class="form-group">
-          <label for="game-name">Nombre de la Partida:</label>
-          <input type="text" id="game-name" bind:value={gameName} placeholder="Introduce un nombre para tu partida" />
+          <label for="game-name">Partidaren Izena:</label>
+          <input type="text" id="game-name" bind:value={gameName} placeholder="Sartu zure partidaren izena" />
         </div>
       </div>
       
       <!-- Civilization Selection Section -->
       <div class="config-section">
-        <h2>Selección de Civilización</h2>
+        <h2>Zibilizazioaren Aukeraketa</h2>
         
         <div class="civs-container">
           <div class="civ-selection player-civ">
-            <h3>Tu Civilización</h3>
+            <h3>Zure Zibilizazioa</h3>
             <div class="civs-grid">
               {#each civilizations as civ}
                 <div 
@@ -388,22 +388,34 @@
                   </div>
                   <div class="civ-info">
                     <h4>{civ.name}</h4>
-                    <p class="civ-description">{civ.description}</p>
+                    <p class="civ-description">
+                      {#if civ.civ_id === 'rome'}
+                        Gerra eta antolaketaren maisuak
+                      {:else if civ.civ_id === 'egypt'}
+                        Nekazaritza eta eraikuntzaren maisuak
+                      {:else if civ.civ_id === 'greece'}
+                        Filosofia eta itsas gerraren maisuak
+                      {:else if civ.civ_id === 'mongolia'}
+                        Zalduneria eta konkistaren maisuak
+                      {:else}
+                        {civ.description}
+                      {/if}
+                    </p>
                     
                     {#if civ.starting_units}
                       <div class="civ-units">
-                        <h5>Unidades iniciales:</h5>
+                        <h5>Hasierako unitateak:</h5>
                         <ul>
                           {#each Object.entries(civ.starting_units) as [unit, count]}
                             <li>
                               {#if unit === "settler"}
-                                Colonizador: {count}
+                                Kolonizatzailea: {count}
                               {:else if unit === "warrior"}
-                                Guerrero: {count}
+                                Gudaria: {count}
                               {:else if unit === "archer"}
-                                Arquero: {count}
+                                Arkaria: {count}
                               {:else if unit === "cavalry"}
-                                Caballería: {count}
+                                Zalduneria: {count}
                               {:else}
                                 {unit}: {count}
                               {/if}
@@ -415,13 +427,13 @@
                     
                     {#if civ.starting_resources}
                       <div class="civ-resources">
-                        <h5>Recursos iniciales:</h5>
+                        <h5>Hasierako baliabideak:</h5>
                         <ul>
-                          <li>Comida: {civ.starting_resources.food}</li>
-                          <li>Oro: {civ.starting_resources.gold}</li>
-                          <li>Madera: {civ.starting_resources.wood}</li>
-                          <li>Piedra: {civ.starting_resources.stone}</li>
-                          <li>Hierro: {civ.starting_resources.iron}</li>
+                          <li>Janaria: {civ.starting_resources.food}</li>
+                          <li>Urrea: {civ.starting_resources.gold}</li>
+                          <li>Zura: {civ.starting_resources.wood}</li>
+                          <li>Harria: {civ.starting_resources.stone}</li>
+                          <li>Burdina: {civ.starting_resources.iron}</li>
                         </ul>
                       </div>
                     {/if}
@@ -432,7 +444,7 @@
           </div>
           
           <div class="civ-selection ai-civ">
-            <h3>Civilización de la IA</h3>
+            <h3>IA-ren Zibilizazioa</h3>
             <div class="civs-grid">
               {#each civilizations as civ}
                 <div 
@@ -456,7 +468,19 @@
                   </div>
                   <div class="civ-info">
                     <h4>{civ.name}</h4>
-                    <p class="civ-description">{civ.description}</p>
+                    <p class="civ-description">
+                      {#if civ.civ_id === 'rome'}
+                        Gerra eta antolaketaren maisuak
+                      {:else if civ.civ_id === 'egypt'}
+                        Nekazaritza eta eraikuntzaren maisuak
+                      {:else if civ.civ_id === 'greece'}
+                        Filosofia eta itsas gerraren maisuak
+                      {:else if civ.civ_id === 'mongolia'}
+                        Zalduneria eta konkistaren maisuak
+                      {:else}
+                        {civ.description}
+                      {/if}
+                    </p>
                   </div>
                 </div>
               {/each}
@@ -467,55 +491,55 @@
       
       <div class="config-section">
         <div class="section-header">
-          <h2>Selecciona un Mapa</h2>
+          <h2>Aukeratu Mapa</h2>
           <button class="create-map-button" on:click={() => showCreateMapForm = !showCreateMapForm}>
-            {showCreateMapForm ? 'Cancelar' : 'Crear Nuevo Mapa'}
+            {showCreateMapForm ? 'Utzi' : 'Mapa Berria Sortu'}
           </button>
         </div>
         
         {#if showCreateMapForm}
           <div class="create-map-form">
-            <h3>Crear Nuevo Mapa</h3>
+            <h3>Mapa Berria Sortu</h3>
             
             <div class="form-group">
-              <label for="map-name">Nombre del mapa:</label>
+              <label for="map-name">Maparen izena:</label>
               <input type="text" id="map-name" bind:value={newMapData.name} 
-                placeholder="Nombre personalizado (opcional)" />
+                placeholder="Izen pertsonalizatua (aukerakoa)" />
             </div>
             
             <div class="form-group">
-              <label for="map-width">Ancho:</label>
+              <label for="map-width">Zabalera:</label>
               <input type="number" id="map-width" bind:value={newMapData.width} min="10" max="100" />
             </div>
             
             <div class="form-group">
-              <label for="map-height">Alto:</label>
+              <label for="map-height">Altuera:</label>
               <input type="number" id="map-height" bind:value={newMapData.height} min="10" max="100" />
             </div>
             
             <div class="form-group">
-              <label for="map-start">Punto de Inicio [x,y]:</label>
+              <label for="map-start">Hasiera Puntua [x,y]:</label>
               <input type="text" id="map-start" 
                 bind:value={newMapData.startPoint} 
                 placeholder="15,7" />
             </div>
             
             <div class="form-group">
-              <label for="map-difficulty">Dificultad:</label>
+              <label for="map-difficulty">Zailtasuna:</label>
               <select id="map-difficulty" bind:value={newMapData.difficulty}>
-                <option value="easy">Fácil</option>
-                <option value="medium">Media</option>
-                <option value="hard">Difícil</option>
+                <option value="easy">Erraza</option>
+                <option value="medium">Ertaina</option>
+                <option value="hard">Zaila</option>
               </select>
             </div>
             
             <button class="submit-map-button" on:click={createNewMap} disabled={isLoading}>
-              {isLoading ? 'Creando...' : 'Crear Mapa'}
+              {isLoading ? 'Sortzen...' : 'Mapa Sortu'}
             </button>
           </div>
         {:else if existingMaps.length === 0}
           <div class="no-maps">
-            <p>No hay mapas disponibles. Por favor, crea un mapa nuevo.</p>
+            <p>Ez dago maparik eskuragarri. Mesedez, sortu mapa berri bat.</p>
           </div>
         {:else}
           <div class="maps-grid scrollable-container">
@@ -533,7 +557,7 @@
                 </div>
                 <div class="map-info">
                   <h3>{map.name || `Mapa ${map.map_id.substring(0, 8)}...`}</h3>
-                  <p>Dificultad: {map.difficulty || 'normal'}</p>
+                  <p>Zailtasuna: {map.difficulty === 'easy' ? 'Erraza' : map.difficulty === 'medium' ? 'Ertaina' : map.difficulty === 'hard' ? 'Zaila' : map.difficulty || 'normala'}</p>
                 </div>
               </div>
             {/each}
@@ -542,7 +566,7 @@
       </div>
       
       <button class="start-button" on:click={startNewGame} disabled={isLoading || !selectedMap || !selectedPlayerCiv || !selectedAICiv}>
-        {isLoading ? 'Iniciando...' : 'Comenzar Partida'}
+        {isLoading ? 'Hasieratzen...' : 'Partida Hasi'}
       </button>
     </div>
   {/if}

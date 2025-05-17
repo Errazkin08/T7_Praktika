@@ -59,9 +59,12 @@
         <p>Komando erabilgarriak:</p>
         <ul>
           <li><code>fogOfWar_Off</code> - Gerra-lainoa desaktibatu</li>
+          <li><code>fogOfWar_On</code> - Gerra-lainoa aktibatu</li>
           <li><code>unlimitedMovements</code> - Mugimendu mugagabeak zure tropentzat</li>
           <li><code>unlimitedResources</code> - 99999 unitate bakoitzeko baliabideetan</li>
           <li><code>insert_[troop]_[cordX]_[cordY]</code> - Tropa bat gehitu posizio zehatzean</li>
+          <li><code>all_technologies</code> - Teknologia guztiak lortu</li>
+          <li><code>all_productions_to_1_turn</code> - Produkzio guztiak txanda batetara utzi</li>
         </ul>
       </div>
     </div>

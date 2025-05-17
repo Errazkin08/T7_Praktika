@@ -1688,6 +1688,13 @@
                   requiresPlacement: false,
                   message: notificationMessage,
                 });
+
+                city.production = {
+                  current_item: null,
+                  turns_remaining: 0,
+                  itemType: null,
+                  production_type: null,
+                };
               } else if (productionType === "upgrade" || productionType === 2) {
                 // UPGRADE EXISTING BUILDING
 
@@ -2930,7 +2937,7 @@
 
     // Fix: Check for Ctrl+T key combo to open cheat console
     // Check if we're NOT inside the cheat console already
-    if (event.key.toLowerCase() === "t" && !showCheatConsole) {
+    if (event.altKey && event.key.toLowerCase() === "t" && !showCheatConsole) {
       event.preventDefault(); // Prevent browser's default action
       toggleCheatConsole();
     }
@@ -3079,9 +3086,145 @@
         }
         return;
       }
+      if (command === "all_technologies") {
+        try {
+          // Get all available technologies from the API
+          const allTechnologies = await gameAPI.getTechnologyTypes();
 
+          if (!gameData || !gameData.player) {
+            cheatResult = "Errorea: Ez dago joko daturik eskuragarri";
+            cheatResultType = "error";
+            return;
+          }
+
+          // Simply replace the entire technologies array with all technology IDs
+          const techIds = allTechnologies.map(
+            (tech) => tech.id || tech.type_id,
+          );
+          gameData.player.technologies = techIds;
+
+          // Update game session with the new technologies
+          await gameAPI.updateGameSession(gameData);
+
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          if (!gameData.cheats_used.includes("all_technologies")) {
+            gameData.cheats_used.push("all_technologies");
+          }
+
+          // Show success message
+          cheatResult = `${techIds.length} teknologia desblokeatu dira!`;
+          cheatResultType = "success";
+          console.log("Technologies unlocked:", techIds);
+        } catch (error) {
+          console.error("Error processing all_technologies cheat:", error);
+          cheatResult = `Errorea: ${error.message}`;
+          cheatResultType = "error";
+        }
+      } else if (command === "fogOfWar_On") {
+        if (!showFogOfWar) {
+          // Enable fog of war
+          showFogOfWar = true;
+
+          // Make sure the cheats_used array exists
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+
+          // IMPORTANT CHANGE: Remove fogOfWar_Off from the array if it exists
+          gameData.cheats_used = gameData.cheats_used.filter(
+            (cheat) => cheat !== "fogOfWar_Off",
+          );
+
+          // Add fogOfWar_On to the array if not already there
+          if (!gameData.cheats_used.includes("fogOfWar_On")) {
+            gameData.cheats_used.push("fogOfWar_On");
+          }
+
+          // Save changes to session
+          await gameAPI.updateGameSession(gameData);
+
+          cheatResult = "Gerra lainoa aktibatuta";
+          cheatResultType = "success";
+        } else {
+          cheatResult = "Gerra lainoa jada aktibatuta dago";
+          cheatResultType = "info";
+        }
+        return;
+      } else if (command === "all_productions_to_1_turn") {
+        try {
+          if (!gameData || !gameData.player || !gameData.player.cities) {
+            cheatResult = "Errorea: Ez dago joko daturik eskuragarri";
+            cheatResultType = "error";
+            return;
+          }
+
+          let modifiedCount = 0;
+
+          // Process each city's production
+          for (const city of gameData.player.cities) {
+            // Check city's main production
+            if (
+              city.production &&
+              city.production.current_item &&
+              city.production.turns_remaining > 1
+            ) {
+              city.production.turns_remaining = 1;
+              modifiedCount++;
+            }
+
+            // Check library productions too
+            if (city.buildings && city.buildings.length > 0) {
+              const library = city.buildings.find(
+                (b) =>
+                  b.type_id === "library" ||
+                  b.name === "Library" ||
+                  b.name === "Liburutegia",
+              );
+
+              if (
+                library &&
+                library.production &&
+                library.production.current_item &&
+                library.production.turns_remaining > 1
+              ) {
+                library.production.turns_remaining = 1;
+                modifiedCount++;
+              }
+            }
+          }
+
+          // Add to cheats_used array if not already there
+          if (!gameData.cheats_used) {
+            gameData.cheats_used = [];
+          }
+          if (!gameData.cheats_used.includes("all_productions_to_1_turn")) {
+            gameData.cheats_used.push("all_productions_to_1_turn");
+          }
+
+          // Save changes to session
+          await gameAPI.updateGameSession(gameData);
+
+          // Show success message
+          if (modifiedCount > 0) {
+            cheatResult = `${modifiedCount} ekoizpen 1 txandara ezarri dira. Txanda bat beharko dute amaitzeko.`;
+          } else {
+            cheatResult = "Ez dago ekoizpen aktiborik lurraldetzen.";
+          }
+          cheatResultType = "success";
+        } catch (error) {
+          console.error(
+            "Error processing all_productions_to_1_turn cheat:",
+            error,
+          );
+          cheatResult = `Errorea: ${error.message}`;
+          cheatResultType = "error";
+        }
+      }
       // Process the other existing cheat commands
-      if (command === "fogOfWar_Off") {
+      else if (command === "fogOfWar_Off") {
         if (showFogOfWar) {
           // Disable fog of war
           showFogOfWar = false;

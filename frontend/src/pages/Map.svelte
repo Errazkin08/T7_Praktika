@@ -1640,6 +1640,7 @@
               // Break out of the loop - handle one production at a time
               break;
             } else if (itemType === "building") {
+              debugger;
               // Get the production type to determine if we're building or upgrading
               const productionType = city.production.production_type || "build";
 
@@ -1697,13 +1698,7 @@
 
                 if (city.buildings && city.buildings.length > 0) {
                   buildingIndex = city.buildings.findIndex(
-                    (building) =>
-                      building.type_id === itemId ||
-                      building.id === itemId ||
-                      building.name?.toLowerCase() ===
-                        buildingDetails.name?.toLowerCase() ||
-                      building.type?.toLowerCase() ===
-                        buildingDetails.type?.toLowerCase(),
+                    (building) => building.type_id === itemId,
                   );
 
                   if (buildingIndex !== -1) {
@@ -1779,7 +1774,6 @@
       }
       // --- NUEVO: Procesar investigación (research) ---
       if (city.research) {
-        debugger
         city.research.turns_remaining--;
         if (city.research.turns_remaining <= 0) {
           try {
@@ -2012,23 +2006,23 @@
     let hasResources = false;
 
     if (resources.food > 0) {
-      resourceMessage += `🌾 ${resources.food} `;
+      resourceMessage += `<img src="./ia_assets/janaria.png" alt="Food" class="resource-bar-icon" /> ${resources.food} `;
       hasResources = true;
     }
     if (resources.gold > 0) {
-      resourceMessage += `💰 ${resources.gold} `;
+      resourceMessage += `<img src="./ia_assets/lingotes_oro.png" alt="Gold" class="resource-bar-icon" /> ${resources.gold} `;
       hasResources = true;
     }
     if (resources.wood > 0) {
-      resourceMessage += `🌲 ${resources.wood} `;
+      resourceMessage += `<img src="./ia_assets/zuhaitza.png" alt="Wood" class="resource-bar-icon" /> ${resources.wood} `;
       hasResources = true;
     }
     if (resources.iron > 0) {
-      resourceMessage += `⚙️ ${resources.iron} `;
+      resourceMessage += `<img src="./ia_assets/lingote_hierro.png" alt="Iron" class="resource-bar-icon" /> ${resources.iron} `;
       hasResources = true;
     }
     if (resources.stone > 0) {
-      resourceMessage += `🪨 ${resources.stone} `;
+      resourceMessage += `<img src="./ia_assets/harria.png" alt="Stone" class="resource-bar-icon" /> ${resources.stone} `;
       hasResources = true;
     }
 
@@ -2056,7 +2050,6 @@
     }
 
     // Process each building
-    debugger
     for (const building of city.buildings) {
       // Get default outcome based on building type if not specified
       const outcome =
@@ -2065,15 +2058,13 @@
       // Apply resource generation based on building type and available resources
       switch (building.type_id) {
         case "farm":
-        case "granary":
           // Each farm/granary building multiplies its food outcome by the number of food tiles
-          if (outcome.food && resourceCounts.food > 0) {
-            const foodGenerated = outcome.food * resourceCounts.food;
-            generatedResources.food += foodGenerated;
-            console.log(
-              `${city.name}: ${building.type_id} generated ${foodGenerated} food from ${resourceCounts.food} food tiles`,
-            );
-          }
+          const foodGenerated = outcome.food;
+          generatedResources.food += foodGenerated;
+          console.log(
+            `${city.name}: ${building.type_id} generated ${foodGenerated} food from ${resourceCounts.food} food tiles`,
+          );
+
           break;
         case "gold mine":
           // Each mine building multiplies its gold outcome by the number of gold tiles
@@ -3234,12 +3225,8 @@
                   b.name === "Liburutegia",
               );
 
-              if (
-                city &&
-                city.research &&
-                city.production.turns_remaining > 1
-              ) {
-                city.production.turns_remaining = 1;
+              if (city && city.research && city.research.turns_remaining > 1) {
+                city.research.turns_remaining = 1;
                 modifiedCount++;
               }
             }
@@ -4444,7 +4431,7 @@
   {#if showToast}
     <div class="toast-container">
       <div class="toast-notification {toastType}">
-        <span class="toast-message">{toastMessage}</span>
+        <span class="toast-message">{@html toastMessage}</span>
       </div>
     </div>
   {/if}

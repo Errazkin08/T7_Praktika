@@ -917,8 +917,7 @@ def get_troop_types():
             "position": [0, 0],
             "movement": 2,
             "cost": {
-                "food": 50,
-                "gold": 10
+                "food": 110
             },
             "abilities": ["basic_attack"],
             "description": "Basic infantry unit"
@@ -936,9 +935,7 @@ def get_troop_types():
             "movement": 2,
             "range": 2,
             "cost": {
-                "food": 40,
-                "gold": 15,
-                "wood": 10
+                "food": 80,
             },
             "abilities": ["ranged_attack"],
             "description": "Basic ranged unit"
@@ -947,18 +944,17 @@ def get_troop_types():
             "name": "Settler",
             "category": "civilian",
             "health": 50,
-            "attack": 0,
+            "attack": 1,
             "defense": 1,
             "turns": 6,
             "technology": "basic",
             "position": [0, 0],
             "movement": 2,
             "cost": {
-                "food": 100,
-                "gold": 50
+                "food": 100
             },
             "abilities": ["found_city"],
-            "description": "Can establish new settlements"
+            "description": "Can establish new settlements, not keen in fighting"
         },
         {
             "type_id": "cavalry",
@@ -985,13 +981,13 @@ def get_troop_types():
             "category": "mounted",
             "health": 100,
             "attack": 20,
-            "defense": 10,
+            "defense": 12,
             "turns": 7,
             "technology": "medium",
             "position": [0, 0],
             "movement": 3,
             "cost": {
-                "food": 80,
+                "food": 200,
                 "gold": 20
             },
             "abilities": ["mace_hit"],
@@ -1001,7 +997,7 @@ def get_troop_types():
             "type_id": "tank",
             "name": "Tank",
             "category": "armored_vehicle",
-            "health": 200,
+            "health": 150,
             "attack": 30,
             "defense": 25,
             "turns": 16,
@@ -1010,7 +1006,7 @@ def get_troop_types():
             "movement": 1,
             "cost": {
                 "iron": 200,
-                "gold": 30
+                "gold": 50
             },
             "abilities": ["heavy_fire"],
             "description": "Heavy armored vehicle with high firepower"
@@ -1194,7 +1190,7 @@ def get_building_types():
                 "stone": 10
             },
             "cost": {
-                "wood": 30, 
+                "wood": 40, 
                 "stone": 20
             },
             "description": "Produces stone over time"
@@ -1211,7 +1207,8 @@ def get_building_types():
                 "food": 15
             },
             "cost": {
-                "wood": 40
+                "wood": 30,
+                "stone": 30
             },
             "description": "Produces food over time"
         },
@@ -1223,8 +1220,8 @@ def get_building_types():
             "technology": "basic",
             "level": 1,
             "cost": {
-                "wood": 70,
-                "stone": 50
+                "wood": 50,
+                "stone": 20
             },
             "description": "Increases the knowledge of the civilization"
         },
@@ -1240,8 +1237,8 @@ def get_building_types():
                 "iron": 8
             },
             "cost": {
-                "wood": 50,
-                "stone": 50
+                "wood": 150,
+                "stone": 100
             },
             "description": "Produces iron over time"
         }, 
@@ -1254,11 +1251,12 @@ def get_building_types():
             "level": 1,
             "level_upgrade": 5,
             "output": {
-                "wood": 5
+                "gold": 5
             },
             "cost": {
-                "wood": 50,
-                "stone": 70
+                "wood": 180,
+                "stone": 100,
+                "iron": 30
             },
             "description": "Produces gold over time"
         }
@@ -1323,9 +1321,9 @@ def get_civilization_types():
             "description": "Masters of agriculture and construction",
             "starting_resources": {
                 "food": 120,  # +20% food
-                "gold": 50,
-                "wood": 15,   # -25% wood (desert)
-                "stone": 30,  # +50% stone (pyramids)
+                "gold": 10,
+                "wood": 100,   # -25% wood (desert)
+                "stone": 60,  # +50% stone (pyramids)
                 "iron": 10
             },
             "starting_units": {
@@ -1340,10 +1338,10 @@ def get_civilization_types():
             "description": "Masters of philosophy and naval warfare",
             "starting_resources": {
                 "food": 100,
-                "gold": 60,   # +20% gold (trade)
-                "wood": 25,   # +25% wood (shipbuilding)
-                "stone": 25,   # +25% stone (architecture)
-                "iron": 5     # -50% iron
+                "gold": 5,   # +20% gold (trade)
+                "wood": 100,   # +25% wood (shipbuilding)
+                "stone": 60,   # +25% stone (architecture)
+                "iron": 15     # -50% iron
             },
             "starting_units": {
                 "settler": 1,
@@ -1357,11 +1355,11 @@ def get_civilization_types():
             "name": "Rome",
             "description": "Masters of warfare and organization",
             "starting_resources": {
-                "food": 110,   # +10% food 
-                "gold": 70,    # +40% gold (empire)
-                "wood": 20,
-                "stone": 20,
-                "iron": 15     # +50% iron (weapons)
+                "food": 50,   # +10% food 
+                "gold": 10,    # +40% gold (empire)
+                "wood": 100,
+                "stone": 60,
+                "iron": 20     # +50% iron (weapons)
             },
             "starting_units": {
                 "settler": 1,
@@ -1375,15 +1373,14 @@ def get_civilization_types():
             "description": "Masters of cavalry and conquest",
             "starting_resources": {
                 "food": 90,    # -10% food (nomadic)
-                "gold": 40,    # -20% gold (less trade) 
-                "wood": 15,    # -25% wood
-                "stone": 15,   # -25% stone
-                "iron": 25     # +150% iron (weapons)
+                "gold": 15,    # -20% gold (less trade) 
+                "wood": 100,    # -25% wood
+                "stone": 60,   # -25% stone
+                "iron": 20     # +150% iron (weapons)
             },
             "starting_units": {
                 "settler": 1,
-                "warrior": 1,
-                "cavalry": 1  # Mongolia gets a cavalry unit
+                "archer": 2,  # Mongolia gets a cavalry unit
             },
             "image":"ia_assets/Mongolia.jpeg"
         }
@@ -1588,16 +1585,16 @@ def get_technology_types():
             "min_civilians": 0,
             "prerequisites": [],
             "unlocks": ["basic units", "basic buildings"],
-            "icon": "🔬"
+            "icon": "⚙️"
         },
         {
             "id": "medium",
             "name": "Medium Technology",
             "description": "Unlock intermediate level units and buildings",
             "turns": 10,
-            "min_civilians": 0,
+            "min_civilians": 30,
             "prerequisites": ["basic"],
-            "unlocks": ["cavalry", "iron_mine", "gold_mine"],
+            "unlocks": ["cavalry", "boar rider" "iron mine", "gold mine"],
             "icon": "🔬"
         },
         {

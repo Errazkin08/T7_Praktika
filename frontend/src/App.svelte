@@ -47,7 +47,7 @@
 
 {#if showFooter}
 <footer>
-  <p>© 2025 Civilization Game Project</p>
+  <p>© 2025 CIVilizaTu Game Project</p>
 </footer>
 {/if}
 

@@ -256,7 +256,7 @@
     return null;
   }
 
-  // Updated start research function to use library production
+  // Updated start research function to use only city.research
   async function startResearch(technology) {
     try {
       if (!city) {
@@ -272,8 +272,7 @@
       }
       
       // Check if there's already research in progress
-      if ((library.production && library.production.current_technology) || 
-          (city.research && city.research.current_technology)) {
+      if (city.research && city.research.current_technology) {
         showToastNotification("Dagoeneko ikerketa bat martxan dago", "error");
         return;
       }
@@ -299,18 +298,7 @@
         }
       }
       
-      // Set the new research on the library building's production
-      library.production = {
-        current_technology: technology.id,
-        turns_remaining: technology.turns,
-        technology_name: technology.name,
-        itemType: 'technology',
-        production_type: 'research'
-      };
-      
-      console.log("Setting research on library:", library.production);
-      
-      // Also set city.research for backward compatibility
+      // Set the new research only on city.research
       city.research = {
         current_technology: technology.id,
         turns_remaining: technology.turns
@@ -320,8 +308,6 @@
       if (gameData && gameData.player && gameData.player.cities) {
         const cityIndex = gameData.player.cities.findIndex(c => c.id === city.id);
         if (cityIndex !== -1) {
-          // Update the city with the modified library
-          gameData.player.cities[cityIndex].buildings = city.buildings;
           gameData.player.cities[cityIndex].research = city.research;
           
           // Save changes to game session
@@ -344,17 +330,16 @@
   async function cancelResearch() {
     try {
       const library = findLibraryBuilding();
-      const hasLibraryResearch = library && library.production && library.production.current_technology;
       const hasCityResearch = city && city.research && city.research.current_technology;
       
-      if (!hasLibraryResearch && !hasCityResearch) {
+      if (!hasCityResearch) {
         showToastNotification("Ez dago ezeztatzeko ikerketa aktiborik", "warning");
         return;
       }
 
       // Get a more readable name if available
-      const techId = hasLibraryResearch ? library.production.current_technology : city.research.current_technology;
-      const techName = hasLibraryResearch ? library.production.technology_name : null;
+      const techId = city.research.current_technology;
+      const techName = techId;
       const techType = technologyTypes.find(t => t.id === techId);
       const displayName = techName || (techType ? techType.name : techId);
       

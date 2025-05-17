@@ -1688,13 +1688,6 @@
                   requiresPlacement: false,
                   message: notificationMessage,
                 });
-
-                city.production = {
-                  current_item: null,
-                  turns_remaining: 0,
-                  itemType: null,
-                  production_type: null,
-                };
               } else if (productionType === "upgrade" || productionType === 2) {
                 // UPGRADE EXISTING BUILDING
 
@@ -1761,15 +1754,13 @@
                     message: notificationMessage,
                   });
                 }
-
-                // Clear the city's production
-                city.production = {
-                  current_item: null,
-                  turns_remaining: 0,
-                  itemType: null,
-                  production_type: null,
-                };
               }
+              city.production = {
+                current_item: null,
+                turns_remaining: 0,
+                itemType: null,
+                production_type: null,
+              };
             }
           } catch (error) {
             console.error(
@@ -1784,6 +1775,32 @@
               production_type: null,
             };
           }
+        }
+      }
+      // --- NUEVO: Procesar investigación (research) ---
+      if (city.research) {
+        debugger
+        city.research.turns_remaining--;
+        if (city.research.turns_remaining <= 0) {
+          try {
+            const techTypeId = city.research.current_technology;
+            const technology = await gameAPI.getTechnologyType(techTypeId);
+            gameData.player.technologies.push(technology);
+            // Notificación opcional
+            showToastNotification(
+              `${city.name} hirian teknologia berria ikertu da: ${technology.name || techTypeId}`,
+              "success",
+              6000,
+            );
+          } catch (error) {
+            console.error(`Error completing research in ${city.name}:`, error);
+            showToastNotification(
+              `Errorea ikerketa amaitzean: ${error.message}`,
+              "error",
+            );
+          }
+          // Limpiar el objeto research
+          city.research = null;
         }
       }
     }
@@ -1930,6 +1947,14 @@
                 city: city.name,
                 message: `IA hiriak eraikinaren ekoizpena amaitu du ${buildingDetails.name || itemId}`,
               });
+
+              // Clear the city's production
+              city.production = {
+                current_item: null,
+                turns_remaining: 0,
+                itemType: null,
+                production_type: null,
+              };
             }
 
             // Clear the city's production regardless of type
@@ -1945,6 +1970,30 @@
             city.production.turns_remaining = 0;
             city.production.itemType = null;
           }
+        }
+      }
+      // --- NUEVO: Procesar investigación (research) para IA ---
+      if (city.research) {
+        city.research.turns_remaining--;
+        if (city.research.turns_remaining <= 0) {
+          try {
+            const techTypeId = city.research.current_technology;
+            const technology = await gameAPI.getTechnologyType(techTypeId);
+            gameData.ia.technologies.push(technology);
+            // Notificación opcional (puedes quitarla si no quieres mostrar nada para IA)
+            // showToastNotification(
+            //   `IA hirian teknologia berria ikertu da: ${technology.name || techTypeId}`,
+            //   "info",
+            //   4000
+            // );
+          } catch (error) {
+            console.error(
+              `Error completing research in AI city ${city.name}:`,
+              error,
+            );
+          }
+          // Limpiar el objeto research
+          city.research = null;
         }
       }
     }
@@ -2007,6 +2056,7 @@
     }
 
     // Process each building
+    debugger
     for (const building of city.buildings) {
       // Get default outcome based on building type if not specified
       const outcome =
@@ -2025,7 +2075,7 @@
             );
           }
           break;
-        case "Gold mine":
+        case "gold mine":
           // Each mine building multiplies its gold outcome by the number of gold tiles
           if (outcome.gold && resourceCounts.gold > 0) {
             const goldGenerated = outcome.gold * resourceCounts.gold;
@@ -2035,7 +2085,7 @@
             );
           }
           break;
-        case "Sawmill":
+        case "sawmill":
           // Each sawmill building multiplies its wood outcome by the number of wood tiles
           if (outcome.wood && resourceCounts.wood > 0) {
             const woodGenerated = outcome.wood * resourceCounts.wood;
@@ -2045,7 +2095,7 @@
             );
           }
           break;
-        case "Iron mine":
+        case "iron mine":
           // Each forge/iron mine building multiplies its iron outcome by the number of iron tiles
           if (outcome.iron && resourceCounts.iron > 0) {
             const ironGenerated = outcome.iron * resourceCounts.iron;
@@ -2055,7 +2105,7 @@
             );
           }
           break;
-        case "Quarry":
+        case "quarry":
           // Each quarry building multiplies its stone outcome by the number of stone tiles
           if (outcome.stone && resourceCounts.stone > 0) {
             const stoneGenerated = outcome.stone * resourceCounts.stone;
@@ -3185,12 +3235,11 @@
               );
 
               if (
-                library &&
-                library.production &&
-                library.production.current_item &&
-                library.production.turns_remaining > 1
+                city &&
+                city.research &&
+                city.production.turns_remaining > 1
               ) {
-                library.production.turns_remaining = 1;
+                city.production.turns_remaining = 1;
                 modifiedCount++;
               }
             }

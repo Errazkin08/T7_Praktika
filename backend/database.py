@@ -1222,7 +1222,6 @@ def get_building_types():
             "turns": 5,
             "technology": "basic",
             "level": 1,
-            "learning": [],
             "cost": {
                 "wood": 70,
                 "stone": 50

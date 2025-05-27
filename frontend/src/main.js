@@ -1,6 +1,6 @@
 import App from './App.svelte';
 import './styles/global.css'; // Import global CSS before any other styles
-import './app.css';
+import './App.css';
 
 // Global scroll fix - ensure we remove map-active class on page loads/refreshes
 if (typeof window !== 'undefined') {
